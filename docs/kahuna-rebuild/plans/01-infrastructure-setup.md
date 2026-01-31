@@ -49,6 +49,7 @@ Create the `@kahuna/shared` package for shared types and utilities.
 ### Files to Create
 
 1. **`packages/shared/package.json`**
+
    ```json
    {
      "name": "@kahuna/shared",
@@ -70,13 +71,16 @@ Create the `@kahuna/shared` package for shared types and utilities.
    }
    ```
 
-2. **`packages/shared/tsconfig.json`** - Extends base (Section 4)
+2. **`packages/shared/tsconfig.json`** - Extends base with `composite: true` (Section 4)
 
 3. **`packages/shared/src/index.ts`**
+
    ```typescript
-   export * from './types.js';
-   export * from './constants.js';
+   export * from "./types";
+   export * from "./constants";
    ```
+
+   **Note:** Uses extensionless imports (bundler resolution). The `.js` extension is NOT needed because shared uses `bundler` moduleResolution.
 
 4. **`packages/shared/src/types.ts`** - Placeholder types
 5. **`packages/shared/src/constants.ts`** - Placeholder constants
@@ -97,6 +101,7 @@ Create the `@kahuna/api` Express backend scaffold.
 ### Files to Create
 
 1. **`apps/api/package.json`**
+
    ```json
    {
      "name": "@kahuna/api",
@@ -124,14 +129,15 @@ Create the `@kahuna/api` Express backend scaffold.
 2. **`apps/api/tsconfig.json`** - NodeNext config (Section 4)
 
 3. **`apps/api/src/index.ts`** - Minimal Express server
+
    ```typescript
-   import express from 'express';
+   import express from "express";
 
    const app = express();
    const PORT = process.env.PORT || 3000;
 
-   app.get('/health', (_req, res) => {
-     res.json({ status: 'ok' });
+   app.get("/health", (_req, res) => {
+     res.json({ status: "ok" });
    });
 
    app.listen(PORT, () => {
@@ -155,6 +161,7 @@ Create the `@kahuna/web` Vite + React frontend scaffold.
 ### Files to Create
 
 1. **`apps/web/package.json`**
+
    ```json
    {
      "name": "@kahuna/web",
@@ -184,16 +191,17 @@ Create the `@kahuna/web` Vite + React frontend scaffold.
 2. **`apps/web/tsconfig.json`** - React config with paths (Section 4)
 
 3. **`apps/web/vite.config.ts`**
+
    ```typescript
-   import react from '@vitejs/plugin-react';
-   import { resolve } from 'path';
-   import { defineConfig } from 'vite';
+   import react from "@vitejs/plugin-react";
+   import { resolve } from "path";
+   import { defineConfig } from "vite";
 
    export default defineConfig({
      plugins: [react()],
      resolve: {
        alias: {
-         '@': resolve(__dirname, './src'),
+         "@": resolve(__dirname, "./src"),
        },
      },
    });
@@ -245,6 +253,57 @@ pnpm clean
 - `pnpm lint` runs Biome with no errors (or only intentional warnings)
 - `pnpm dev` starts both web and api servers
 - Workspace dependencies resolve correctly (`@kahuna/shared` importable from both apps)
+
+---
+
+## Phase 6: TypeScript Project References
+
+Add project references for proper IDE support across workspace packages.
+
+### Files to Create/Modify
+
+1. **`tsconfig.json`** (NEW - root) - Project references for IDE
+
+   ```json
+   {
+     "files": [],
+     "references": [
+       { "path": "packages/shared" },
+       { "path": "apps/api" },
+       { "path": "apps/web" }
+     ]
+   }
+   ```
+
+2. **`packages/shared/tsconfig.json`** - Add `composite: true`
+
+3. **`apps/api/tsconfig.json`** - Add `composite: true` and `references`
+
+4. **`apps/web/tsconfig.json`** - Add `composite: true` and `references`
+
+5. **`packages/shared/src/index.ts`** - Remove `.js` extensions (use bundler resolution)
+   ```typescript
+   export * from "./types";
+   export * from "./constants";
+   ```
+
+### Verification
+
+```bash
+# IDE should now resolve cross-package imports without building
+# Restart TypeScript server in VSCode: Cmd/Ctrl+Shift+P -> "TypeScript: Restart TS Server"
+
+# Verify builds still work
+pnpm build
+pnpm typecheck
+pnpm lint
+```
+
+### Expected Results
+
+- No TypeScript errors in VSCode for cross-package imports
+- `@kahuna/shared` exports resolve in both `apps/api` and `apps/web`
+- IDE "Go to Definition" works across packages
 
 ---
 

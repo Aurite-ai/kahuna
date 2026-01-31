@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+
+# Prisma
+*.db
+*.db-journal
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Cache
+.cache/
+*.tsbuildinfo
+.turbo/
+
+# Temporary
+tmp/
+temp/
+docs/.coding-copilot-prompts/
+docs/internal/

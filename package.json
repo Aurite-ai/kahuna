@@ -1,0 +1,27 @@
+{
+  "name": "kahuna",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:web": "turbo dev --filter @kahuna/web",
+    "dev:api": "turbo dev --filter @kahuna/api",
+    "build": "turbo build",
+    "start": "turbo start",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "clean": "rm -rf apps/*/dist packages/*/dist node_modules/.cache .turbo"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "turbo": "^2.0.0",
+    "typescript": "^5.9.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

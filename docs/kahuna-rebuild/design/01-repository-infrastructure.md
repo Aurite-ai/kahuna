@@ -12,16 +12,16 @@ This document defines the repository infrastructure for the new Kahuna repositor
 
 ## Summary of Decisions
 
-| Area | Decision |
-|------|----------|
-| **Monorepo** | Yes - essential for tRPC type sharing |
-| **Package Manager** | pnpm 9.x with workspaces |
-| **Monorepo Tooling** | pnpm workspaces + minimal Turborepo |
-| **Linting/Formatting** | Biome (replaces ESLint + Prettier) |
-| **App Naming** | `web/` (frontend) and `api/` (backend) |
-| **Package Scope** | `@kahuna/*` |
-| **Shared Packages** | `packages/shared/` initially |
-| **TypeScript** | Simple extends pattern, strict mode |
+| Area                   | Decision                               |
+| ---------------------- | -------------------------------------- |
+| **Monorepo**           | Yes - essential for tRPC type sharing  |
+| **Package Manager**    | pnpm 9.x with workspaces               |
+| **Monorepo Tooling**   | pnpm workspaces + minimal Turborepo    |
+| **Linting/Formatting** | Biome (replaces ESLint + Prettier)     |
+| **App Naming**         | `web/` (frontend) and `api/` (backend) |
+| **Package Scope**      | `@kahuna/*`                            |
+| **Shared Packages**    | `packages/shared/` initially           |
+| **TypeScript**         | Simple extends pattern, strict mode    |
 
 ---
 
@@ -75,8 +75,8 @@ kahuna/
 
 ```yaml
 packages:
-  - 'apps/*'
-  - 'packages/*'
+  - "apps/*"
+  - "packages/*"
 ```
 
 ### Package Naming Convention
@@ -135,6 +135,50 @@ Use `workspace:*` protocol for internal dependencies:
 
 ## 4. TypeScript Configuration
 
+### Architecture: Project References
+
+TypeScript project references enable the IDE to understand cross-package dependencies without requiring a build step. This architecture uses:
+
+- **`tsconfig.base.json`** - Shared compiler options (strict, target, lib, etc.)
+- **`tsconfig.json`** (root) - Project references for IDE navigation
+- **Per-package `tsconfig.json`** - Extends base, adds `composite: true`, references dependencies
+
+```
+┌─────────────────────────────────────────────────┐
+│ tsconfig.json (root)                            │
+│   references: [shared, api, web]                │
+│                                                 │
+│ tsconfig.base.json                              │
+│   compilerOptions only (no references)          │
+│                                                 │
+│ packages/shared/tsconfig.json                   │
+│   extends: base, composite: true                │
+│                                                 │
+│ apps/api/tsconfig.json                          │
+│   extends: base, composite: true                │
+│   references: [shared]                          │
+│                                                 │
+│ apps/web/tsconfig.json                          │
+│   extends: base, composite: true                │
+│   references: [shared]                          │
+└─────────────────────────────────────────────────┘
+```
+
+### Root Config: `tsconfig.json`
+
+```json
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "apps/api" },
+    { "path": "apps/web" }
+  ]
+}
+```
+
+**Note:** `"files": []` prevents the root config from compiling anything - it only defines the project graph.
+
 ### Base Config: `tsconfig.base.json`
 
 ```json
@@ -168,14 +212,18 @@ Use `workspace:*` protocol for internal dependencies:
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "outDir": "./dist",
+    "rootDir": "./src"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [{ "path": "../../packages/shared" }]
 }
 ```
 
@@ -185,12 +233,14 @@ Use `workspace:*` protocol for internal dependencies:
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": true,
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [{ "path": "../../packages/shared" }]
 }
 ```
 
@@ -200,6 +250,7 @@ Use `workspace:*` protocol for internal dependencies:
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": true,
     "outDir": "./dist",
     "rootDir": "./src"
   },
@@ -209,12 +260,26 @@ Use `workspace:*` protocol for internal dependencies:
 
 ### Key Decisions
 
-| Setting | Value | Rationale |
-|---------|-------|-----------|
-| `strict` | `true` | Modern TypeScript standard |
-| `noUncheckedIndexedAccess` | `false` | Matches current codebase, can enable later |
-| `moduleResolution` (web) | `bundler` | Vite handles resolution |
-| `moduleResolution` (api) | `NodeNext` | Native ESM with `.js` extensions |
+| Setting                     | Value      | Rationale                                              |
+| --------------------------- | ---------- | ------------------------------------------------------ |
+| `composite`                 | `true`     | Enables project references for IDE support             |
+| `strict`                    | `true`     | Modern TypeScript standard                             |
+| `noUncheckedIndexedAccess`  | `false`    | Matches current codebase, can enable later             |
+| `moduleResolution` (web)    | `bundler`  | Vite handles resolution                                |
+| `moduleResolution` (api)    | `NodeNext` | Native ESM with `.js` extensions                       |
+| `moduleResolution` (shared) | `bundler`  | Extensionless imports, consumed by both apps via dist/ |
+
+### Import Extensions
+
+With project references, the shared package uses `bundler` resolution (no `.js` extensions):
+
+```typescript
+// packages/shared/src/index.ts
+export * from "./types"; // ✓ bundler resolution
+export * from "./constants"; // ✓ no .js extension needed
+```
+
+Both consumers (api and web) import `@kahuna/shared` through the package.json `exports` field, which resolves to the compiled `dist/` output. This works with both `NodeNext` (api) and `bundler` (web) resolution.
 
 ---
 
@@ -257,13 +322,13 @@ Use `workspace:*` protocol for internal dependencies:
 
 ### Formatting Decisions
 
-| Setting | Value | Rationale |
-|---------|-------|-----------|
-| Line width | 100 | Wider for LLM prompts in code |
-| Quotes | Single | TypeScript convention |
-| Semicolons | Always | Explicit, avoids ASI issues |
-| Trailing commas | `es5` | Objects/arrays only |
-| Indent | 2 spaces | Standard |
+| Setting         | Value    | Rationale                     |
+| --------------- | -------- | ----------------------------- |
+| Line width      | 100      | Wider for LLM prompts in code |
+| Quotes          | Single   | TypeScript convention         |
+| Semicolons      | Always   | Explicit, avoids ASI issues   |
+| Trailing commas | `es5`    | Objects/arrays only           |
+| Indent          | 2 spaces | Standard                      |
 
 ---
 
@@ -430,43 +495,49 @@ AI-powered platform for translating business workflows into automated AI agents.
 ## Quick Start
 
 \`\`\`bash
+
 # Install dependencies
+
 pnpm install
 
 # Set up environment
+
 cp .env.example .env
+
 # Edit .env with your values
 
 # Run database migrations
+
 pnpm --filter @kahuna/api db:migrate
 
 # Start development
+
 pnpm dev
 \`\`\`
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| \`pnpm dev\` | Start all development servers |
-| \`pnpm dev:web\` | Start frontend only |
-| \`pnpm dev:api\` | Start backend only |
-| \`pnpm build\` | Build all packages |
-| \`pnpm start\` | Start production servers |
-| \`pnpm lint\` | Lint codebase |
-| \`pnpm typecheck\` | Type-check all packages |
-| \`pnpm test\` | Run all tests |
+| Command            | Description                   |
+| ------------------ | ----------------------------- |
+| \`pnpm dev\`       | Start all development servers |
+| \`pnpm dev:web\`   | Start frontend only           |
+| \`pnpm dev:api\`   | Start backend only            |
+| \`pnpm build\`     | Build all packages            |
+| \`pnpm start\`     | Start production servers      |
+| \`pnpm lint\`      | Lint codebase                 |
+| \`pnpm typecheck\` | Type-check all packages       |
+| \`pnpm test\`      | Run all tests                 |
 
 ## Project Structure
 
 \`\`\`
 kahuna/
 ├── apps/
-│   ├── web/          # React frontend
-│   └── api/          # Express backend
+│ ├── web/ # React frontend
+│ └── api/ # Express backend
 ├── packages/
-│   └── shared/       # Shared types & utilities
-└── docs/             # Documentation
+│ └── shared/ # Shared types & utilities
+└── docs/ # Documentation
 \`\`\`
 ```
 
