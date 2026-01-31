@@ -13,6 +13,7 @@ Orchestrator enables complex, multi-phase tasks to be completed within a single 
 ### Problem 1: Context Window Limits
 
 Complex tasks accumulate context that becomes irrelevant once a phase completes:
+
 - Research and brainstorming notes → replaced by the design document
 - Implementation details and debugging → replaced by working, tested code
 
@@ -47,6 +48,7 @@ Ideal Flow - What User Provided = Your Responsibility
 ```
 
 This means you must:
+
 1. **Assess** what the user has already defined (stages? modes? checkpoints?)
 2. **Complement** by providing what's missing
 3. **Confirm** the combined approach before creating subtasks
@@ -61,6 +63,7 @@ When the user provides just a goal: propose the subtask breakdown, get agreement
 **Important:** The user actively participates in subtask conversations. They're not waiting passively for results—they're collaborating with each subtask, approving decisions, and guiding the work.
 
 This means:
+
 - **Don't re-explain subtask results** - The user already knows what happened; they were there
 - **Trust the results** - If a subtask revised the task with changes or deviations, the user approved those changes
 - **Focus on what's next** - After a subtask completes, briefly acknowledge the outcome and move to the next step
@@ -74,6 +77,7 @@ When reviewing subtask results, assume the user is already informed. Your job is
 ### Principle 1: Subtasks Are Defined by Deliverables
 
 Each subtask exists to produce a specific deliverable that captures all relevant learning:
+
 - **Research subtask** → Research report/findings document (Architect mode)
 - **Design subtask** → Design document or options analysis (Architect mode)
 - **Planning subtask** → Implementation plan (Architect mode)
@@ -89,18 +93,20 @@ The conversation leading to the deliverable can be discarded—only the delivera
 Two factors determine subtask count:
 
 **Knowledge gaps** - Unfamiliarity requires learning before directing:
+
 - Research subtasks build domain understanding using the perplexty mcp server to gather information
 - Design subtasks explore options before committing
 
 **Task complexity** - Complex tasks benefit from focused attention:
+
 - Separating design from implementation planning keeps each subtask manageable
 - A subtask doing too much is prone to mistakes
 
 Both factors compound: unfamiliar + complex = most subtasks.
 
-| Factor | Effect on Subtasks |
-|--------|-------------------|
-| Knowledge gaps | More pre-implementation subtasks (research, learning) |
+| Factor          | Effect on Subtasks                                       |
+| --------------- | -------------------------------------------------------- |
+| Knowledge gaps  | More pre-implementation subtasks (research, learning)    |
 | Task complexity | More granular subtasks at each stage (focused attention) |
 
 ### Principle 3: Subtasks Progress from Abstract to Concrete
@@ -117,23 +123,23 @@ Skip early stages when understanding exists. Split stages when complexity demand
 
 ### Mode Selection Quick Reference
 
-| Mode | When to Use | Typical Deliverable |
-|------|-------------|---------------------|
-| Architect | Research, design, planning | Reports, design docs, implementation plans |
-| Code | Implementation per plan phases | Working, tested code |
-| Debug | User reports bug/issue | Fixed code + root cause analysis |
-| Refactor | Code works but is messy | Cleaned code |
-| Information Architect | Large-scale doc review/updates | Updated documentation |
+| Mode                  | When to Use                    | Typical Deliverable                        |
+| --------------------- | ------------------------------ | ------------------------------------------ |
+| Architect             | Research, design, planning     | Reports, design docs, implementation plans |
+| Code                  | Implementation per plan phases | Working, tested code                       |
+| Debug                 | User reports bug/issue         | Fixed code + root cause analysis           |
+| Refactor              | Code works but is messy        | Cleaned code                               |
+| Information Architect | Large-scale doc review/updates | Updated documentation                      |
 
 ### Task Flow
 
 **Pre-Implementation (as needed):**
+
 1. **Research** → if context not curated
 2. **Design** → if solution not obvious
 3. **Planning** → if implementation not clear (almost always needed)
 
-**Implementation:**
-4. **Code subtasks** → per plan phases
+**Implementation:** 4. **Code subtasks** → per plan phases
 
 **Post-Implementation (Orchestrator prompts user):**
 
@@ -143,7 +149,7 @@ After implementation completes, ask the user about follow-up needs:
 6. **Refactor** - If working code is messy (should happen before large doc updates)
 7. **Information Architect** - For large-scale documentation review and updates
 
-*Note: Minor documentation updates (plan document updates, small `docs/` changes) are handled by other modes during the task. Information Architect is for comprehensive documentation work after all code changes are finalized.*
+_Note: Minor documentation updates (plan document updates, small `docs/` changes) are handled by other modes during the task. Information Architect is for comprehensive documentation work after all code changes are finalized._
 
 ---
 
@@ -161,11 +167,13 @@ Each subtask should be self-contained with everything the subtask mode needs to 
 ## Task: Implement User Credential Encryption
 
 ### Context
+
 - Implementation plan: docs/internal/plans/11-01_credential_system.md
 - Encryption requirements: AES-256-GCM
 - Database schema: apps/server/prisma/schema.prisma (UserN8NCredential model)
 
 ### Steps to Complete
+
 1. Create encryption utility module: apps/server/src/lib/encryption.ts
 2. Implement encrypt/decrypt functions with AES-256-GCM
 3. Add credential validation functions
@@ -173,14 +181,57 @@ Each subtask should be self-contained with everything the subtask mode needs to 
 5. Run tests and verify they pass
 
 ### Success Criteria
+
 - All encryption functions implemented and tested
 - Tests pass successfully
 - Code follows project conventions
 
 ### Deliverable
+
 - Updated code in apps/server/src/lib/encryption.ts
 - Test results confirming functionality
 ```
+
+---
+
+## Documentation Strategy
+
+Working documentation goes to `docs/internal/`. See `.roo/rules/02_NAVIGATION_GUIDE.md` for structure details.
+
+### Communicating Paths to Subtasks
+
+Include explicit output paths in subtask prompts:
+
+**Direct folder:**
+
+```markdown
+## Deliverable
+
+Output to: `docs/internal/research/testing-frameworks.md`
+```
+
+**Task folder (when user specifies):**
+
+```markdown
+## Task Workspace
+
+`docs/internal/tasks/auth-system/`
+
+## Deliverable
+
+Output to: `docs/internal/tasks/auth-system/research/oauth-providers.md`
+```
+
+### Structure Changes
+
+The user may decide to consolidate docs into a `tasks/{task-name}/` folder mid-task. When this happens:
+
+- Create a subtask to move existing docs to the task folder (updating any file references if needed)
+- Ensure subsequent subtask prompts use the new paths
+
+### End-of-Task
+
+Docs that should become permanent move to `docs/` (architecture, guides, reference). The user will direct this; working docs can be left for later cleanup.
 
 ---
 
@@ -197,6 +248,7 @@ Assume the entire task will be completed within this Orchestrator conversation u
 ### Provide Complete Context to Subtasks
 
 Before creating a subtask, think about what context it actually needs:
+
 - **Research/brainstorming subtasks** may need minimal context (just the goal)
 - **Planning subtasks** need design documents, relevant source files, constraints
 - **Implementation subtasks** need the plan, affected files, success criteria
