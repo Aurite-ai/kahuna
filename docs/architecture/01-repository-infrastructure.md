@@ -556,6 +556,6 @@ kahuna/
 
 ## References
 
-- [Research: Repository Structure](../research/01-repo-structure.md)
-- [Research: TypeScript Tooling](../research/02-typescript-tooling.md)
-- [Current State Summary](../current-state/SUMMARY.md)
+- [Research: Repository Structure](../internal/research/01-repo-structure.md)
+- [Research: TypeScript Tooling](../internal/research/02-typescript-tooling.md)
+- [Current State Summary](../reference/legacy-kahuna/SUMMARY.md)

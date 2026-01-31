@@ -9,14 +9,14 @@ The end goal is to release Kahuna Rebuild ASAP with the following feature set:
 - Static Verifier reviews the output of the vibe code tool (agent code, session, traces) and identifies errors and warnings.
 - Agent Library collects and registers agents throughout the organization, displays verification status, and provides an environment for distribution.
 
-![Kahuna2.png](./new-design-diagram.webp)
+![Kahuna2.png](./assets/product-vision-diagram.webp)
 
 ## Stages
 
 Implementation will occur in 2 stages: first delivering a standard version of Kahuna, then a professional/enterprise version later based on feedback from the standard version.
 
 - Standard version will contain manual collection of business information, basic context translator for most popular tools, static verifier to verify against business information, and agent library to manually register agents and display static verification results.
-    - Standard will be designed for individual users.
+  - Standard will be designed for individual users.
 
 ## Stage 1 - Kahuna Standard
 
@@ -30,7 +30,7 @@ The main value of the standard release is demonstrating how Kahuna can add conte
 2. Add ability to output prompt, rules files, tools files, and config information for vibe code tools: Claude Code, Cursor, Codex.
 3. Create ability to collect output code and tool information (session messages, traces) from vibe code tools (before agent is run).
 4. Create ability to scan the vibe code output and identify if the vibe code tool improved with context.
-    1. Will require inputting output of vibe code tool without Kahuna context.
+   1. Will require inputting output of vibe code tool without Kahuna context.
 5. Create report that Kahuna developers use to improve data collection and context translator.
 
 Using this environment, we will have multiple testers create different agents and push them through to refine the output.
@@ -44,12 +44,12 @@ We will keep the same UI look and feel as Kahuna 1.0 but will update UX to fit t
 
 ### Step 3 - Testing, improvement, release
 
-
 ## Feature Requirements Summary
 
 Based on the sprint breakdown planning, the following features will be built in the new repository:
 
 ### Business Architect Features
+
 - Tool and database capture (carried over from Kahuna 1.0)
 - Workflow creation capabilities
 - Policy/rules input method
@@ -58,28 +58,32 @@ Based on the sprint breakdown planning, the following features will be built in 
 - User prompt input with context parsing from business information
 
 ### Context Translator Features
+
 - Framework to transform business information into context for vibe code tools
 - Support for multiple output targets:
-    - Claude Code
-    - Cursor
-    - Codex
-    - Crew
-    - LangChain/LangGraph
-    - Code-first SDK
+  - Claude Code
+  - Cursor
+  - Codex
+  - Crew
+  - LangChain/LangGraph
+  - Code-first SDK
 - Path for direct specification input to copilot
 
 ### Static Verifier Features
+
 - Capture and storage of vibe code tool output
 - Verification engine to check output against business rules
 - Intelligence layer for rule verification (LLM as judge approach)
 - Report generation for verification results
 
 ### Agent Library Features
+
 - Display agents captured from verifier with verification status
 - Upload capability for agents not built/verified in Kahuna
 - Download/distribution capability for agents (potential GitHub integration)
 
 ### User Experience
+
 - Individual user focus (no team/role onboarding)
 - Multiple projects per user
 - Streamlined modes: Architect and Verifier (formerly Developer Mode)

@@ -2,7 +2,24 @@
 
 ## Overview
 
-TODO
+You are working in the **Kahuna 2.0** repository. Following these rules is CRITICAL for maintaining code quality, consistency, and effective development.
+
+**Kahuna** is a platform that helps non-technical users build AI agents by generating **Vibe Code Kits (VCKs)**—downloadable folders containing everything a coding copilot needs to succeed: copilot configuration, business context, framework rules, and boilerplate code.
+
+**Core Components:**
+
+- **Business Architect** - Collects business information (tools, databases, policies, workflows)
+- **Context Translator** - Transforms business info into VCKs for vibe code tools (Claude Code, Cursor, Codex, etc.)
+- **Static Verifier** - Reviews vibe code output against business rules
+- **Agent Library** - Manages and distributes verified agents
+
+**The Feedback Loop is Central:** Kahuna improves through an empirical feedback loop: user context → VCK generation → agent build → results analysis → learning → better VCKs. This loop is the product's core value and the primary development focus. See `.roo/rules/04_EMPIRICAL_DEVELOPMENT.md` and `.roo/rules/05_FEEDBACK_LOOP_STRATEGY.md` for the development philosophy.
+
+**Technology Stack:** TypeScript/Node.js monorepo (pnpm + Turborepo) with React frontend (Vite), Express + tRPC backend, and PostgreSQL database.
+
+**Development Stage:** Kahuna 2.0 is a complete rebuild from scratch, currently in early infrastructure phase. Backwards compatibility is **never** required. Focus on clean, simple code that enables rapid iteration on the feedback loop. If something isn't working, change it or delete it.
+
+**Note:** Roo's mode system automatically loads the appropriate rules for your current mode (Architect, Code, Debug, etc.). This document contains universal context that applies to all modes
 
 ---
 
