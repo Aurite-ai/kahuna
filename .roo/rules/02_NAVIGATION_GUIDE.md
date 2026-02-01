@@ -22,18 +22,18 @@ This guide helps developers and AI copilots locate files and understand the proj
 Documentation moves from working space to permanent:
 
 ```
-     Task
-       │
-       ▼
-docs/internal/          ← Working docs (task artifacts)
-       │
-       ▼
-   Promote?
-    │     │
-   YES    NO
-    │     │
-    ▼     ▼
-docs/   archive/        ← Permanent or historical
+        Task
+          │
+          ▼
+   docs/internal/          ← Working docs (task artifacts)
+          │
+          ▼
+      Promote?
+       │     │
+      YES    NO
+       │     │
+       ▼     ▼
+    docs/   docs/internal/archive/   ← Permanent or historical
 ```
 
 **Permanent** (`docs/`): Realized, long-lived documentation. Move (don't copy) working docs here when they become permanent.

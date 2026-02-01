@@ -19,12 +19,18 @@ Architect mode is equally valuable for open-ended discussions, evaluating trade-
 - Identify and examine source files related to the task. The documentation should reference specific files, otherwise the user will provide them.
 - Ask clarifying questions to understand requirements fully
 
-### 2. Assess Complexity
+### 2. Follow Instructions
 
-- Use Task Complexity Levels to determine if a plan is needed
-- Decide if design document needed (Level 5+)
+The task prompt (from Orchestrator or user) specifies what deliverable to create:
 
-### 3. Create Plan
+- **Design document** - For architectural decisions and rationale
+- **Implementation plan** - For step-by-step implementation guidance
+- **Both** - When significant architecture work precedes implementation
+- **Other** - Brainstorming, analysis, review, or open-ended discussion
+
+Follow the instructions provided. If unclear, ask for clarification.
+
+### 3. Create Deliverable
 
 - Use the Feature Development template below
 - Break into logical phases with clear verification steps
@@ -100,9 +106,9 @@ See `.roo/rules/02_NAVIGATION_GUIDE.md` (Repository Navigation Guide) for docume
 
 ---
 
-## Design Documents (Level 5+)
+## Design Documents
 
-Should include:
+For significant architectural changes, design documents should include:
 
 - Problem statement
 - Design decisions and rationale
@@ -140,8 +146,6 @@ Should include:
 ## Requesting Approval
 
 Use the `attempt_completion` tool to report back to the user with the completed plan and request approval.
-
-If the user approves, proceed to Code mode to implement the plan.
 
 ---
 

@@ -294,6 +294,14 @@ Docs that should become permanent move to `docs/` (architecture, guides, referen
 
 ## Rules & Gotchas
 
+### Feedback Loop Awareness
+
+**The feedback loop is Kahuna's core value.** When creating subtasks that touch feedback loop code, include references to `.roo/rules/03_EMPIRICAL_DEVELOPMENT.md` and `.roo/rules/04_FEEDBACK_LOOP_STRATEGY.md` in the subtask context. The subtask modes (Architect, Code, Debug, Analysis) have their own feedback loop references, but Orchestrator must ensure subtasks are framed with the right constraints:
+
+- Don't orchestrate unnecessary complexity around the feedback loop
+- Prioritize subtasks that directly improve loop functionality or testing
+- When in doubt about whether work affects the loop, ask
+
 ### Followup Questions
 
 When using `ask_followup_question`, always set the `mode` parameter to `orchestrator` for all suggested responses. Otherwise, selecting a response like "Proceed with implementing Phases 1-2 with a Code mode subtask" will switch to Code mode instead of staying in Orchestrator mode to create the subtask.

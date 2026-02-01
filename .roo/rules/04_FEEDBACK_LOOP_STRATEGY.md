@@ -1,6 +1,6 @@
 # Feedback Loop Strategy
 
-This document describes the strategic approach to building Kahuna's core feedback loop. It complements [04_EMPIRICAL_DEVELOPMENT.md](./04_EMPIRICAL_DEVELOPMENT.md) which explains _why_ we approach development this way.
+This document describes the strategic approach to building Kahuna's core feedback loop. It complements [03_EMPIRICAL_DEVELOPMENT.md](./03_EMPIRICAL_DEVELOPMENT.md) which explains _why_ we approach development this way.
 
 ---
 
@@ -167,7 +167,7 @@ Context window limits mean AI copilots will forget. The feedback loop's design, 
 
 Ask: "Does this relate to the feedback loop?"
 
-- **If yes**: Follow empirical development practices (see 04_EMPIRICAL_DEVELOPMENT.md)
+- **If yes**: Follow empirical development practices (see 03_EMPIRICAL_DEVELOPMENT.md)
 - **If no**: Ensure it won't interfere with loop development, then proceed
 
 ### When Proposing Changes

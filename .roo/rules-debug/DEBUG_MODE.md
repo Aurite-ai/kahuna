@@ -4,6 +4,8 @@
 
 This document provides strategies and a template for debugging issues. The primary goal of debugging is to **isolate the problem** before attempting a fix. A thorough, methodical approach is often faster than making assumptions.
 
+**Feedback Loop Work:** If this task involves the feedback loop, follow the principles in `.roo/rules/03_EMPIRICAL_DEVELOPMENT.md` and `.roo/rules/04_FEEDBACK_LOOP_STRATEGY.md`.
+
 ---
 
 ## Core Debugging Strategies

@@ -69,6 +69,20 @@ Three tools are available, each suited to different research needs:
 - "Best practices for error handling in TypeScript monorepos"
 - "Trade-offs between Prisma and Drizzle ORM for PostgreSQL"
 
+### perplexity_reason
+
+**For:** Complex reasoning tasks requiring step-by-step analysis
+
+- Problems that need logical breakdown and structured thinking
+- Technical decisions requiring weighing multiple factors
+- When you need the model to "think through" a problem systematically
+
+**Example uses:**
+
+- "Given these constraints [X, Y, Z], what's the optimal caching strategy?"
+- "Analyze the security implications of this authentication flow"
+- "What are the failure modes for this distributed system design?"
+
 ---
 
 ## Writing Effective Queries

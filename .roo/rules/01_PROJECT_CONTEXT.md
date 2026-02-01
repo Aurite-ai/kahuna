@@ -13,7 +13,7 @@ You are working in the **Kahuna 2.0** repository. Following these rules is CRITI
 - **Static Verifier** - Reviews vibe code output against business rules
 - **Agent Library** - Manages and distributes verified agents
 
-**The Feedback Loop is Central:** Kahuna improves through an empirical feedback loop: user context → VCK generation → agent build → results analysis → learning → better VCKs. This loop is the product's core value and the primary development focus. See `.roo/rules/04_EMPIRICAL_DEVELOPMENT.md` and `.roo/rules/05_FEEDBACK_LOOP_STRATEGY.md` for the development philosophy.
+**The Feedback Loop is Central:** Kahuna improves through an empirical feedback loop: user context → VCK generation → agent build → results analysis → learning → better VCKs. This loop is the product's core value and the primary development focus. See `.roo/rules/03_EMPIRICAL_DEVELOPMENT.md` and `.roo/rules/04_FEEDBACK_LOOP_STRATEGY.md` for the development philosophy.
 
 **Technology Stack:** TypeScript/Node.js monorepo (pnpm + Turborepo) with React frontend (Vite), Express + tRPC backend, and PostgreSQL database.
 
