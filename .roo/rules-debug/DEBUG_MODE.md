@@ -4,8 +4,6 @@
 
 This document provides strategies and a template for debugging issues. The primary goal of debugging is to **isolate the problem** before attempting a fix. A thorough, methodical approach is often faster than making assumptions.
 
-General workflow phases are in `.roo/rules/03_DEVELOPMENT_WORKFLOW.md`.
-
 ---
 
 ## Core Debugging Strategies
@@ -91,3 +89,4 @@ See `.roo/rules/02_NAVIGATION_GUIDE.md` (Repository Navigation Guide) for docume
 ## Changelog
 
 - v1.0 (YYYY-MM-DD): Initial plan
+```

@@ -19,61 +19,7 @@ You are working in the **Kahuna 2.0** repository. Following these rules is CRITI
 
 **Development Stage:** Kahuna 2.0 is a complete rebuild from scratch, currently in early infrastructure phase. Backwards compatibility is **never** required. Focus on clean, simple code that enables rapid iteration on the feedback loop. If something isn't working, change it or delete it.
 
-**Note:** Roo's mode system automatically loads the appropriate rules for your current mode (Architect, Code, Debug, etc.). This document contains universal context that applies to all modes
-
----
-
-## Task Complexity Levels
-
-Not every task requires a formal plan. Use this guide to determine the appropriate approach:
-
-### Level 1: Simple Question/Command
-
-**Examples:** "What does this function do?", "Show me the test files", "Run the tests"
-
-- **Plan Required:** No
-- **Approach:** Answer directly or execute the command
-- **Documentation:** None needed
-
-### Level 2: Basic Task
-
-**Examples:** Fix a typo, update a comment, add a simple logging statement
-
-- **Plan Required:** No
-- **Approach:** Make the change directly if the solution is obvious
-- **Documentation:** Rarely needed
-
-### Level 3: Standard Task
-
-**Examples:** Add a new method, fix a straightforward bug, update documentation
-
-- **Plan Required:** Recommended but not required
-- **Approach:** May benefit from a simple plan outlining steps
-- **Documentation:** Update relevant docs if needed
-
-### Level 4: Complex Task
-
-**Examples:** Implement a new feature, refactor a module, fix a complex bug
-
-- **Plan Required:** Yes - Implementation Plan
-- **Approach:** Follow full workflow: Discovery → Planning → Implementation
-- **Documentation:** Implementation plan in `docs/internal/plans/`
-
-### Level 5: Complex Task with Design
-
-**Examples:** New architecture component, significant refactoring, API redesign
-
-- **Plan Required:** Yes - Design Document + Implementation Plan
-- **Approach:** Design first, then plan, then implement
-- **Documentation:** Design doc in `docs/architecture/` (or in a different location if requested) + implementation plan
-
-### Level 6: Multiple Related Tasks
-
-**Examples:** Project overhaul, multi-feature implementation, system-wide changes
-
-- **Plan Required:** Yes - Overarching plan + individual task plans
-- **Approach:** Break into sub-tasks, each with its own plan
-- **Documentation:** Project plan + first implementation plan
+**Note:** Roo's mode system automatically loads the appropriate rules for your current mode. This document contains universal context that applies to all modes.
 
 ---
 
@@ -136,16 +82,12 @@ These rules apply to ALL development tasks, regardless of type or mode:
 
 ### Collaboration Practices
 
-- Follow the established workflow phases (see `.roo/rules/03_DEVELOPMENT_WORKFLOW.md`)
-- Create implementation plans for complex tasks (Level 4+)
-- Store plans in `docs/internal/plans/MM-DD_[name].md`
+- Store working documents in `docs/internal/` (see `02_NAVIGATION_GUIDE.md`)
 - Use changelogs within plans to track modifications
 - Communicate proactively about progress, blockers, and questions
 
 ---
 
 ## Remember
-
-**Flexibility is key!** Not every conversation needs a formal plan. Use your judgment based on the task complexity levels above. When in doubt, ask the user for guidance on the appropriate level of formality needed.
 
 The goal is effective collaboration and quality code, not bureaucratic process. These rules exist to help achieve that goal, not hinder it.

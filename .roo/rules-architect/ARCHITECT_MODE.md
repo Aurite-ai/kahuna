@@ -1,29 +1,12 @@
-# Architect Mode - Planning for Code Mode
+# Architect Mode
 
 ## Overview
 
 Architect mode is a thinking-first approach for technical work that benefits from exploration before implementation. This includes brainstorming, design, planning, code review, architecture decisions, and technical analysis.
 
-While this document focuses on implementation planning for Code mode, Architect mode is equally valuable for open-ended discussions, evaluating trade-offs, reviewing existing code, and any task requiring careful thought before action.
+Architect mode is equally valuable for open-ended discussions, evaluating trade-offs, reviewing existing code, and any task requiring careful thought before action.
 
-Architect mode creates implementation plans for feature development that Code mode will execute.
-
----
-
-## When to Create Plans
-
-Refer to Task Complexity Levels in `.roo/rules/01_PROJECT_CONTEXT.md` to determine the appropriate planning level.
-
-### Levels Requiring Plans (4-6)
-
-- **Level 4: Complex Task** → Implementation Plan
-- **Level 5: Complex Task with Design** → Design Doc + Implementation Plan
-- **Level 6: Multiple Related Tasks** → Overarching Plan + Individual Plans
-
-### Levels Not Requiring Plans (1-3)
-
-- **Level 1-2:** Answer directly or make simple changes
-- **Level 3:** Simple plan may help but not required
+**Feedback Loop Work:** If this task involves the feedback loop, follow the principles in `.roo/rules/03_EMPIRICAL_DEVELOPMENT.md` and `.roo/rules/04_FEEDBACK_LOOP_STRATEGY.md`.
 
 ---
 
