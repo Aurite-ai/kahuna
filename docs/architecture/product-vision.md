@@ -1,90 +1,116 @@
-# Kahuna Rebuild Implementation Plan
+# Kahuna Product Vision
 
 ## Goal
 
-The end goal is to release Kahuna Rebuild ASAP with the following feature set:
+Release Kahuna 2.0 with the following core capabilities:
 
-- Business Architect collects business information using manual and automated methods.
-- Context Translator uses business information, user prompts, and intelligence to generate prompts for vibe code tools.
-- Static Verifier reviews the output of the vibe code tool (agent code, session, traces) and identifies errors and warnings.
-- Agent Library collects and registers agents throughout the organization, displays verification status, and provides an environment for distribution.
+- **Business Architect** - Collects business information using manual and automated methods
+- **Context Translator** - Transforms business information, user prompts, and intelligence into prompts for vibe code tools
+- **Static Verifier** - Reviews vibe code output (agent code, session, traces) and identifies errors and warnings
+- **Agent Library** - Collects and registers agents throughout the organization, displays verification status, and provides distribution
 
 ![Kahuna2.png](./assets/product-vision-diagram.webp)
 
-## Stages
+## Release Strategy
 
-Implementation will occur in 2 stages: first delivering a standard version of Kahuna, then a professional/enterprise version later based on feedback from the standard version.
+Implementation occurs in two stages:
 
-- Standard version will contain manual collection of business information, basic context translator for most popular tools, static verifier to verify against business information, and agent library to manually register agents and display static verification results.
-  - Standard will be designed for individual users.
+1. **Standard Version** - Manual business information collection, basic context translator for popular tools, static verification against business information, and agent library for manual registration with verification results. Designed for individual users.
 
-## Stage 1 - Kahuna Standard
+2. **Professional/Enterprise Version** - Built later based on Standard version feedback.
 
-The goal for the Standard version of Kahuna is to get a product out ASAP that provides the functionality of adding business context to vibe code tools. This release will show the value of this context in creating better agents in less time and demonstrate the potential for enterprise leaders to address security, policy, and cost issues of using vibe code tools with Kahuna.
+---
 
-### Step 1 - Build a context translator testing environment
+## Stage 1: Kahuna Standard
 
-The main value of the standard release is demonstrating how Kahuna can add context to vibe code tools to make them produce better agents. To do this, we need to refine the context translator to output the best prompts, rules, and config files possible based on the business information collected. The feedback loop—from capturing business information, to creating vibe code prompts, rules, and configs, to analyzing the output from the vibe code tool, and feeding back results so the translator can be improved—will produce better and better agents. This feedback system will be the heart of Kahuna and is the first area of focus.
+The Standard version demonstrates how adding business context to vibe code tools produces better agents faster. This release shows value to individual users while demonstrating potential for enterprise leaders to address security, policy, and cost concerns.
 
-1. Add ability to manually input policy/rules into Business Architect.
-2. Add ability to output prompt, rules files, tools files, and config information for vibe code tools: Claude Code, Cursor, Codex.
-3. Create ability to collect output code and tool information (session messages, traces) from vibe code tools (before agent is run).
-4. Create ability to scan the vibe code output and identify if the vibe code tool improved with context.
-   1. Will require inputting output of vibe code tool without Kahuna context.
-5. Create report that Kahuna developers use to improve data collection and context translator.
+### Step 1: Build Context Translator Testing Environment
 
-Using this environment, we will have multiple testers create different agents and push them through to refine the output.
+The feedback loop is Kahuna's core value: capture business information → create vibe code prompts/rules/configs → analyze output → improve the translator. This cycle produces progressively better agents and is the first area of focus.
 
-### Step 2 - Update UX experience for standard version
+**Deliverables:**
 
-We will keep the same UI look and feel as Kahuna 1.0 but will update UX to fit the new workflow.
+1. Manual policy/rules input in Business Architect
+2. Output generation for vibe code tools (Claude Code, Cursor, Codex):
+   - Prompts
+   - Rules files
+   - Tools files
+   - Config information
+3. Collection of vibe code output (code and tool information: session messages, traces) before agent execution
+4. Scanning capability to identify if vibe code output improved with Kahuna context
+   - Requires baseline: vibe code output without Kahuna context
+5. Developer report for improving data collection and context translator
 
-1. Architect mode - Keep tool and database capture, keep create workflows, add policy capture, add prompt download, add user prompt input in place of workflows on main dashboard.
-2. Developer Mode - Becomes verifier; dashboard should facilitate capturing output of vibe code tool for an agent (and store), with a button to run verification of the output to generate a report. Should show path to Dynamic Verifier (under construction).
+**Validation:** Multiple testers create different agents and push them through the system to refine output quality.
 
-### Step 3 - Testing, improvement, release
+### Step 2: Update UX for Standard Version
+
+Retain Kahuna 1.0 look and feel while updating UX for the new workflow.
+
+**Architect Mode:**
+
+- Keep tool and database capture
+- Keep workflow creation
+- Add policy capture
+- Add prompt download
+- Replace workflows on main dashboard with user prompt input
+
+**Verifier Mode (formerly Developer Mode):**
+
+- Dashboard for capturing and storing vibe code output per agent
+- Button to run verification and generate report
+- Clear indication of future Dynamic Verifier capability
+
+### Step 3: Testing, Improvement, Release
+
+Final testing cycle and release preparation.
+
+---
 
 ## Feature Requirements Summary
 
-Based on the sprint breakdown planning, the following features will be built in the new repository:
+### Business Architect
 
-### Business Architect Features
+| Feature               | Description                                                                 |
+| --------------------- | --------------------------------------------------------------------------- |
+| Tool/database capture | Carried over from Kahuna 1.0                                                |
+| Workflow creation     | Create and manage workflows                                                 |
+| Policy/rules input    | Manual entry of business policies                                           |
+| Import/export         | Download and upload business information                                    |
+| Connectivity checks   | Authorization and connectivity validation for business information elements |
+| User prompt input     | Context parsing from business information                                   |
 
-- Tool and database capture (carried over from Kahuna 1.0)
-- Workflow creation capabilities
-- Policy/rules input method
-- Business information download/upload
-- Authorization and connectivity checks for business information elements
-- User prompt input with context parsing from business information
+### Context Translator
 
-### Context Translator Features
+| Feature                   | Description                                                           |
+| ------------------------- | --------------------------------------------------------------------- |
+| Transformation framework  | Convert business information into vibe code tool context              |
+| Multi-target output       | Claude Code, Cursor, Codex, Crew, LangChain/LangGraph, Code-first SDK |
+| Direct specification path | Input specifications directly to copilot                              |
 
-- Framework to transform business information into context for vibe code tools
-- Support for multiple output targets:
-  - Claude Code
-  - Cursor
-  - Codex
-  - Crew
-  - LangChain/LangGraph
-  - Code-first SDK
-- Path for direct specification input to copilot
+### Static Verifier
 
-### Static Verifier Features
+| Feature             | Description                                 |
+| ------------------- | ------------------------------------------- |
+| Output capture      | Store vibe code tool output                 |
+| Verification engine | Check output against business rules         |
+| Intelligence layer  | LLM-as-judge approach for rule verification |
+| Report generation   | Verification results reporting              |
 
-- Capture and storage of vibe code tool output
-- Verification engine to check output against business rules
-- Intelligence layer for rule verification (LLM as judge approach)
-- Report generation for verification results
+### Agent Library
 
-### Agent Library Features
-
-- Display agents captured from verifier with verification status
-- Upload capability for agents not built/verified in Kahuna
-- Download/distribution capability for agents (potential GitHub integration)
+| Feature           | Description                                        |
+| ----------------- | -------------------------------------------------- |
+| Agent display     | Show agents from verifier with verification status |
+| Upload capability | Add agents not built/verified in Kahuna            |
+| Distribution      | Download agents (potential GitHub integration)     |
 
 ### User Experience
 
-- Individual user focus (no team/role onboarding)
-- Multiple projects per user
-- Streamlined modes: Architect and Verifier (formerly Developer Mode)
-- Clear path indication to future Dynamic Verifier capability
+| Aspect            | Design                                     |
+| ----------------- | ------------------------------------------ |
+| User focus        | Individual users (no team/role onboarding) |
+| Project structure | Multiple projects per user                 |
+| Modes             | Architect and Verifier (streamlined)       |
+| Future capability | Clear path to Dynamic Verifier             |
