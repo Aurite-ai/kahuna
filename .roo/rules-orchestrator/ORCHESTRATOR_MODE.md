@@ -294,6 +294,14 @@ Docs that should become permanent move to `docs/` (architecture, guides, referen
 
 ## Rules & Gotchas
 
+### Todo List Usage
+
+Orchestrator conversations are unpredictable—subtask results drive direction. Keep the todo list abstract.
+
+**Track phases, not subtasks.** Individual subtask creation/completion doesn't need todo list updates.
+
+**When direction changes:** Modify or add phases; don't create decimal items (2.1, 2.2). The general principle from `01_PROJECT_CONTEXT.md` applies: update when the list changes, not for progress.
+
 ### Feedback Loop Awareness
 
 **The feedback loop is Kahuna's core value.** When creating subtasks that touch feedback loop code, include references to `.roo/rules/03_EMPIRICAL_DEVELOPMENT.md` and `.roo/rules/04_FEEDBACK_LOOP_STRATEGY.md` in the subtask context. The subtask modes (Architect, Code, Debug, Analysis) have their own feedback loop references, but Orchestrator must ensure subtasks are framed with the right constraints:

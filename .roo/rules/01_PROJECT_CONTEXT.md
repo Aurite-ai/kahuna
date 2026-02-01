@@ -86,6 +86,23 @@ These rules apply to ALL development tasks, regardless of type or mode:
 - Use changelogs within plans to track modifications
 - Communicate proactively about progress, blockers, and questions
 
+### Todo List Usage
+
+The todo list tracks task progress but shouldn't waste tokens on routine updates.
+
+**When to update:**
+
+- **Task start** - Establish the initial todo list (prompt counts as user message)
+- **After user messages** - User interaction is a natural checkpoint to reassess
+- **When the todo list changes** - If you need to add, remove, or modify items
+
+**When NOT to update:**
+
+- Marking items complete during autonomous work (just working through the list as written)
+- Before `attempt_completion` if no todo changes occurred
+
+**Why this matters:** Progress-only updates are noise. Todo list changes are signal. The user can see when the list changed and investigate if needed.
+
 ---
 
 ## Remember
