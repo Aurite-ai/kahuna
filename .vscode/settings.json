@@ -3,5 +3,13 @@
   "editor.defaultFormatter": "biomejs.biome",
   "editor.codeActionsOnSave": {
     "source.organizeImports.biome": "explicit"
+  },
+  "explorer.fileNesting.patterns": {
+    "package.json": "package-lock.json, pnpm-lock.yaml, yarn.lock, index.html, components.json, biome.json",
+    ".env": ".env.*, !.env.local, !.env.*.local",
+    "vite.config.ts": "vite.config.*.ts, vite.config.*.mts, eslint*, prettier*, tsconfig*",
+    "Dockerfile": "docker-compose*.yml, Dockerfile.*, docker-entrypoint.sh, railway.toml, .dockerignore",
+    ".gitignore": ".eslintignore, .prettierignore, .dockerignore, .rooignore",
+    "pnpm-workspace.yaml": "turbo.json, .npmrc, .prettierrc, knip.json"
   }
 }
