@@ -540,7 +540,7 @@ import { prisma } from '../db.js';
 
 | Variable         | Purpose                   | Example                             |
 | ---------------- | ------------------------- | ----------------------------------- |
-| `DATABASE_URL`   | PostgreSQL connection     | `postgresql://user:pass@host/db`    |
+| `DATABASE_URL`   | SQLite database file      | `file:./dev.db`                     |
 | `SESSION_SECRET` | Cookie signing key        | 64+ character random string         |
 | `NODE_ENV`       | Environment mode          | `development`, `test`, `production` |
 | `CORS_ORIGIN`    | Allowed frontend origin   | `http://localhost:5173`             |
