@@ -70,6 +70,7 @@ export const contextRouter = router({
       },
     });
 
+    ctx.logger.info({ contextFileId: contextFile.id, projectId: input.projectId }, 'Context file created');
     return contextFile;
   }),
 
@@ -170,6 +171,7 @@ export const contextRouter = router({
       data: updateData,
     });
 
+    ctx.logger.info({ contextFileId: updated.id }, 'Context file updated');
     return updated;
   }),
 
@@ -206,6 +208,7 @@ export const contextRouter = router({
         where: { id: input.id },
       });
 
+      ctx.logger.info({ contextFileId: input.id }, 'Context file deleted');
       return { success: true };
     }),
 });

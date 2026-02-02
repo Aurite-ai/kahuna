@@ -1,7 +1,9 @@
 import type { User } from '@prisma/client';
 import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
+import type { Logger } from 'pino';
 import { prisma } from '../db.js';
 import { validateSession } from '../lib/auth.js';
+import { logger } from '../lib/logger.js';
 
 /**
  * Context available to all tRPC procedures.
@@ -17,6 +19,8 @@ export interface Context {
   user: User | null;
   /** True if this context was created via test auth bypass */
   isTestContext: boolean;
+  /** Pino logger instance for structured logging */
+  logger: Logger;
 }
 
 /**
@@ -43,6 +47,7 @@ export async function createContext({ req }: CreateExpressContextOptions): Promi
       prisma,
       user: testUser,
       isTestContext: true,
+      logger,
     };
   }
 
@@ -59,6 +64,7 @@ export async function createContext({ req }: CreateExpressContextOptions): Promi
     prisma,
     user,
     isTestContext: false,
+    logger,
   };
 }
 

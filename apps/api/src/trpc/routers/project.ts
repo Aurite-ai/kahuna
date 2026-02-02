@@ -38,6 +38,7 @@ export const projectRouter = router({
       },
     });
 
+    ctx.logger.info({ projectId: project.id, userId: ctx.user.id }, 'Project created');
     return project;
   }),
 
@@ -125,6 +126,7 @@ export const projectRouter = router({
       data: updateData,
     });
 
+    ctx.logger.info({ projectId: project.id }, 'Project updated');
     return project;
   }),
 
@@ -160,6 +162,7 @@ export const projectRouter = router({
         where: { id: input.id },
       });
 
+      ctx.logger.info({ projectId: input.id }, 'Project deleted');
       return { success: true };
     }),
 });

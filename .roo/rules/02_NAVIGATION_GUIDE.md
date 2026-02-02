@@ -61,6 +61,7 @@ docs/
 | `02-feedback-loop-architecture.md`  | Data flow, entities, VCK structure, API endpoints |
 | `03-foundational-infrastructure.md` | Auth, middleware, tRPC setup, session management  |
 | `04-system-boundaries.md`           | Infrastructure/loop separation, design principles |
+| `05-frontend-architecture.md`        | React structure, state management, routing       |
 | `product-vision.md`                 | High-level product goals and features             |
 
 ### Working (`docs/internal/`)

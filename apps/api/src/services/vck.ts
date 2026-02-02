@@ -11,6 +11,7 @@ import type { VCK } from '@kahuna/shared';
 import { generateVCK } from '@kahuna/vck-templates';
 import type { PrismaClient } from '@prisma/client';
 import archiver from 'archiver';
+import { logger } from '../lib/logger.js';
 
 /**
  * Options for VCK generation.
@@ -62,6 +63,8 @@ export async function generateProjectVCK(
   options: GenerateVCKOptions = {}
 ): Promise<GenerateVCKResult> {
   const { framework = 'langgraph', copilot = 'claude-code' } = options;
+
+  logger.info({ projectId, framework, copilot }, 'Generating VCK');
 
   // Fetch project with context files
   const project = await prisma.project.findUnique({
@@ -199,6 +202,8 @@ export async function generateVCKZip(
   userId: string,
   options: GenerateVCKOptions = {}
 ): Promise<archiver.Archiver> {
+  logger.info({ projectId }, 'Generating VCK ZIP download');
+
   // 1. Generate VCK using existing function
   const { vck } = await generateProjectVCK(prisma, projectId, userId, options);
 

@@ -41,6 +41,10 @@ export const vckRouter = router({
         }
       );
 
+      ctx.logger.info(
+        { generationId: result.generation.id, projectId: input.projectId },
+        'VCK generated'
+      );
       return {
         vck: result.vck,
         generationId: result.generation.id,

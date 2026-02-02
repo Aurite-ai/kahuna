@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { logger } from '../lib/logger.js';
 
 /**
  * Custom error class for HTTP errors with status codes.
@@ -23,16 +24,12 @@ export function errorMiddleware(
   res: Response,
   _next: NextFunction
 ): void {
-  // Log the error
-  console.error(
-    JSON.stringify({
-      timestamp: new Date().toISOString(),
-      error: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-      path: req.path,
-      method: req.method,
-    })
-  );
+  // Log the error - pino serializes Error objects automatically
+  logger.error({
+    err,
+    path: req.path,
+    method: req.method,
+  });
 
   // Determine status code
   const statusCode = err instanceof HttpError ? err.statusCode : 500;
