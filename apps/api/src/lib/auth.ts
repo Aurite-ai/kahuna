@@ -1,6 +1,6 @@
-import bcrypt from "bcrypt";
-import type { Response } from "express";
-import { prisma } from "../db.js";
+import bcrypt from 'bcrypt';
+import type { Response } from 'express';
+import { prisma } from '../db.js';
 
 // Session expires in 7 days
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -15,8 +15,8 @@ const BCRYPT_ROUNDS = 12;
  */
 export const sessionCookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
   maxAge: SESSION_MAX_AGE_MS,
   signed: true,
 };
@@ -31,10 +31,7 @@ export async function hashPassword(password: string): Promise<string> {
 /**
  * Verify a password against a bcrypt hash.
  */
-export async function verifyPassword(
-  password: string,
-  hash: string,
-): Promise<boolean> {
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
 
@@ -84,12 +81,12 @@ export async function deleteSession(sessionId: string): Promise<void> {
  * Set the session cookie on a response.
  */
 export function setSessionCookie(res: Response, sessionId: string): void {
-  res.cookie("kahuna.sid", sessionId, sessionCookieOptions);
+  res.cookie('kahuna.sid', sessionId, sessionCookieOptions);
 }
 
 /**
  * Clear the session cookie from a response.
  */
 export function clearSessionCookie(res: Response): void {
-  res.clearCookie("kahuna.sid");
+  res.clearCookie('kahuna.sid');
 }

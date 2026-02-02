@@ -1,8 +1,8 @@
-import type { User } from "@prisma/client";
-import type { NextFunction, Request, Response } from "express";
-import { prisma } from "../db.js";
-import { validateSession } from "../lib/auth.js";
-import { HttpError } from "./error.js";
+import type { User } from '@prisma/client';
+import type { NextFunction, Request, Response } from 'express';
+import { prisma } from '../db.js';
+import { validateSession } from '../lib/auth.js';
+import { HttpError } from './error.js';
 
 // Extend Express Request type to include user
 declare global {
@@ -22,15 +22,11 @@ declare global {
  * In test environment (NODE_ENV=test), allows bypassing auth via X-Test-User-Id header.
  * This enables automated testing without simulating browser sessions.
  */
-export async function requireAuth(
-  req: Request,
-  _res: Response,
-  next: NextFunction,
-): Promise<void> {
+export async function requireAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
   try {
     // Test bypass: Check for test user header in test environment
-    if (process.env.NODE_ENV === "test" && req.headers["x-test-user-id"]) {
-      const testUserId = req.headers["x-test-user-id"] as string;
+    if (process.env.NODE_ENV === 'test' && req.headers['x-test-user-id']) {
+      const testUserId = req.headers['x-test-user-id'] as string;
       const testUser = await prisma.user.findUnique({
         where: { id: testUserId },
       });
@@ -45,16 +41,16 @@ export async function requireAuth(
     }
 
     // Normal auth: Check session cookie
-    const sessionId = req.signedCookies?.["kahuna.sid"];
+    const sessionId = req.signedCookies?.['kahuna.sid'];
 
     if (!sessionId) {
-      throw new HttpError(401, "Authentication required");
+      throw new HttpError(401, 'Authentication required');
     }
 
     const user = await validateSession(sessionId);
 
     if (!user) {
-      throw new HttpError(401, "Invalid or expired session");
+      throw new HttpError(401, 'Invalid or expired session');
     }
 
     req.user = user;
@@ -72,12 +68,12 @@ export async function requireAuth(
 export async function optionalAuth(
   req: Request,
   _res: Response,
-  next: NextFunction,
+  next: NextFunction
 ): Promise<void> {
   try {
     // Test bypass
-    if (process.env.NODE_ENV === "test" && req.headers["x-test-user-id"]) {
-      const testUserId = req.headers["x-test-user-id"] as string;
+    if (process.env.NODE_ENV === 'test' && req.headers['x-test-user-id']) {
+      const testUserId = req.headers['x-test-user-id'] as string;
       const testUser = await prisma.user.findUnique({
         where: { id: testUserId },
       });
@@ -91,7 +87,7 @@ export async function optionalAuth(
     }
 
     // Normal auth - try to get user from session if present
-    const sessionId = req.signedCookies?.["kahuna.sid"];
+    const sessionId = req.signedCookies?.['kahuna.sid'];
 
     if (sessionId) {
       const user = await validateSession(sessionId);

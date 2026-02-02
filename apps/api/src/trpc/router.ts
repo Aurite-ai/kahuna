@@ -1,4 +1,4 @@
-import { publicProcedure, router } from "./trpc.js";
+import { publicProcedure, router } from './trpc.js';
 
 /**
  * Health check router - provides a simple endpoint for verifying tRPC is working.
@@ -10,7 +10,7 @@ const healthRouter = router({
    */
   ping: publicProcedure.query(() => {
     return {
-      status: "ok",
+      status: 'ok',
       timestamp: new Date().toISOString(),
     };
   }),

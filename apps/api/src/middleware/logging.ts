@@ -1,20 +1,16 @@
-import type { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, Response } from 'express';
 
 /**
  * Request logging middleware.
  * Logs JSON-formatted request information on response completion.
  */
-export function loggingMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
+export function loggingMiddleware(req: Request, res: Response, next: NextFunction): void {
   const start = Date.now();
 
-  res.on("finish", () => {
+  res.on('finish', () => {
     const duration = Date.now() - start;
     // userId comes from the session if attached by auth middleware
-    const userId = (req as Request & { userId?: string }).userId ?? "anonymous";
+    const userId = (req as Request & { userId?: string }).userId ?? 'anonymous';
 
     console.log(
       JSON.stringify({
@@ -24,7 +20,7 @@ export function loggingMiddleware(
         status: res.statusCode,
         duration,
         userId,
-      }),
+      })
     );
   });
   next();

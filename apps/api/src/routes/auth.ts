@@ -1,6 +1,6 @@
-import { Router } from "express";
-import type { IRouter } from "express";
-import { prisma } from "../db.js";
+import { Router } from 'express';
+import type { IRouter } from 'express';
+import { prisma } from '../db.js';
 import {
   clearSessionCookie,
   createSession,
@@ -8,9 +8,9 @@ import {
   hashPassword,
   setSessionCookie,
   verifyPassword,
-} from "../lib/auth.js";
-import { requireAuth } from "../middleware/auth.js";
-import { HttpError } from "../middleware/error.js";
+} from '../lib/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { HttpError } from '../middleware/error.js';
 
 export const authRouter: IRouter = Router();
 
@@ -18,25 +18,25 @@ export const authRouter: IRouter = Router();
  * POST /api/auth/register
  * Create a new user account and start a session.
  */
-authRouter.post("/register", async (req, res, next) => {
+authRouter.post('/register', async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
     // Basic validation
-    if (!email || typeof email !== "string") {
-      throw new HttpError(400, "Email is required");
+    if (!email || typeof email !== 'string') {
+      throw new HttpError(400, 'Email is required');
     }
-    if (!password || typeof password !== "string") {
-      throw new HttpError(400, "Password is required");
+    if (!password || typeof password !== 'string') {
+      throw new HttpError(400, 'Password is required');
     }
     if (password.length < 8) {
-      throw new HttpError(400, "Password must be at least 8 characters");
+      throw new HttpError(400, 'Password must be at least 8 characters');
     }
 
     // Check if user already exists
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      throw new HttpError(409, "Email already registered");
+      throw new HttpError(409, 'Email already registered');
     }
 
     // Create user with hashed password
@@ -68,28 +68,28 @@ authRouter.post("/register", async (req, res, next) => {
  * POST /api/auth/login
  * Authenticate with email and password, start a session.
  */
-authRouter.post("/login", async (req, res, next) => {
+authRouter.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
     // Basic validation
-    if (!email || typeof email !== "string") {
-      throw new HttpError(400, "Email is required");
+    if (!email || typeof email !== 'string') {
+      throw new HttpError(400, 'Email is required');
     }
-    if (!password || typeof password !== "string") {
-      throw new HttpError(400, "Password is required");
+    if (!password || typeof password !== 'string') {
+      throw new HttpError(400, 'Password is required');
     }
 
     // Find user
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      throw new HttpError(401, "Invalid credentials");
+      throw new HttpError(401, 'Invalid credentials');
     }
 
     // Verify password
     const validPassword = await verifyPassword(password, user.password);
     if (!validPassword) {
-      throw new HttpError(401, "Invalid credentials");
+      throw new HttpError(401, 'Invalid credentials');
     }
 
     // Create session and set cookie
@@ -112,9 +112,9 @@ authRouter.post("/login", async (req, res, next) => {
  * POST /api/auth/logout
  * End the current session and clear the cookie.
  */
-authRouter.post("/logout", async (req, res, next) => {
+authRouter.post('/logout', async (req, res, next) => {
   try {
-    const sessionId = req.signedCookies?.["kahuna.sid"];
+    const sessionId = req.signedCookies?.['kahuna.sid'];
 
     if (sessionId) {
       await deleteSession(sessionId);
@@ -133,12 +133,12 @@ authRouter.post("/logout", async (req, res, next) => {
  * Get the current authenticated user.
  * Requires authentication.
  */
-authRouter.get("/me", requireAuth, (req, res) => {
+authRouter.get('/me', requireAuth, (req, res) => {
   // User is guaranteed to exist after requireAuth middleware
   const user = req.user;
   if (!user) {
     // This should never happen after requireAuth, but satisfies TypeScript
-    res.status(401).json({ error: "Not authenticated" });
+    res.status(401).json({ error: 'Not authenticated' });
     return;
   }
 

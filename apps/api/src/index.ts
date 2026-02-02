@@ -1,16 +1,16 @@
-import "dotenv/config";
-import { app } from "./app.js";
+import 'dotenv/config';
+import { app } from './app.js';
 
 const PORT = process.env.PORT || 3000;
 
 // Validate required environment variables
 if (!process.env.SESSION_SECRET) {
-  console.error("ERROR: SESSION_SECRET environment variable is required");
-  console.error("Generate one with: openssl rand -base64 48");
+  console.error('ERROR: SESSION_SECRET environment variable is required');
+  console.error('Generate one with: openssl rand -base64 48');
   process.exit(1);
 }
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });

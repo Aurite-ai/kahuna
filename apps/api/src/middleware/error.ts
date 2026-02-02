@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, Response } from 'express';
 
 /**
  * Custom error class for HTTP errors with status codes.
@@ -6,10 +6,10 @@ import type { NextFunction, Request, Response } from "express";
 export class HttpError extends Error {
   constructor(
     public statusCode: number,
-    message: string,
+    message: string
   ) {
     super(message);
-    this.name = "HttpError";
+    this.name = 'HttpError';
   }
 }
 
@@ -21,17 +21,17 @@ export function errorMiddleware(
   err: Error,
   req: Request,
   res: Response,
-  _next: NextFunction,
+  _next: NextFunction
 ): void {
   // Log the error
   console.error(
     JSON.stringify({
       timestamp: new Date().toISOString(),
       error: err.message,
-      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
       path: req.path,
       method: req.method,
-    }),
+    })
   );
 
   // Determine status code
@@ -39,9 +39,9 @@ export function errorMiddleware(
 
   // Don't leak error details in production
   const message =
-    process.env.NODE_ENV === "development" || err instanceof HttpError
+    process.env.NODE_ENV === 'development' || err instanceof HttpError
       ? err.message
-      : "Internal server error";
+      : 'Internal server error';
 
   res.status(statusCode).json({ error: message });
 }

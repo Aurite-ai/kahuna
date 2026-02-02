@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@kahuna/shared": "workspace:*",
+    "@kahuna/vck-templates": "workspace:*",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.0.0",
     "@trpc/server": "^11.9.0",

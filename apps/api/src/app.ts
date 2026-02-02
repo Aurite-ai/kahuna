@@ -1,12 +1,12 @@
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import cors from "cors";
-import express from "express";
-import type { Express } from "express";
-import { cookieMiddleware } from "./middleware/cookies.js";
-import { errorMiddleware } from "./middleware/error.js";
-import { loggingMiddleware } from "./middleware/logging.js";
-import { authRouter } from "./routes/auth.js";
-import { appRouter, createContext } from "./trpc/index.js";
+import { createExpressMiddleware } from '@trpc/server/adapters/express';
+import cors from 'cors';
+import express from 'express';
+import type { Express } from 'express';
+import { cookieMiddleware } from './middleware/cookies.js';
+import { errorMiddleware } from './middleware/error.js';
+import { loggingMiddleware } from './middleware/logging.js';
+import { authRouter } from './routes/auth.js';
+import { appRouter, createContext } from './trpc/index.js';
 
 const app: Express = express();
 
@@ -17,9 +17,9 @@ const app: Express = express();
 // CORS - allow credentials for cookie-based auth
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
     credentials: true,
-  }),
+  })
 );
 
 // Parse JSON request bodies
@@ -36,20 +36,20 @@ app.use(loggingMiddleware);
 // =============================================================================
 
 // Health check endpoint
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Auth routes (outside tRPC for direct cookie handling)
-app.use("/api/auth", authRouter);
+app.use('/api/auth', authRouter);
 
 // tRPC API - type-safe RPC endpoints
 app.use(
-  "/api/trpc",
+  '/api/trpc',
   createExpressMiddleware({
     router: appRouter,
     createContext,
-  }),
+  })
 );
 
 // =============================================================================

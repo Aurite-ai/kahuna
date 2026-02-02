@@ -1,7 +1,7 @@
-import type { User } from "@prisma/client";
-import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import { prisma } from "../db.js";
-import { validateSession } from "../lib/auth.js";
+import type { User } from '@prisma/client';
+import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
+import { prisma } from '../db.js';
+import { validateSession } from '../lib/auth.js';
 
 /**
  * Context available to all tRPC procedures.
@@ -29,13 +29,11 @@ export interface Context {
  * The test bypass enables programmatic testing of the feedback loop
  * without requiring browser session management.
  */
-export async function createContext({
-  req,
-}: CreateExpressContextOptions): Promise<Context> {
+export async function createContext({ req }: CreateExpressContextOptions): Promise<Context> {
   // Test auth bypass: allows programmatic testing with header-based auth
   // Only available when NODE_ENV=test
-  if (process.env.NODE_ENV === "test" && req.headers["x-test-user-id"]) {
-    const testUserId = req.headers["x-test-user-id"] as string;
+  if (process.env.NODE_ENV === 'test' && req.headers['x-test-user-id']) {
+    const testUserId = req.headers['x-test-user-id'] as string;
     const testUser = await prisma.user.findUnique({
       where: { id: testUserId },
     });
@@ -49,7 +47,7 @@ export async function createContext({
 
   // Normal session-based authentication
   // Read session ID from signed cookie and validate against database
-  const sessionId = req.signedCookies?.["kahuna.sid"];
+  const sessionId = req.signedCookies?.['kahuna.sid'];
   let user: User | null = null;
 
   if (sessionId) {

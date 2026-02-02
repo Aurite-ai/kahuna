@@ -23,12 +23,18 @@ importers:
       '@kahuna/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@kahuna/vck-templates':
+        specifier: workspace:*
+        version: link:../../packages/vck-templates
       '@prisma/adapter-pg':
         specifier: ^7.3.0
         version: 7.3.0
       '@prisma/client':
         specifier: ^7.0.0
         version: 7.3.0(prisma@7.3.0(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3))(typescript@5.9.3)
+      '@trpc/server':
+        specifier: ^11.9.0
+        version: 11.9.0(typescript@5.9.3)
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
@@ -47,6 +53,9 @@ importers:
       pg:
         specifier: ^8.18.0
         version: 8.18.0
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@types/bcrypt':
         specifier: ^6.0.0
@@ -99,6 +108,12 @@ importers:
         version: 6.4.1(@types/node@22.19.7)(jiti@2.6.1)(tsx@4.21.0)
 
   packages/shared: {}
+
+  packages/vck-templates:
+    dependencies:
+      '@kahuna/shared':
+        specifier: workspace:*
+        version: link:../shared
 
 packages:
 
@@ -790,6 +805,11 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@trpc/server@11.9.0':
+    resolution: {integrity: sha512-T8gC4NOCzx8tCsQEQ5sSjf24bN+9AEqXZRfpThG+YCEmcEwXfS7RP8VVrl5Vodt1S+zGEDyQSof4YVAj1zq/mg==}
+    peerDependencies:
+      typescript: '>=5.7.2'
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -1699,6 +1719,9 @@ packages:
   zeptomatch@2.1.0:
     resolution: {integrity: sha512-KiGErG2J0G82LSpniV0CtIzjlJ10E04j02VOudJsPyPwNZgGnRKQy7I1R7GMyg/QswnE4l7ohSGrQbQbjXPPDA==}
 
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+
 snapshots:
 
   '@babel/code-frame@7.29.0':
@@ -2222,6 +2245,10 @@ snapshots:
     optional: true
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@trpc/server@11.9.0(typescript@5.9.3)':
+    dependencies:
+      typescript: 5.9.3
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -3165,3 +3192,5 @@ snapshots:
     dependencies:
       grammex: 3.1.12
       graphmatch: 1.1.0
+
+  zod@4.3.6: {}
