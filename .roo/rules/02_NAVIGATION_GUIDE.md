@@ -53,6 +53,16 @@ docs/
 └── reference/              # Long-term reference materials
 ```
 
+### Architecture Documents
+
+| Document                            | Contents                                          |
+| ----------------------------------- | ------------------------------------------------- |
+| `01-repository-infrastructure.md`   | Monorepo setup, tooling, TypeScript config        |
+| `02-feedback-loop-architecture.md`  | Data flow, entities, VCK structure, API endpoints |
+| `03-foundational-infrastructure.md` | Auth, middleware, tRPC setup, session management  |
+| `04-system-boundaries.md`           | Infrastructure/loop separation, design principles |
+| `product-vision.md`                 | High-level product goals and features             |
+
 ### Working (`docs/internal/`)
 
 ```
@@ -101,7 +111,9 @@ apps/
 └── web/                    # React frontend (Vite)
 
 packages/
-└── shared/                 # Shared types, schemas, utilities
+├── shared/                 # Shared types, schemas, utilities
+├── vck-templates/          # VCK content (copilot configs, frameworks)
+└── testing/                # Test scenarios and CLI tools
 ```
 
 ---
