@@ -3,6 +3,9 @@
  *
  * Creates test users and sample data for local development.
  * Run with: pnpm --filter @kahuna/api prisma db seed
+ *
+ * Note: All IDs use CUID format for consistency with Prisma schema
+ * and tRPC validation. Use these IDs with the X-Test-User-Id header.
  */
 
 import "dotenv/config";
@@ -16,15 +19,27 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+// Fixed CUIDs for reproducible test data
+// These are valid CUIDs that can be used with X-Test-User-Id header
+const TEST_USER_1_ID = "cm6mwpnw80000qz1ktest0001";
+const TEST_USER_2_ID = "cm6mwpnw80001qz1ktest0002";
+const SAMPLE_PROJECT_ID = "cm6mwpnw80002qz1ktest0003";
+const SAMPLE_CONTEXT_ID = "cm6mwpnw80003qz1ktest0004";
+
 async function main() {
   console.log("🌱 Seeding database...");
+  console.log("");
+  console.log("Test User IDs (use with X-Test-User-Id header):");
+  console.log(`  User 1: ${TEST_USER_1_ID}`);
+  console.log(`  User 2: ${TEST_USER_2_ID}`);
+  console.log("");
 
-  // Create test user with known ID for X-Test-User-Id header
+  // Create test user with known CUID for X-Test-User-Id header
   const testUser = await prisma.user.upsert({
     where: { email: "test@example.com" },
     update: {},
     create: {
-      id: "test-user-1", // Fixed ID for test auth bypass
+      id: TEST_USER_1_ID,
       email: "test@example.com",
       password: await bcrypt.hash("testpassword123", 10),
     },
@@ -36,7 +51,7 @@ async function main() {
     where: { email: "test2@example.com" },
     update: {},
     create: {
-      id: "test-user-2",
+      id: TEST_USER_2_ID,
       email: "test2@example.com",
       password: await bcrypt.hash("testpassword123", 10),
     },
@@ -47,10 +62,10 @@ async function main() {
 
   // Create a sample project for the first test user
   const sampleProject = await prisma.project.upsert({
-    where: { id: "sample-project-1" },
+    where: { id: SAMPLE_PROJECT_ID },
     update: {},
     create: {
-      id: "sample-project-1",
+      id: SAMPLE_PROJECT_ID,
       userId: testUser.id,
       name: "Sample Project",
     },
@@ -61,10 +76,10 @@ async function main() {
 
   // Create a sample context file
   const sampleContext = await prisma.contextFile.upsert({
-    where: { id: "sample-context-1" },
+    where: { id: SAMPLE_CONTEXT_ID },
     update: {},
     create: {
-      id: "sample-context-1",
+      id: SAMPLE_CONTEXT_ID,
       projectId: sampleProject.id,
       filename: "business-context.md",
       content: `# Sample Business Context
@@ -81,7 +96,16 @@ This is a sample context file for testing purposes.
   });
   console.log(`✅ Sample context file created: ${sampleContext.filename}`);
 
+  console.log("");
   console.log("🌱 Seeding complete!");
+  console.log("");
+  console.log("Quick test commands:");
+  console.log(
+    `  curl http://localhost:3000/api/trpc/project.list -H "X-Test-User-Id: ${TEST_USER_1_ID}"`,
+  );
+  console.log(
+    `  curl -X POST http://localhost:3000/api/trpc/vck.generate -H "Content-Type: application/json" -H "X-Test-User-Id: ${TEST_USER_1_ID}" -d '{"json":{"projectId":"${SAMPLE_PROJECT_ID}"}}'`,
+  );
 }
 
 main()
