@@ -2,10 +2,10 @@
  * tRPC client configuration.
  * Creates the tRPC client and React Query client instances.
  */
-import { QueryClient } from "@tanstack/react-query";
-import { type TRPCClient, type TRPCLink, httpBatchLink } from "@trpc/client";
-import { config } from "./config";
-import { type AppRouter, trpc } from "./trpc";
+import { QueryClient } from '@tanstack/react-query';
+import { type TRPCClient, type TRPCLink, httpBatchLink } from '@trpc/client';
+import { config } from './config';
+import { type AppRouter, trpc } from './trpc';
 
 /**
  * React Query client with defaults optimized for this application.
@@ -33,7 +33,7 @@ const links: TRPCLink<AppRouter>[] = [
     fetch(url, options) {
       return fetch(url, {
         ...options,
-        credentials: "include",
+        credentials: 'include',
       });
     },
   }),
