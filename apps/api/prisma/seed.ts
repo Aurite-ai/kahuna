@@ -9,14 +9,16 @@
  */
 
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
-import { Pool } from 'pg';
 
-// Create Prisma client with adapter (Prisma 7+ requirement)
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
+// Create Prisma client with libsql adapter (Prisma 7+ requirement for SQLite)
+const url = process.env.DATABASE_URL;
+if (!url) {
+  throw new Error('DATABASE_URL environment variable is required');
+}
+const adapter = new PrismaLibSql({ url });
 const prisma = new PrismaClient({ adapter });
 
 // Fixed CUIDs for reproducible test data
@@ -111,5 +113,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-    await pool.end();
   });

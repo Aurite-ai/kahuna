@@ -23,6 +23,27 @@ cp .env.example .env
 pnpm dev
 ```
 
+## Database
+
+Kahuna uses SQLite for local development (stored at `apps/api/dev.db`).
+
+```bash
+# Generate Prisma client after schema changes
+pnpm db:generate
+
+# Run migrations
+pnpm db:migrate
+
+# Seed database with test data
+pnpm db:seed
+
+# Reset database (drops all data, re-runs migrations and seed)
+pnpm db:reset
+
+# Open Prisma Studio (database browser)
+pnpm db:studio
+```
+
 ## Scripts
 
 | Command          | Description                   |
@@ -38,6 +59,7 @@ pnpm dev
 | `pnpm typecheck` | Type-check all packages       |
 | `pnpm test`      | Run all tests                 |
 | `pnpm clean`     | Remove build artifacts        |
+| `pnpm db:*`      | Database commands (see above) |
 
 ## Project Structure
 

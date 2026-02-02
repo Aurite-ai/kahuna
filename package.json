@@ -15,6 +15,7 @@
     "test": "turbo test",
     "clean": "rm -rf apps/*/dist packages/*/dist node_modules/.cache .turbo",
     "db:generate": "pnpm --filter @kahuna/api db:generate",
+    "db:seed": "pnpm --filter @kahuna/api db:seed",
     "db:migrate": "pnpm --filter @kahuna/api db:migrate",
     "db:push": "pnpm --filter @kahuna/api db:push",
     "db:studio": "pnpm --filter @kahuna/api db:studio",
