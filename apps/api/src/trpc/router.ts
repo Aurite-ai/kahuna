@@ -1,4 +1,6 @@
-import { publicProcedure, router } from './trpc.js';
+import { contextRouter } from "./routers/context.js";
+import { projectRouter } from "./routers/project.js";
+import { publicProcedure, router } from "./trpc.js";
 
 /**
  * Health check router - provides a simple endpoint for verifying tRPC is working.
@@ -10,7 +12,7 @@ const healthRouter = router({
    */
   ping: publicProcedure.query(() => {
     return {
-      status: 'ok',
+      status: "ok",
       timestamp: new Date().toISOString(),
     };
   }),
@@ -22,15 +24,17 @@ const healthRouter = router({
  *
  * Current structure:
  * - health.ping - Health check endpoint (public)
- *
- * Future phases will add:
  * - project.* - Project management (protected)
  * - context.* - Context file management (protected)
+ *
+ * Future phases will add:
  * - vck.* - VCK generation (protected)
  * - results.* - Build results (protected)
  */
 export const appRouter = router({
   health: healthRouter,
+  project: projectRouter,
+  context: contextRouter,
 });
 
 /**
