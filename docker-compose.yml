@@ -1,0 +1,25 @@
+# Kahuna Development Services
+# Start with: docker compose up -d
+# Stop with: docker compose down
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kahuna-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kahuna
+      POSTGRES_PASSWORD: kahuna_dev
+      POSTGRES_DB: kahuna
+    ports:
+      - "5432:5432"
+    volumes:
+      - kahuna_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kahuna -d kahuna"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  kahuna_postgres_data:
