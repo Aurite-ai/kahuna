@@ -1,5 +1,6 @@
 import { contextRouter } from "./routers/context.js";
 import { projectRouter } from "./routers/project.js";
+import { resultsRouter } from "./routers/results.js";
 import { vckRouter } from "./routers/vck.js";
 import { publicProcedure, router } from "./trpc.js";
 
@@ -28,15 +29,14 @@ const healthRouter = router({
  * - project.* - Project management (protected)
  * - context.* - Context file management (protected)
  * - vck.* - VCK generation (protected)
- *
- * Future phases will add:
- * - results.* - Build results (protected)
+ * - results.* - Build results capture (protected)
  */
 export const appRouter = router({
   health: healthRouter,
   project: projectRouter,
   context: contextRouter,
   vck: vckRouter,
+  results: resultsRouter,
 });
 
 /**
