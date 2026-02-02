@@ -49,3 +49,4 @@ docs/.coding-copilot-prompts/
 docs/internal/
 agent-dev/
 **/.venv/**
+projects/

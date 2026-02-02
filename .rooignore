@@ -1,4 +1,4 @@
 !docs/internal
 .clinerules/
-CLAUDE.md
 !agent-dev/
+!projects/

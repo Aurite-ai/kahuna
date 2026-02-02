@@ -4,13 +4,21 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../trpc.js";
 
 /**
+ * Schema for file content - maps relative paths to file contents.
+ * Example: { "index.ts": "export const foo = 1;", "utils/helper.ts": "..." }
+ */
+const fileContentSchema = z.record(z.string(), z.string());
+
+/**
  * Input schema for submitting build results.
- * Content is a flexible text blob that can contain conversation logs,
- * generated code, notes, and any other feedback data.
+ * Structured fields for code, docs, and tests from the built agent.
  */
 const submitResultInput = z.object({
   projectId: z.string().cuid(),
-  content: z.string().min(1, "Content cannot be empty"),
+  code: fileContentSchema,
+  docs: fileContentSchema,
+  tests: fileContentSchema,
+  conversationLog: z.string().optional(),
 });
 
 /**
@@ -64,11 +72,14 @@ export const resultsRouter = router({
           ctx.user.id,
         );
 
-        // Create the build result
+        // Create the build result with structured fields
         const result = await ctx.prisma.buildResult.create({
           data: {
             projectId: input.projectId,
-            content: input.content,
+            code: input.code,
+            docs: input.docs,
+            tests: input.tests,
+            conversationLog: input.conversationLog,
           },
         });
 
