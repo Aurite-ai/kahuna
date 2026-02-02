@@ -1,3 +1,4 @@
+import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import cors from "cors";
 import express from "express";
 import type { Express } from "express";
@@ -5,6 +6,7 @@ import { cookieMiddleware } from "./middleware/cookies.js";
 import { errorMiddleware } from "./middleware/error.js";
 import { loggingMiddleware } from "./middleware/logging.js";
 import { authRouter } from "./routes/auth.js";
+import { appRouter, createContext } from "./trpc/index.js";
 
 const app: Express = express();
 
@@ -41,8 +43,14 @@ app.get("/health", (_req, res) => {
 // Auth routes (outside tRPC for direct cookie handling)
 app.use("/api/auth", authRouter);
 
-// tRPC will be mounted here in Phase 3
-// app.use('/trpc', ...)
+// tRPC API - type-safe RPC endpoints
+app.use(
+  "/api/trpc",
+  createExpressMiddleware({
+    router: appRouter,
+    createContext,
+  }),
+);
 
 // =============================================================================
 // Error Handling (must be last)
