@@ -1,7 +1,7 @@
-import type { PrismaClient } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-import { protectedProcedure, router } from "../trpc.js";
+import type { PrismaClient } from '@prisma/client';
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
+import { protectedProcedure, router } from '../trpc.js';
 
 /**
  * Schema for file content - maps relative paths to file contents.
@@ -28,7 +28,7 @@ const submitResultInput = z.object({
 async function verifyProjectOwnership(
   prisma: PrismaClient,
   projectId: string,
-  userId: string,
+  userId: string
 ): Promise<void> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -36,11 +36,11 @@ async function verifyProjectOwnership(
   });
 
   if (!project) {
-    throw new Error("Project not found");
+    throw new Error('Project not found');
   }
 
   if (project.userId !== userId) {
-    throw new Error("Access denied");
+    throw new Error('Access denied');
   }
 }
 
@@ -61,47 +61,41 @@ export const resultsRouter = router({
    * or plain text. This flexibility allows capturing various types of
    * feedback without schema changes.
    */
-  submit: protectedProcedure
-    .input(submitResultInput)
-    .mutation(async ({ ctx, input }) => {
-      try {
-        // Verify ownership before creating
-        await verifyProjectOwnership(
-          ctx.prisma as PrismaClient,
-          input.projectId,
-          ctx.user.id,
-        );
+  submit: protectedProcedure.input(submitResultInput).mutation(async ({ ctx, input }) => {
+    try {
+      // Verify ownership before creating
+      await verifyProjectOwnership(ctx.prisma as PrismaClient, input.projectId, ctx.user.id);
 
-        // Create the build result with structured fields
-        const result = await ctx.prisma.buildResult.create({
-          data: {
-            projectId: input.projectId,
-            code: input.code,
-            docs: input.docs,
-            tests: input.tests,
-            conversationLog: input.conversationLog,
-          },
-        });
+      // Create the build result with structured fields
+      const result = await ctx.prisma.buildResult.create({
+        data: {
+          projectId: input.projectId,
+          code: input.code,
+          docs: input.docs,
+          tests: input.tests,
+          conversationLog: input.conversationLog,
+        },
+      });
 
-        return result;
-      } catch (error) {
-        if (error instanceof Error) {
-          if (error.message === "Project not found") {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Project not found",
-            });
-          }
-          if (error.message === "Access denied") {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "Access denied",
-            });
-          }
+      return result;
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === 'Project not found') {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Project not found',
+          });
         }
-        throw error;
+        if (error.message === 'Access denied') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Access denied',
+          });
+        }
       }
-    }),
+      throw error;
+    }
+  }),
 
   /**
    * List build results for a project.
@@ -114,31 +108,27 @@ export const resultsRouter = router({
     .query(async ({ ctx, input }) => {
       try {
         // Verify ownership
-        await verifyProjectOwnership(
-          ctx.prisma as PrismaClient,
-          input.projectId,
-          ctx.user.id,
-        );
+        await verifyProjectOwnership(ctx.prisma as PrismaClient, input.projectId, ctx.user.id);
 
         // Fetch results for the project
         const results = await ctx.prisma.buildResult.findMany({
           where: { projectId: input.projectId },
-          orderBy: { createdAt: "desc" },
+          orderBy: { createdAt: 'desc' },
         });
 
         return results;
       } catch (error) {
         if (error instanceof Error) {
-          if (error.message === "Project not found") {
+          if (error.message === 'Project not found') {
             throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Project not found",
+              code: 'NOT_FOUND',
+              message: 'Project not found',
             });
           }
-          if (error.message === "Access denied") {
+          if (error.message === 'Access denied') {
             throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "Access denied",
+              code: 'FORBIDDEN',
+              message: 'Access denied',
             });
           }
         }
@@ -166,16 +156,16 @@ export const resultsRouter = router({
 
       if (!result) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Build result not found",
+          code: 'NOT_FOUND',
+          message: 'Build result not found',
         });
       }
 
       // Check ownership
       if (result.project.userId !== ctx.user.id) {
         throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Access denied",
+          code: 'FORBIDDEN',
+          message: 'Access denied',
         });
       }
 

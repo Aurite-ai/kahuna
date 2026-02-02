@@ -6,4 +6,4 @@
  * It simply imports and runs the compiled CLI module.
  */
 
-import "../dist/cli.js";
+import '../dist/cli.js';

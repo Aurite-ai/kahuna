@@ -17,5 +17,8 @@
   },
   "dependencies": {
     "@kahuna/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
   }
 }

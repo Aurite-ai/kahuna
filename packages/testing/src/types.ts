@@ -18,9 +18,9 @@ export interface KahunaConfig {
   };
   defaults: {
     /** Default copilot: claude-code | cursor | codex */
-    copilot: "claude-code" | "cursor" | "codex";
+    copilot: 'claude-code' | 'cursor' | 'codex';
     /** Default framework: langgraph */
-    framework: "langgraph";
+    framework: 'langgraph';
     /** Last-used scenario ID */
     scenario?: string;
   };
@@ -35,14 +35,14 @@ export interface KahunaConfig {
  */
 export const DEFAULT_CONFIG: KahunaConfig = {
   tester: {
-    name: "Anonymous",
+    name: 'Anonymous',
   },
   defaults: {
-    copilot: "claude-code",
-    framework: "langgraph",
+    copilot: 'claude-code',
+    framework: 'langgraph',
   },
   api: {
-    url: "http://localhost:3000",
+    url: 'http://localhost:3000',
   },
 };
 
@@ -184,8 +184,8 @@ export interface BuildResult {
  * These match the IDs created by apps/api/prisma/seed.ts
  */
 export const SEED_DATA = {
-  TEST_USER_1_ID: "cm6mwpnw80000qz1ktest0001",
-  TEST_USER_2_ID: "cm6mwpnw80001qz1ktest0002",
-  SAMPLE_PROJECT_ID: "cm6mwpnw80002qz1ktest0003",
-  SAMPLE_CONTEXT_ID: "cm6mwpnw80003qz1ktest0004",
+  TEST_USER_1_ID: 'cm6mwpnw80000qz1ktest0001',
+  TEST_USER_2_ID: 'cm6mwpnw80001qz1ktest0002',
+  SAMPLE_PROJECT_ID: 'cm6mwpnw80002qz1ktest0003',
+  SAMPLE_CONTEXT_ID: 'cm6mwpnw80003qz1ktest0004',
 } as const;

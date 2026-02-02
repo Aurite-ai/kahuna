@@ -28,7 +28,7 @@ export const queryClient = new QueryClient({
  */
 const links: TRPCLink<AppRouter>[] = [
   httpBatchLink({
-    url: `${config.apiUrl}/trpc`,
+    url: `${config.apiUrl}/api/trpc`,
     // Include cookies in cross-origin requests for session auth
     fetch(url, options) {
       return fetch(url, {

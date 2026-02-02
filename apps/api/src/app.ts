@@ -6,6 +6,7 @@ import { cookieMiddleware } from './middleware/cookies.js';
 import { errorMiddleware } from './middleware/error.js';
 import { loggingMiddleware } from './middleware/logging.js';
 import { authRouter } from './routes/auth.js';
+import vckRouter from './routes/vck.js';
 import { appRouter, createContext } from './trpc/index.js';
 
 const app: Express = express();
@@ -42,6 +43,9 @@ app.get('/health', (_req, res) => {
 
 // Auth routes (outside tRPC for direct cookie handling)
 app.use('/api/auth', authRouter);
+
+// VCK routes (outside tRPC for binary download handling)
+app.use('/api/vck', vckRouter);
 
 // tRPC API - type-safe RPC endpoints
 app.use(

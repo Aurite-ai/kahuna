@@ -2,11 +2,21 @@
  * Template access utilities
  *
  * Functions for accessing VCK template files.
- * Phase 1: Templates are embedded as strings for simplicity.
- * Future phases may load from filesystem.
+ * Phase 1: Read templates from filesystem at runtime.
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { CopilotConfigTemplate, FrameworkTemplate, TemplateFile } from './types.js';
+
+// Get the directory where this module is located
+const currentFileUrl = import.meta.url;
+const currentFilePath = fileURLToPath(currentFileUrl);
+const currentDir = path.dirname(currentFilePath);
+
+// Templates directory is at packages/vck-templates/templates relative to src/
+const TEMPLATES_DIR = path.join(currentDir, '..', 'templates');
 
 /**
  * Available framework templates.
@@ -61,54 +71,49 @@ export function listCopilotConfigs(): CopilotConfigTemplate[] {
 }
 
 // =============================================================================
-// Embedded Templates (Phase 1)
+// Filesystem Template Loading
 // =============================================================================
 
 /**
- * Claude Code rules template.
- * These rules guide the copilot when building agents.
+ * Recursively read all files from a directory and return them as TemplateFile[].
+ * File paths are relative to the given base directory.
  */
-const CLAUDE_CODE_RULES = `# Agent Development Rules
+function readDirectoryRecursive(dirPath: string, basePath = ''): TemplateFile[] {
+  const files: TemplateFile[] = [];
 
-## Overview
-You are helping build an AI agent using LangGraph. Follow these rules to ensure quality code.
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
 
-## Core Principles
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry.name);
+    const relativePath = basePath ? path.join(basePath, entry.name) : entry.name;
 
-1. **Keep it Simple** - Start with the minimal working implementation
-2. **Test First** - Write tests before implementing features
-3. **Document Intent** - Comments should explain "why", not "what"
+    if (entry.isDirectory()) {
+      // Recursively read subdirectory
+      files.push(...readDirectoryRecursive(fullPath, relativePath));
+    } else if (entry.isFile()) {
+      // Read file content
+      const content = fs.readFileSync(fullPath, 'utf-8');
+      files.push({
+        path: relativePath,
+        content,
+      });
+    }
+  }
 
-## Code Standards
+  return files;
+}
 
-### Python
-- Use type hints for all function signatures
-- Follow PEP 8 style guidelines
-- Use descriptive variable names
+/**
+ * Get Claude Code configuration files from the templates directory.
+ */
+export function getClaudeCodeFiles(): TemplateFile[] {
+  const templateDir = path.join(TEMPLATES_DIR, 'copilot-configs', 'claude-code');
+  return readDirectoryRecursive(templateDir);
+}
 
-### LangGraph Specific
-- Define clear state schemas
-- Keep tools focused and single-purpose
-- Handle errors gracefully with informative messages
-
-## Project Structure
-
-\`\`\`
-src/agent/
-├── __init__.py      # Package initialization
-├── graph.py         # Main graph definition
-├── state.py         # State schema definitions
-└── tools.py         # Tool implementations
-\`\`\`
-
-## Getting Started
-
-1. Review the context files to understand the business requirements
-2. Start with the state schema in \`state.py\`
-3. Implement tools in \`tools.py\`
-4. Build the graph in \`graph.py\`
-5. Test each component as you build
-`;
+// =============================================================================
+// Embedded Templates (LangGraph boilerplate - kept as strings for now)
+// =============================================================================
 
 /**
  * LangGraph boilerplate - main.py
@@ -325,18 +330,6 @@ Run tests:
 pytest
 \`\`\`
 `;
-
-/**
- * Get Claude Code configuration files.
- */
-export function getClaudeCodeFiles(): TemplateFile[] {
-  return [
-    {
-      path: '.copilot/rules.md',
-      content: CLAUDE_CODE_RULES,
-    },
-  ];
-}
 
 /**
  * Get LangGraph boilerplate files.

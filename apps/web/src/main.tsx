@@ -6,6 +6,7 @@ import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { trpc } from './lib/trpc';
 import { queryClient, trpcClient } from './lib/trpc-client';
+import './styles/global.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

@@ -13,10 +13,8 @@ export function ProtectedRoute() {
   // Show loading state while checking auth
   if (isLoading) {
     return (
-      <div
-        style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}
-      >
-        <p>Loading...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-500">Loading...</p>
       </div>
     );
   }

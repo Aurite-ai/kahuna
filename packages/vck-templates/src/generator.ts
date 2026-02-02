@@ -55,24 +55,19 @@ export function generateVCK(input: VCKGeneratorInput): VCK {
   const copilotFiles = getCopilotConfigFiles(copilot);
   const frameworkFiles = getFrameworkFiles(framework);
 
-  // Extract rules from copilot config
-  const rulesFile = copilotFiles.find((f) => f.path.endsWith('rules.md'));
-  const rules = rulesFile ? [rulesFile.content] : [];
-
   // Build boilerplate from framework files
   const boilerplate: Record<string, string> = {};
   for (const file of frameworkFiles) {
     boilerplate[file.path] = file.content;
   }
 
-  // Add copilot config files to boilerplate (excluding rules which go in rules array)
+  // Add all copilot config files to boilerplate
   for (const file of copilotFiles) {
-    if (!file.path.endsWith('rules.md')) {
-      boilerplate[file.path] = file.content;
-    }
+    boilerplate[file.path] = file.content;
   }
 
   // Construct the VCK
+  // Note: rules array is empty because all rules are now in boilerplate as files
   const vck: VCK = {
     metadata: {
       projectId,
@@ -83,7 +78,7 @@ export function generateVCK(input: VCKGeneratorInput): VCK {
       businessSummary,
       files: contextFiles,
     },
-    rules,
+    rules: [],
     boilerplate,
   };
 

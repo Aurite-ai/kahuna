@@ -7,9 +7,10 @@
  * This service is isolated from HTTP/tRPC concerns for easier testing.
  */
 
-import type { VCK } from "@kahuna/shared";
-import { generateVCK } from "@kahuna/vck-templates";
-import type { PrismaClient } from "@prisma/client";
+import type { VCK } from '@kahuna/shared';
+import { generateVCK } from '@kahuna/vck-templates';
+import type { PrismaClient } from '@prisma/client';
+import archiver from 'archiver';
 
 /**
  * Options for VCK generation.
@@ -58,27 +59,27 @@ export async function generateProjectVCK(
   prisma: PrismaClient,
   projectId: string,
   userId: string,
-  options: GenerateVCKOptions = {},
+  options: GenerateVCKOptions = {}
 ): Promise<GenerateVCKResult> {
-  const { framework = "langgraph", copilot = "claude-code" } = options;
+  const { framework = 'langgraph', copilot = 'claude-code' } = options;
 
   // Fetch project with context files
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
       contextFiles: {
-        orderBy: { updatedAt: "desc" },
+        orderBy: { updatedAt: 'desc' },
       },
     },
   });
 
   if (!project) {
-    throw new Error("Project not found");
+    throw new Error('Project not found');
   }
 
   // Verify ownership
   if (project.userId !== userId) {
-    throw new Error("Access denied");
+    throw new Error('Access denied');
   }
 
   // Transform context files into generator input format (filename -> content)
@@ -90,10 +91,7 @@ export async function generateProjectVCK(
   // Build business summary from context files
   // For Phase 1, we combine all context into a simple summary
   // Future phases may have a dedicated summary field in the project
-  const businessSummary = buildBusinessSummary(
-    project.name,
-    project.contextFiles,
-  );
+  const businessSummary = buildBusinessSummary(project.name, project.contextFiles);
 
   // Generate the VCK using the template generator
   const vck = generateVCK({
@@ -128,28 +126,24 @@ export async function generateProjectVCK(
  * @returns List of VCK generations for the project
  * @throws Error if project not found or user doesn't own it
  */
-export async function getVCKHistory(
-  prisma: PrismaClient,
-  projectId: string,
-  userId: string,
-) {
+export async function getVCKHistory(prisma: PrismaClient, projectId: string, userId: string) {
   // Verify project exists and user owns it
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
 
   if (!project) {
-    throw new Error("Project not found");
+    throw new Error('Project not found');
   }
 
   if (project.userId !== userId) {
-    throw new Error("Access denied");
+    throw new Error('Access denied');
   }
 
   // Get generation history
   const generations = await prisma.vckGeneration.findMany({
     where: { projectId },
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: 'desc' },
   });
 
   return generations;
@@ -164,11 +158,7 @@ export async function getVCKHistory(
  * @returns The VCK generation record
  * @throws Error if generation not found or user doesn't own the parent project
  */
-export async function getVCKGeneration(
-  prisma: PrismaClient,
-  generationId: string,
-  userId: string,
-) {
+export async function getVCKGeneration(prisma: PrismaClient, generationId: string, userId: string) {
   const generation = await prisma.vckGeneration.findUnique({
     where: { id: generationId },
     include: {
@@ -177,11 +167,11 @@ export async function getVCKGeneration(
   });
 
   if (!generation) {
-    throw new Error("VCK generation not found");
+    throw new Error('VCK generation not found');
   }
 
   if (generation.project.userId !== userId) {
-    throw new Error("Access denied");
+    throw new Error('Access denied');
   }
 
   // Return without the nested project to keep response clean
@@ -190,22 +180,103 @@ export async function getVCKGeneration(
 }
 
 /**
+ * Generate a ZIP archive containing the complete VCK.
+ *
+ * This function:
+ * 1. Generates the VCK using existing infrastructure
+ * 2. Creates a ZIP archive with proper file structure
+ * 3. Returns a streamable archiver instance
+ *
+ * @param prisma - Prisma client instance
+ * @param projectId - ID of the project to generate VCK for
+ * @param userId - ID of the requesting user (for ownership verification)
+ * @param options - Optional generation options (framework, copilot)
+ * @returns Archiver stream that can be piped to response
+ */
+export async function generateVCKZip(
+  prisma: PrismaClient,
+  projectId: string,
+  userId: string,
+  options: GenerateVCKOptions = {}
+): Promise<archiver.Archiver> {
+  // 1. Generate VCK using existing function
+  const { vck } = await generateProjectVCK(prisma, projectId, userId, options);
+
+  // 2. Create archiver instance with maximum compression
+  const archive = archiver('zip', { zlib: { level: 9 } });
+
+  // 3. Add README
+  const readme = generateReadme(vck.metadata.projectId);
+  archive.append(readme, { name: 'README.md' });
+
+  // 4. Add boilerplate files (copilot config + framework)
+  // Skip README.md from framework templates since we generate our own
+  for (const [filePath, content] of Object.entries(vck.boilerplate)) {
+    if (filePath === 'README.md') continue;
+    archive.append(content, { name: filePath });
+  }
+
+  // 5. Add context files (preserve subdirectory structure under context/)
+  for (const [filename, content] of Object.entries(vck.context.files)) {
+    archive.append(content, { name: `context/${filename}` });
+  }
+
+  // 6. Add empty .env template
+  archive.append('# Add your API keys here\nANTHROPIC_API_KEY=\nOPENAI_API_KEY=\n', {
+    name: '.env',
+  });
+
+  // 7. Finalize the archive (important!)
+  archive.finalize();
+
+  return archive;
+}
+
+/**
+ * Generate README content for the VCK.
+ */
+function generateReadme(projectId: string): string {
+  return `# Vibe Code Kit
+
+This folder was generated by Kahuna and contains everything needed to build an AI agent with a coding copilot.
+
+## Quick Start
+
+1. Open this folder in your code editor
+2. Open Claude Code (or your preferred AI coding assistant)
+3. Read CLAUDE.md for the workflow instructions
+4. Fill in your API keys in .env
+
+## Contents
+
+- \`CLAUDE.md\` - Main instructions for your coding assistant
+- \`.claude/\` - Additional rules and skills
+- \`context/\` - Your business context files
+- \`src/\` - Agent boilerplate code
+
+## Generated By
+
+Kahuna - https://kahuna.dev
+Project ID: ${projectId}
+Generated: ${new Date().toISOString()}
+`;
+}
+
+/**
  * Build a business summary from project name and context files.
  * This is a simple Phase 1 implementation.
  */
 function buildBusinessSummary(
   projectName: string,
-  contextFiles: { filename: string; content: string }[],
+  contextFiles: { filename: string; content: string }[]
 ): string {
   const parts: string[] = [`Project: ${projectName}`];
 
   if (contextFiles.length > 0) {
-    parts.push(
-      `\nContext files included: ${contextFiles.map((f) => f.filename).join(", ")}`,
-    );
+    parts.push(`\nContext files included: ${contextFiles.map((f) => f.filename).join(', ')}`);
   } else {
-    parts.push("\nNo context files provided yet.");
+    parts.push('\nNo context files provided yet.');
   }
 
-  return parts.join("");
+  return parts.join('');
 }

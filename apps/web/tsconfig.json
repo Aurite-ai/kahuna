@@ -12,8 +12,5 @@
     "rootDir": "./src"
   },
   "include": ["src"],
-  "references": [
-    { "path": "../../packages/shared" },
-    { "path": "../../apps/api" }
-  ]
+  "references": [{ "path": "../../packages/shared" }, { "path": "../../apps/api" }]
 }

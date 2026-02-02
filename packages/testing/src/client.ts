@@ -17,8 +17,8 @@ import type {
   TRPCResult,
   VckGenerateResponse,
   VckGeneration,
-} from "./types.js";
-import { SEED_DATA } from "./types.js";
+} from './types.js';
+import { SEED_DATA } from './types.js';
 
 /**
  * API client for programmatic testing of the feedback loop.
@@ -31,35 +31,30 @@ export class TestApiClient {
   private testUserId: string;
 
   constructor(options: ApiClientOptions = {}) {
-    this.baseUrl = options.baseUrl || "http://localhost:3000";
+    this.baseUrl = options.baseUrl || 'http://localhost:3000';
     this.testUserId = options.testUserId || SEED_DATA.TEST_USER_1_ID;
   }
 
   /**
    * Make a tRPC mutation (POST request)
    */
-  private async mutation<T>(
-    procedure: string,
-    input: Record<string, unknown>,
-  ): Promise<T> {
+  private async mutation<T>(procedure: string, input: Record<string, unknown>): Promise<T> {
     const url = `${this.baseUrl}/api/trpc/${procedure}`;
 
     const response = await fetch(url, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "X-Test-User-Id": this.testUserId,
+        'Content-Type': 'application/json',
+        'X-Test-User-Id': this.testUserId,
       },
       body: JSON.stringify(input),
     });
 
     const data = (await response.json()) as TRPCResult<T> | TRPCError;
 
-    if (!response.ok || "error" in data) {
+    if (!response.ok || 'error' in data) {
       const error = data as TRPCError;
-      throw new Error(
-        error.error?.message || `Request failed with status ${response.status}`,
-      );
+      throw new Error(error.error?.message || `Request failed with status ${response.status}`);
     }
 
     return (data as TRPCResult<T>).result.data;
@@ -68,10 +63,7 @@ export class TestApiClient {
   /**
    * Make a tRPC query (GET request)
    */
-  private async query<T>(
-    procedure: string,
-    input?: Record<string, unknown>,
-  ): Promise<T> {
+  private async query<T>(procedure: string, input?: Record<string, unknown>): Promise<T> {
     let url = `${this.baseUrl}/api/trpc/${procedure}`;
 
     if (input) {
@@ -80,19 +72,17 @@ export class TestApiClient {
     }
 
     const response = await fetch(url, {
-      method: "GET",
+      method: 'GET',
       headers: {
-        "X-Test-User-Id": this.testUserId,
+        'X-Test-User-Id': this.testUserId,
       },
     });
 
     const data = (await response.json()) as TRPCResult<T> | TRPCError;
 
-    if (!response.ok || "error" in data) {
+    if (!response.ok || 'error' in data) {
       const error = data as TRPCError;
-      throw new Error(
-        error.error?.message || `Request failed with status ${response.status}`,
-      );
+      throw new Error(error.error?.message || `Request failed with status ${response.status}`);
     }
 
     return (data as TRPCResult<T>).result.data;
@@ -118,21 +108,21 @@ export class TestApiClient {
    * Create a new project
    */
   async createProject(name: string): Promise<Project> {
-    return this.mutation<Project>("project.create", { name });
+    return this.mutation<Project>('project.create', { name });
   }
 
   /**
    * List all projects for the test user
    */
   async listProjects(): Promise<Project[]> {
-    return this.query<Project[]>("project.list");
+    return this.query<Project[]>('project.list');
   }
 
   /**
    * Get a specific project by ID
    */
   async getProject(id: string): Promise<Project> {
-    return this.query<Project>("project.get", { id });
+    return this.query<Project>('project.get', { id });
   }
 
   // ==================== Context Operations ====================
@@ -140,12 +130,8 @@ export class TestApiClient {
   /**
    * Create a context file for a project
    */
-  async createContext(
-    projectId: string,
-    filename: string,
-    content: string,
-  ): Promise<ContextFile> {
-    return this.mutation<ContextFile>("context.create", {
+  async createContext(projectId: string, filename: string, content: string): Promise<ContextFile> {
+    return this.mutation<ContextFile>('context.create', {
       projectId,
       filename,
       content,
@@ -156,14 +142,14 @@ export class TestApiClient {
    * List all context files for a project
    */
   async listContextFiles(projectId: string): Promise<ContextFile[]> {
-    return this.query<ContextFile[]>("context.list", { projectId });
+    return this.query<ContextFile[]>('context.list', { projectId });
   }
 
   /**
    * Get a specific context file
    */
   async getContextFile(id: string): Promise<ContextFile> {
-    return this.query<ContextFile>("context.get", { id });
+    return this.query<ContextFile>('context.get', { id });
   }
 
   // ==================== VCK Operations ====================
@@ -173,9 +159,9 @@ export class TestApiClient {
    */
   async generateVck(
     projectId: string,
-    options?: { framework?: string; copilot?: string },
+    options?: { framework?: string; copilot?: string }
   ): Promise<VckGenerateResponse> {
-    return this.mutation<VckGenerateResponse>("vck.generate", {
+    return this.mutation<VckGenerateResponse>('vck.generate', {
       projectId,
       ...options,
     });
@@ -185,7 +171,7 @@ export class TestApiClient {
    * List all VCK generations for a project (via history endpoint)
    */
   async listVckGenerations(projectId: string): Promise<VckGeneration[]> {
-    return this.query<VckGeneration[]>("vck.history", {
+    return this.query<VckGeneration[]>('vck.history', {
       projectId,
     });
   }
@@ -197,8 +183,8 @@ export class TestApiClient {
    */
   async submitResults(input: BuildResultInput): Promise<BuildResult> {
     return this.mutation<BuildResult>(
-      "results.submit",
-      input as unknown as Record<string, unknown>,
+      'results.submit',
+      input as unknown as Record<string, unknown>
     );
   }
 
@@ -206,14 +192,14 @@ export class TestApiClient {
    * List all build results for a project
    */
   async listResults(projectId: string): Promise<BuildResult[]> {
-    return this.query<BuildResult[]>("results.list", { projectId });
+    return this.query<BuildResult[]>('results.list', { projectId });
   }
 
   /**
    * Get a specific build result
    */
   async getResult(id: string): Promise<BuildResult> {
-    return this.query<BuildResult>("results.get", { id });
+    return this.query<BuildResult>('results.get', { id });
   }
 
   // ==================== Health Check ====================
@@ -222,7 +208,7 @@ export class TestApiClient {
    * Check if the API is running
    */
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
-    return this.query<{ status: string; timestamp: string }>("health.ping");
+    return this.query<{ status: string; timestamp: string }>('health.ping');
   }
 }
 

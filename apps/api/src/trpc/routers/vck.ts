@@ -1,12 +1,8 @@
-import type { PrismaClient } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-import {
-  generateProjectVCK,
-  getVCKGeneration,
-  getVCKHistory,
-} from "../../services/vck.js";
-import { protectedProcedure, router } from "../trpc.js";
+import type { PrismaClient } from '@prisma/client';
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
+import { generateProjectVCK, getVCKGeneration, getVCKHistory } from '../../services/vck.js';
+import { protectedProcedure, router } from '../trpc.js';
 
 /**
  * Input schema for VCK generation.
@@ -33,57 +29,55 @@ export const vckRouter = router({
    * and returns a complete VCK JSON structure. Also records the generation
    * in the database for history tracking.
    */
-  generate: protectedProcedure
-    .input(generateVCKInput)
-    .mutation(async ({ ctx, input }) => {
-      try {
-        const result = await generateProjectVCK(
-          ctx.prisma as PrismaClient,
-          input.projectId,
-          ctx.user.id,
-          {
-            framework: input.framework,
-            copilot: input.copilot,
-          },
-        );
-
-        return {
-          vck: result.vck,
-          generationId: result.generation.id,
-        };
-      } catch (error) {
-        // Map service errors to tRPC errors
-        if (error instanceof Error) {
-          if (error.message === "Project not found") {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Project not found",
-            });
-          }
-          if (error.message === "Access denied") {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "Access denied",
-            });
-          }
-          // Unknown framework/copilot errors from the generator
-          if (error.message.startsWith("Unknown framework:")) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: error.message,
-            });
-          }
-          if (error.message.startsWith("Unknown copilot:")) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: error.message,
-            });
-          }
+  generate: protectedProcedure.input(generateVCKInput).mutation(async ({ ctx, input }) => {
+    try {
+      const result = await generateProjectVCK(
+        ctx.prisma as PrismaClient,
+        input.projectId,
+        ctx.user.id,
+        {
+          framework: input.framework,
+          copilot: input.copilot,
         }
-        // Re-throw unknown errors
-        throw error;
+      );
+
+      return {
+        vck: result.vck,
+        generationId: result.generation.id,
+      };
+    } catch (error) {
+      // Map service errors to tRPC errors
+      if (error instanceof Error) {
+        if (error.message === 'Project not found') {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Project not found',
+          });
+        }
+        if (error.message === 'Access denied') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Access denied',
+          });
+        }
+        // Unknown framework/copilot errors from the generator
+        if (error.message.startsWith('Unknown framework:')) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: error.message,
+          });
+        }
+        if (error.message.startsWith('Unknown copilot:')) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: error.message,
+          });
+        }
       }
-    }),
+      // Re-throw unknown errors
+      throw error;
+    }
+  }),
 
   /**
    * Get VCK generation history for a project.
@@ -98,22 +92,22 @@ export const vckRouter = router({
         const generations = await getVCKHistory(
           ctx.prisma as PrismaClient,
           input.projectId,
-          ctx.user.id,
+          ctx.user.id
         );
 
         return generations;
       } catch (error) {
         if (error instanceof Error) {
-          if (error.message === "Project not found") {
+          if (error.message === 'Project not found') {
             throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Project not found",
+              code: 'NOT_FOUND',
+              message: 'Project not found',
             });
           }
-          if (error.message === "Access denied") {
+          if (error.message === 'Access denied') {
             throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "Access denied",
+              code: 'FORBIDDEN',
+              message: 'Access denied',
             });
           }
         }
@@ -134,22 +128,22 @@ export const vckRouter = router({
         const generation = await getVCKGeneration(
           ctx.prisma as PrismaClient,
           input.id,
-          ctx.user.id,
+          ctx.user.id
         );
 
         return generation;
       } catch (error) {
         if (error instanceof Error) {
-          if (error.message === "VCK generation not found") {
+          if (error.message === 'VCK generation not found') {
             throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "VCK generation not found",
+              code: 'NOT_FOUND',
+              message: 'VCK generation not found',
             });
           }
-          if (error.message === "Access denied") {
+          if (error.message === 'Access denied') {
             throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "Access denied",
+              code: 'FORBIDDEN',
+              message: 'Access denied',
             });
           }
         }

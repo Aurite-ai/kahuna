@@ -1,12 +1,12 @@
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-import { protectedProcedure, router } from "../trpc.js";
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
+import { protectedProcedure, router } from '../trpc.js';
 
 /**
  * Input schema for creating a project.
  */
 const createProjectInput = z.object({
-  name: z.string().min(1, "Project name is required").max(255),
+  name: z.string().min(1, 'Project name is required').max(255),
   description: z.string().max(1000).optional(),
 });
 
@@ -15,7 +15,7 @@ const createProjectInput = z.object({
  */
 const updateProjectInput = z.object({
   id: z.string().cuid(),
-  name: z.string().min(1, "Project name is required").max(255).optional(),
+  name: z.string().min(1, 'Project name is required').max(255).optional(),
   description: z.string().max(1000).nullable().optional(),
 });
 
@@ -30,18 +30,16 @@ export const projectRouter = router({
   /**
    * Create a new project for the authenticated user.
    */
-  create: protectedProcedure
-    .input(createProjectInput)
-    .mutation(async ({ ctx, input }) => {
-      const project = await ctx.prisma.project.create({
-        data: {
-          name: input.name,
-          userId: ctx.user.id,
-        },
-      });
+  create: protectedProcedure.input(createProjectInput).mutation(async ({ ctx, input }) => {
+    const project = await ctx.prisma.project.create({
+      data: {
+        name: input.name,
+        userId: ctx.user.id,
+      },
+    });
 
-      return project;
-    }),
+    return project;
+  }),
 
   /**
    * List all projects owned by the authenticated user.
@@ -52,7 +50,7 @@ export const projectRouter = router({
         userId: ctx.user.id,
       },
       orderBy: {
-        updatedAt: "desc",
+        updatedAt: 'desc',
       },
     });
 
@@ -70,22 +68,22 @@ export const projectRouter = router({
         where: { id: input.id },
         include: {
           contextFiles: {
-            orderBy: { updatedAt: "desc" },
+            orderBy: { updatedAt: 'desc' },
           },
         },
       });
 
       if (!project) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
+          code: 'NOT_FOUND',
+          message: 'Project not found',
         });
       }
 
       if (project.userId !== ctx.user.id) {
         throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Access denied",
+          code: 'FORBIDDEN',
+          message: 'Access denied',
         });
       }
 
@@ -96,41 +94,39 @@ export const projectRouter = router({
    * Update a project's name or description.
    * Verifies ownership before updating.
    */
-  update: protectedProcedure
-    .input(updateProjectInput)
-    .mutation(async ({ ctx, input }) => {
-      // Verify ownership first
-      const existing = await ctx.prisma.project.findUnique({
-        where: { id: input.id },
+  update: protectedProcedure.input(updateProjectInput).mutation(async ({ ctx, input }) => {
+    // Verify ownership first
+    const existing = await ctx.prisma.project.findUnique({
+      where: { id: input.id },
+    });
+
+    if (!existing) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Project not found',
       });
+    }
 
-      if (!existing) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
-        });
-      }
-
-      if (existing.userId !== ctx.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Access denied",
-        });
-      }
-
-      // Build update data (only include provided fields)
-      const updateData: { name?: string } = {};
-      if (input.name !== undefined) {
-        updateData.name = input.name;
-      }
-
-      const project = await ctx.prisma.project.update({
-        where: { id: input.id },
-        data: updateData,
+    if (existing.userId !== ctx.user.id) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Access denied',
       });
+    }
 
-      return project;
-    }),
+    // Build update data (only include provided fields)
+    const updateData: { name?: string } = {};
+    if (input.name !== undefined) {
+      updateData.name = input.name;
+    }
+
+    const project = await ctx.prisma.project.update({
+      where: { id: input.id },
+      data: updateData,
+    });
+
+    return project;
+  }),
 
   /**
    * Delete a project.
@@ -147,15 +143,15 @@ export const projectRouter = router({
 
       if (!existing) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
+          code: 'NOT_FOUND',
+          message: 'Project not found',
         });
       }
 
       if (existing.userId !== ctx.user.id) {
         throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Access denied",
+          code: 'FORBIDDEN',
+          message: 'Access denied',
         });
       }
 

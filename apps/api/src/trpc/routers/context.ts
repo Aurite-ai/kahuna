@@ -1,14 +1,14 @@
-import type { PrismaClient } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-import { protectedProcedure, router } from "../trpc.js";
+import type { PrismaClient } from '@prisma/client';
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
+import { protectedProcedure, router } from '../trpc.js';
 
 /**
  * Input schema for creating a context file.
  */
 const createContextInput = z.object({
   projectId: z.string().cuid(),
-  filename: z.string().min(1, "Filename is required").max(255),
+  filename: z.string().min(1, 'Filename is required').max(255),
   content: z.string(),
 });
 
@@ -17,7 +17,7 @@ const createContextInput = z.object({
  */
 const updateContextInput = z.object({
   id: z.string().cuid(),
-  filename: z.string().min(1, "Filename is required").max(255).optional(),
+  filename: z.string().min(1, 'Filename is required').max(255).optional(),
   content: z.string().optional(),
 });
 
@@ -25,26 +25,22 @@ const updateContextInput = z.object({
  * Helper to verify the user owns the project.
  * Returns the project if ownership is verified, throws FORBIDDEN otherwise.
  */
-async function verifyProjectOwnership(
-  prisma: PrismaClient,
-  projectId: string,
-  userId: string,
-) {
+async function verifyProjectOwnership(prisma: PrismaClient, projectId: string, userId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
 
   if (!project) {
     throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Project not found",
+      code: 'NOT_FOUND',
+      message: 'Project not found',
     });
   }
 
   if (project.userId !== userId) {
     throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Access denied",
+      code: 'FORBIDDEN',
+      message: 'Access denied',
     });
   }
 
@@ -62,26 +58,20 @@ export const contextRouter = router({
    * Create a new context file for a project.
    * Verifies the user owns the project.
    */
-  create: protectedProcedure
-    .input(createContextInput)
-    .mutation(async ({ ctx, input }) => {
-      // Verify user owns the project
-      await verifyProjectOwnership(
-        ctx.prisma as PrismaClient,
-        input.projectId,
-        ctx.user.id,
-      );
+  create: protectedProcedure.input(createContextInput).mutation(async ({ ctx, input }) => {
+    // Verify user owns the project
+    await verifyProjectOwnership(ctx.prisma as PrismaClient, input.projectId, ctx.user.id);
 
-      const contextFile = await ctx.prisma.contextFile.create({
-        data: {
-          projectId: input.projectId,
-          filename: input.filename,
-          content: input.content,
-        },
-      });
+    const contextFile = await ctx.prisma.contextFile.create({
+      data: {
+        projectId: input.projectId,
+        filename: input.filename,
+        content: input.content,
+      },
+    });
 
-      return contextFile;
-    }),
+    return contextFile;
+  }),
 
   /**
    * List all context files for a project.
@@ -91,18 +81,14 @@ export const contextRouter = router({
     .input(z.object({ projectId: z.string().cuid() }))
     .query(async ({ ctx, input }) => {
       // Verify user owns the project
-      await verifyProjectOwnership(
-        ctx.prisma as PrismaClient,
-        input.projectId,
-        ctx.user.id,
-      );
+      await verifyProjectOwnership(ctx.prisma as PrismaClient, input.projectId, ctx.user.id);
 
       const contextFiles = await ctx.prisma.contextFile.findMany({
         where: {
           projectId: input.projectId,
         },
         orderBy: {
-          updatedAt: "desc",
+          updatedAt: 'desc',
         },
       });
 
@@ -125,16 +111,16 @@ export const contextRouter = router({
 
       if (!contextFile) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Context file not found",
+          code: 'NOT_FOUND',
+          message: 'Context file not found',
         });
       }
 
       // Verify ownership through project
       if (contextFile.project.userId !== ctx.user.id) {
         throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Access denied",
+          code: 'FORBIDDEN',
+          message: 'Access denied',
         });
       }
 
@@ -147,47 +133,45 @@ export const contextRouter = router({
    * Update a context file's filename or content.
    * Verifies the user owns the parent project.
    */
-  update: protectedProcedure
-    .input(updateContextInput)
-    .mutation(async ({ ctx, input }) => {
-      const contextFile = await ctx.prisma.contextFile.findUnique({
-        where: { id: input.id },
-        include: {
-          project: true,
-        },
+  update: protectedProcedure.input(updateContextInput).mutation(async ({ ctx, input }) => {
+    const contextFile = await ctx.prisma.contextFile.findUnique({
+      where: { id: input.id },
+      include: {
+        project: true,
+      },
+    });
+
+    if (!contextFile) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Context file not found',
       });
+    }
 
-      if (!contextFile) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Context file not found",
-        });
-      }
-
-      // Verify ownership through project
-      if (contextFile.project.userId !== ctx.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Access denied",
-        });
-      }
-
-      // Build update data (only include provided fields)
-      const updateData: { filename?: string; content?: string } = {};
-      if (input.filename !== undefined) {
-        updateData.filename = input.filename;
-      }
-      if (input.content !== undefined) {
-        updateData.content = input.content;
-      }
-
-      const updated = await ctx.prisma.contextFile.update({
-        where: { id: input.id },
-        data: updateData,
+    // Verify ownership through project
+    if (contextFile.project.userId !== ctx.user.id) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Access denied',
       });
+    }
 
-      return updated;
-    }),
+    // Build update data (only include provided fields)
+    const updateData: { filename?: string; content?: string } = {};
+    if (input.filename !== undefined) {
+      updateData.filename = input.filename;
+    }
+    if (input.content !== undefined) {
+      updateData.content = input.content;
+    }
+
+    const updated = await ctx.prisma.contextFile.update({
+      where: { id: input.id },
+      data: updateData,
+    });
+
+    return updated;
+  }),
 
   /**
    * Delete a context file.
@@ -205,16 +189,16 @@ export const contextRouter = router({
 
       if (!contextFile) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Context file not found",
+          code: 'NOT_FOUND',
+          message: 'Context file not found',
         });
       }
 
       // Verify ownership through project
       if (contextFile.project.userId !== ctx.user.id) {
         throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Access denied",
+          code: 'FORBIDDEN',
+          message: 'Access denied',
         });
       }
 

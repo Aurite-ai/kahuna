@@ -4,33 +4,16 @@
  * Route structure:
  * - /login          → LoginPage (public)
  * - /register       → RegisterPage (public)
- * - /               → ProjectListPage (protected) [placeholder]
- * - /projects/:id   → ProjectDetailPage (protected) [placeholder]
+ * - /               → ProjectListPage (protected)
+ * - /projects/:id   → ProjectDetailPage (protected)
  */
 import { Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
+import { ProjectDetailPage } from './pages/ProjectDetailPage';
+import { ProjectListPage } from './pages/ProjectListPage';
 import { RegisterPage } from './pages/RegisterPage';
-
-// Placeholder components for protected routes (to be implemented in Phase 4/5)
-function ProjectListPage() {
-  return (
-    <div>
-      <h2>Projects</h2>
-      <p>Project list will be implemented in Phase 4.</p>
-    </div>
-  );
-}
-
-function ProjectDetailPage() {
-  return (
-    <div>
-      <h2>Project Detail</h2>
-      <p>Project detail will be implemented in Phase 5.</p>
-    </div>
-  );
-}
 
 function App() {
   return (
