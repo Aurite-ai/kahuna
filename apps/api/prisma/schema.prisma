@@ -10,7 +10,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   // URL configured in prisma.config.ts (Prisma 7+)
 }
 
@@ -78,7 +78,7 @@ model ContextFile {
   id        String   @id @default(cuid())
   projectId String
   filename  String
-  content   String   @db.Text
+  content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -105,7 +105,7 @@ model BuildResult {
   code            Json     // src/ files as Record<string, string>
   docs            Json     // docs/ files as Record<string, string>
   tests           Json     // tests/ files as Record<string, string>
-  conversationLog String?  @db.Text // Optional conversation log from coding copilot
+  conversationLog String? // Optional conversation log from coding copilot
   createdAt       DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -140,8 +140,8 @@ model TestEvaluation {
   id            String   @id @default(cuid())
   testSessionId String
   score         Int?     // Optional numeric score
-  notes         String?  @db.Text
-  metrics       String?  @db.Text // JSON blob for structured evaluation data
+  notes         String?
+  metrics       String? // JSON blob for structured evaluation data
   createdAt     DateTime @default(now())
 
   testSession TestSession @relation(fields: [testSessionId], references: [id], onDelete: Cascade)

@@ -1,28 +1,21 @@
-import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { PrismaClient } from '@prisma/client';
-import { Pool } from 'pg';
 
-// Prisma client singleton with PostgreSQL adapter (required for Prisma 7+)
+// Prisma client singleton with SQLite via libsql adapter (required for Prisma 7+)
 // In development, we store the client on globalThis to survive HMR reloads.
 // In production, a single instance is created per process.
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
-  pool: Pool | undefined;
 };
 
 function createPrismaClient(): PrismaClient {
-  const connectionString = process.env.DATABASE_URL;
-
-  if (!connectionString) {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
     throw new Error('DATABASE_URL environment variable is required');
   }
 
-  const pool = new Pool({ connectionString });
-  const adapter = new PrismaPg(pool);
-
-  // Store pool for cleanup
-  globalForPrisma.pool = pool;
+  const adapter = new PrismaLibSql({ url });
 
   return new PrismaClient({
     adapter,
