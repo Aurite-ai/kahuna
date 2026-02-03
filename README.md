@@ -15,9 +15,15 @@ Kahuna helps non-technical users build AI agents by generating **Vibe Code Kits 
 # Install dependencies
 pnpm install
 
-# Set up environment
-cp .env.example .env
-# Edit .env with your values
+# Set up environment (API needs its own .env)
+cp .env.example apps/api/.env
+
+# Build workspace packages (required before first run)
+pnpm build
+
+# Set up database
+pnpm db:migrate
+pnpm db:seed
 
 # Start development
 pnpm dev
