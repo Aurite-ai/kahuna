@@ -18,12 +18,12 @@ pnpm install
 # Set up environment (API needs its own .env)
 cp .env.example apps/api/.env
 
-# Build workspace packages (required before first run)
-pnpm build
-
-# Set up database
+# Set up database (generates Prisma client needed for build)
 pnpm db:migrate
 pnpm db:seed
+
+# Build workspace packages
+pnpm build
 
 # Start development
 pnpm dev
