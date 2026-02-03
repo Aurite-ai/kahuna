@@ -8,10 +8,16 @@
  * and tRPC validation. Use these IDs with the X-Test-User-Id header.
  */
 
-import 'dotenv/config';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import dotenv from 'dotenv';
+
+// Load .env from the api directory (parent of prisma/), not current working directory
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 // Create Prisma client with libsql adapter (Prisma 7+ requirement for SQLite)
 const url = process.env.DATABASE_URL;
