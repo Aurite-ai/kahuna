@@ -1,0 +1,152 @@
+// =============================================================================
+// Kahuna CLI Prisma Schema
+// =============================================================================
+// Simplified schema focused on infrastructure management (tools & data sources)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// FOUNDATION TABLES
+// =============================================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions Session[]
+  projects Project[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// =============================================================================
+// PROJECT
+// =============================================================================
+
+model Project {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  contextFiles   ContextFile[]
+  vckGenerations VckGeneration[]
+  buildResults   BuildResult[]
+
+  @@index([userId])
+}
+
+// =============================================================================
+// FEEDBACK LOOP TABLES
+// =============================================================================
+
+model ContextFile {
+  id        String   @id @default(cuid())
+  projectId String
+  filename  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model VckGeneration {
+  id        String   @id @default(cuid())
+  projectId String
+  framework String   @default("langgraph")
+  copilot   String   @default("claude-code")
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model BuildResult {
+  id              String   @id @default(cuid())
+  projectId       String
+  code            Json
+  docs            Json
+  tests           Json
+  conversationLog String?
+  createdAt       DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+// =============================================================================
+// WORKFLOW DATA SOURCES & TOOLS (Infrastructure)
+// =============================================================================
+
+model WorkflowDataSource {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  sourceType  String
+
+  configuration        Json
+  encryptedCredentials String?
+
+  isActive       Boolean   @default(true)
+  lastTestedAt   DateTime?
+  lastTestStatus String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([sourceType])
+  @@index([isActive])
+}
+
+model WorkflowTool {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  toolType    String
+
+  configuration        Json
+  encryptedCredentials String?
+
+  isActive       Boolean   @default(true)
+  lastTestedAt   DateTime?
+  lastTestStatus String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([toolType])
+  @@index([isActive])
+}

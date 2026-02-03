@@ -1,0 +1,44 @@
+{
+  "name": "@kahuna/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Kahuna CLI - Professional command-line interface for VCK generation and infrastructure management",
+  "bin": {
+    "kahuna": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "dev:run": "tsx src/index.ts",
+    "build": "tsc && chmod +x dist/index.js",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui"
+  },
+  "dependencies": {
+    "@kahuna/shared": "workspace:*",
+    "@prisma/client": "^6.1.0",
+    "commander": "^12.0.0",
+    "inquirer": "^9.2.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1",
+    "cli-table3": "^0.6.3",
+    "boxen": "^7.1.1",
+    "gradient-string": "^2.0.2",
+    "figlet": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.7",
+    "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "^1.2.0",
+    "@vitest/ui": "^1.2.0",
+    "prisma": "^6.1.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.9.0",
+    "vitest": "^1.2.0"
+  }
+}

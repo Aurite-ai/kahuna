@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+
+# Environment
+.env
+.env.local
+
+# Database
+*.db
+*.db-journal
+
+# Logs
+*.log
+
+# Cache
+.turbo/
+*.tsbuildinfo
+
+# OS
+.DS_Store
+
+# Config
+.kahuna/
