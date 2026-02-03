@@ -1,5 +1,5 @@
 /**
- * Connector Registry - Maps tool types to their connectors
+ * Connector Registry - Maps integration types to their connectors
  */
 import type { BaseConnector } from './base.connector.js';
 import { GitHubConnector } from './github.connector.js';
@@ -13,15 +13,15 @@ const connectors: Record<string, BaseConnector> = {
 };
 
 /**
- * Get connector for a specific tool type
+ * Get connector for a specific integration type
  */
-export function getConnector(toolType: string): BaseConnector | null {
-  return connectors[toolType] || null;
+export function getConnector(integrationType: string): BaseConnector | null {
+  return connectors[integrationType] || null;
 }
 
 /**
- * Get all available tool types
+ * Get all available integration types
  */
-export function getAvailableToolTypes(): string[] {
+export function getAvailableIntegrationTypes(): string[] {
   return Object.keys(connectors);
 }

@@ -1,19 +1,19 @@
-import type { WorkflowTool } from '@prisma/client';
+import type { WorkflowIntegration } from '@prisma/client';
 /**
- * Tool Service - CRUD operations for workflow tools
+ * Integration Service - CRUD operations for workflow integrations
  */
 import { prisma } from '../lib/db.js';
 import { decrypt, encrypt } from '../lib/encryption.js';
 
-export interface CreateToolInput {
+export interface CreateIntegrationInput {
   name: string;
   description?: string;
-  toolType: string;
+  integrationType: string;
   configuration: Record<string, any>;
   credentials?: Record<string, any>;
 }
 
-export interface UpdateToolInput {
+export interface UpdateIntegrationInput {
   name?: string;
   description?: string;
   configuration?: Record<string, any>;
@@ -21,16 +21,17 @@ export interface UpdateToolInput {
   isActive?: boolean;
 }
 
-export interface ToolWithDecryptedCredentials extends Omit<WorkflowTool, 'encryptedCredentials'> {
+export interface IntegrationWithDecryptedCredentials
+  extends Omit<WorkflowIntegration, 'encryptedCredentials'> {
   credentials?: Record<string, any>;
 }
 
-export class ToolService {
+export class IntegrationService {
   /**
-   * List all tools for a user
+   * List all integrations for a user
    */
-  async list(userId: string): Promise<WorkflowTool[]> {
-    return prisma.workflowTool.findMany({
+  async list(userId: string): Promise<WorkflowIntegration[]> {
+    return prisma.workflowIntegration.findMany({
       where: {
         userId,
         isActive: true,
@@ -42,57 +43,60 @@ export class ToolService {
   }
 
   /**
-   * Get a tool by ID
+   * Get an integration by ID
    */
-  async getById(id: string, userId: string): Promise<ToolWithDecryptedCredentials | null> {
-    const tool = await prisma.workflowTool.findFirst({
+  async getById(id: string, userId: string): Promise<IntegrationWithDecryptedCredentials | null> {
+    const integration = await prisma.workflowIntegration.findFirst({
       where: {
         id,
         userId,
       },
     });
 
-    if (!tool) {
+    if (!integration) {
       return null;
     }
 
-    return this.decryptCredentials(tool);
+    return this.decryptCredentials(integration);
   }
 
   /**
-   * Get a tool by name
+   * Get an integration by name
    */
-  async getByName(name: string, userId: string): Promise<ToolWithDecryptedCredentials | null> {
-    const tool = await prisma.workflowTool.findFirst({
+  async getByName(
+    name: string,
+    userId: string
+  ): Promise<IntegrationWithDecryptedCredentials | null> {
+    const integration = await prisma.workflowIntegration.findFirst({
       where: {
         name,
         userId,
       },
     });
 
-    if (!tool) {
+    if (!integration) {
       return null;
     }
 
-    return this.decryptCredentials(tool);
+    return this.decryptCredentials(integration);
   }
 
   /**
-   * Create a new tool
+   * Create a new integration
    */
-  async create(userId: string, input: CreateToolInput): Promise<WorkflowTool> {
+  async create(userId: string, input: CreateIntegrationInput): Promise<WorkflowIntegration> {
     // Encrypt credentials if provided
     let encryptedCredentials: string | null = null;
     if (input.credentials && Object.keys(input.credentials).length > 0) {
       encryptedCredentials = encrypt(JSON.stringify(input.credentials));
     }
 
-    return prisma.workflowTool.create({
+    return prisma.workflowIntegration.create({
       data: {
         userId,
         name: input.name,
         description: input.description || null,
-        toolType: input.toolType,
+        integrationType: input.integrationType,
         configuration: input.configuration,
         encryptedCredentials,
       },
@@ -100,16 +104,20 @@ export class ToolService {
   }
 
   /**
-   * Update a tool
+   * Update an integration
    */
-  async update(id: string, userId: string, input: UpdateToolInput): Promise<WorkflowTool> {
+  async update(
+    id: string,
+    userId: string,
+    input: UpdateIntegrationInput
+  ): Promise<WorkflowIntegration> {
     // Verify ownership
-    const existing = await prisma.workflowTool.findFirst({
+    const existing = await prisma.workflowIntegration.findFirst({
       where: { id, userId },
     });
 
     if (!existing) {
-      throw new Error('Tool not found');
+      throw new Error('Integration not found');
     }
 
     // Build update data
@@ -129,25 +137,25 @@ export class ToolService {
       }
     }
 
-    return prisma.workflowTool.update({
+    return prisma.workflowIntegration.update({
       where: { id },
       data: updateData,
     });
   }
 
   /**
-   * Delete a tool
+   * Delete an integration
    */
   async delete(id: string, userId: string): Promise<void> {
-    const existing = await prisma.workflowTool.findFirst({
+    const existing = await prisma.workflowIntegration.findFirst({
       where: { id, userId },
     });
 
     if (!existing) {
-      throw new Error('Tool not found');
+      throw new Error('Integration not found');
     }
 
-    await prisma.workflowTool.delete({
+    await prisma.workflowIntegration.delete({
       where: { id },
     });
   }
@@ -156,7 +164,7 @@ export class ToolService {
    * Update test status
    */
   async updateTestStatus(id: string, status: 'success' | 'failed'): Promise<void> {
-    await prisma.workflowTool.update({
+    await prisma.workflowIntegration.update({
       where: { id },
       data: {
         lastTestedAt: new Date(),
@@ -166,10 +174,12 @@ export class ToolService {
   }
 
   /**
-   * Helper: Decrypt credentials from a tool
+   * Helper: Decrypt credentials from an integration
    */
-  private decryptCredentials(tool: WorkflowTool): ToolWithDecryptedCredentials {
-    const { encryptedCredentials, ...rest } = tool;
+  private decryptCredentials(
+    integration: WorkflowIntegration
+  ): IntegrationWithDecryptedCredentials {
+    const { encryptedCredentials, ...rest } = integration;
 
     let credentials: Record<string, any> | undefined;
     if (encryptedCredentials) {
@@ -187,4 +197,4 @@ export class ToolService {
   }
 }
 
-export const toolService = new ToolService();
+export const integrationService = new IntegrationService();

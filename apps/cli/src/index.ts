@@ -7,7 +7,7 @@ import { Command } from 'commander';
 import { config } from 'dotenv';
 import figlet from 'figlet';
 import gradient from 'gradient-string';
-import { registerToolCommands } from './commands/tool.js';
+import { registerIntegrationCommands } from './commands/integration.js';
 
 // Load environment variables
 config();
@@ -38,7 +38,7 @@ async function main(): Promise<void> {
     });
 
   // Register command groups
-  registerToolCommands(program);
+  registerIntegrationCommands(program);
 
   // TODO: Add more command groups
   // registerDataSourceCommands(program);

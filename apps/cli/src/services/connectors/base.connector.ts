@@ -1,5 +1,5 @@
 /**
- * Base connector interface for all tool/data source connectors
+ * Base connector interface for all integration/data source connectors
  */
 
 export interface ConnectionTestResult {

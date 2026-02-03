@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 /**
- * Tool Commands - Manage workflow tools (GitHub, Slack, etc.)
+ * Integration Commands - Manage workflow integrations (GitHub, Slack, etc.)
  */
 import { Command } from 'commander';
 import inquirer from 'inquirer';
@@ -8,63 +8,65 @@ import ora from 'ora';
 import { getCurrentUserId } from '../lib/config.js';
 import { prisma } from '../lib/db.js';
 import { getConnector } from '../services/connectors/index.js';
-import { toolService } from '../services/tool.service.js';
+import { integrationService } from '../services/integration.service.js';
 import * as ui from '../ui/messages.js';
-import { formatToolDetail, formatToolsTable } from '../ui/tables.js';
+import { formatIntegrationDetail, formatIntegrationsTable } from '../ui/tables.js';
 
-export function registerToolCommands(program: Command): void {
-  const tool = program.command('tool').description('Manage workflow tools (GitHub, Slack, etc.)');
+export function registerIntegrationCommands(program: Command): void {
+  const integration = program
+    .command('integration')
+    .description('Manage workflow integrations (GitHub, Slack, etc.)');
 
-  // kahuna tool list
-  tool
+  // kahuna integration list
+  integration
     .command('list')
-    .description('List all configured tools')
+    .description('List all configured integrations')
     .action(async () => {
       try {
         const userId = await getCurrentUserId(prisma);
-        const tools = await toolService.list(userId);
+        const integrations = await integrationService.list(userId);
 
-        ui.header('🔧 Workflow Tools');
-        console.log(formatToolsTable(tools));
+        ui.header('🔧 Workflow Integrations');
+        console.log(formatIntegrationsTable(integrations));
         console.log('');
 
-        if (tools.length === 0) {
-          ui.info('Add your first tool with: kahuna tool add');
+        if (integrations.length === 0) {
+          ui.info('Add your first integration with: kahuna integration add');
         } else {
-          ui.info(`Run ${chalk.cyan('kahuna tool show <name>')} for details`);
+          ui.info(`Run ${chalk.cyan('kahuna integration show <name>')} for details`);
         }
       } catch (error) {
-        ui.error(error instanceof Error ? error.message : 'Failed to list tools');
+        ui.error(error instanceof Error ? error.message : 'Failed to list integrations');
         process.exit(1);
       }
     });
 
-  // kahuna tool add
-  tool
+  // kahuna integration add
+  integration
     .command('add')
-    .description('Add a new tool')
-    .option('-t, --type <type>', 'Tool type (e.g., github, slack)')
+    .description('Add a new integration')
+    .option('-t, --type <type>', 'Integration type (e.g., github, slack)')
     .action(async (options) => {
       try {
         const userId = await getCurrentUserId(prisma);
 
         // For now, only GitHub is implemented
-        const toolType = options.type?.toUpperCase() || 'GITHUB';
+        const integrationType = options.type?.toUpperCase() || 'GITHUB';
 
-        if (toolType !== 'GITHUB') {
-          ui.error(`Tool type ${toolType} is not yet implemented`);
+        if (integrationType !== 'GITHUB') {
+          ui.error(`Integration type ${integrationType} is not yet implemented`);
           ui.info('Currently supported: github');
           process.exit(1);
         }
 
-        ui.header('🔌 Add GitHub Tool');
+        ui.header('🔌 Add GitHub Integration');
 
-        // Gather tool information (one prompt at a time so Enter advances correctly)
+        // Gather integration information (one prompt at a time so Enter advances correctly)
         const { name } = await inquirer.prompt([
           {
             type: 'input',
             name: 'name',
-            message: 'Tool name:',
+            message: 'Integration name:',
             default: 'GitHub Personal',
             validate: (input: string) => (input.trim().length > 0 ? true : 'Name is required'),
           },
@@ -98,7 +100,7 @@ export function registerToolCommands(program: Command): void {
         ui.section('Testing Connection');
         const spinner = ora('Connecting to GitHub...').start();
 
-        const connector = getConnector(toolType);
+        const connector = getConnector(integrationType);
         if (!connector) {
           spinner.fail('No connector available for GitHub');
           process.exit(1);
@@ -128,89 +130,89 @@ export function registerToolCommands(program: Command): void {
           console.log(chalk.dim(`  Type: ${testResult.details.type}`));
         }
 
-        // Save tool
-        ui.section('Saving Tool');
-        const savingSpinner = ora('Creating tool...').start();
+        // Save integration
+        ui.section('Saving Integration');
+        const savingSpinner = ora('Creating integration...').start();
 
-        const tool = await toolService.create(userId, {
+        const integration = await integrationService.create(userId, {
           name: answers.name,
           description: answers.description || undefined,
-          toolType,
+          integrationType,
           configuration: { baseUrl: answers.baseUrl },
           credentials: { token: answers.token },
         });
 
         // Update test status
-        await toolService.updateTestStatus(tool.id, 'success');
+        await integrationService.updateTestStatus(integration.id, 'success');
 
-        savingSpinner.succeed('Tool created successfully');
+        savingSpinner.succeed('Integration created successfully');
 
-        ui.successBox('Tool Added!', [
-          `Name: ${tool.name}`,
-          `Type: ${tool.toolType}`,
+        ui.successBox('Integration Added!', [
+          `Name: ${integration.name}`,
+          `Type: ${integration.integrationType}`,
           `Status: ${chalk.green('✓')} Connected`,
           '',
-          `Use: ${chalk.cyan(`kahuna tool test ${tool.name}`)} to test again`,
+          `Use: ${chalk.cyan(`kahuna integration test ${integration.name}`)} to test again`,
         ]);
       } catch (error) {
-        ui.error(error instanceof Error ? error.message : 'Failed to add tool');
+        ui.error(error instanceof Error ? error.message : 'Failed to add integration');
         process.exit(1);
       }
     });
 
-  // kahuna tool show <name>
-  tool
+  // kahuna integration show <name>
+  integration
     .command('show <name>')
-    .description('Show tool details')
+    .description('Show integration details')
     .action(async (name: string) => {
       try {
         const userId = await getCurrentUserId(prisma);
-        const tool = await toolService.getByName(name, userId);
+        const integration = await integrationService.getByName(name, userId);
 
-        if (!tool) {
-          ui.error(`Tool not found: ${name}`);
+        if (!integration) {
+          ui.error(`Integration not found: ${name}`);
           process.exit(1);
         }
 
-        ui.header('🔧 Tool Details');
-        const details = formatToolDetail(tool);
+        ui.header('🔧 Integration Details');
+        const details = formatIntegrationDetail(integration);
 
         for (const line of details) {
           console.log(line);
         }
         console.log('');
       } catch (error) {
-        ui.error(error instanceof Error ? error.message : 'Failed to show tool');
+        ui.error(error instanceof Error ? error.message : 'Failed to show integration');
         process.exit(1);
       }
     });
 
-  // kahuna tool test <name>
-  tool
+  // kahuna integration test <name>
+  integration
     .command('test <name>')
-    .description('Test tool connection')
+    .description('Test integration connection')
     .action(async (name: string) => {
       try {
         const userId = await getCurrentUserId(prisma);
-        const tool = await toolService.getByName(name, userId);
+        const integration = await integrationService.getByName(name, userId);
 
-        if (!tool) {
-          ui.error(`Tool not found: ${name}`);
+        if (!integration) {
+          ui.error(`Integration not found: ${name}`);
           process.exit(1);
         }
 
         ui.header('🔌 Testing Connection');
-        const spinner = ora(`Testing ${tool.name}...`).start();
+        const spinner = ora(`Testing ${integration.name}...`).start();
 
-        const connector = getConnector(tool.toolType);
+        const connector = getConnector(integration.integrationType);
         if (!connector) {
-          spinner.fail(`No connector available for ${tool.toolType}`);
+          spinner.fail(`No connector available for ${integration.integrationType}`);
           process.exit(1);
         }
 
         const result = await connector.testConnection(
-          tool.configuration as Record<string, unknown>,
-          tool.credentials
+          integration.configuration as Record<string, unknown>,
+          integration.credentials
         );
 
         if (result.success) {
@@ -224,7 +226,7 @@ export function registerToolCommands(program: Command): void {
           }
 
           // Update test status
-          await toolService.updateTestStatus(tool.id, 'success');
+          await integrationService.updateTestStatus(integration.id, 'success');
 
           console.log('');
           ui.success('Connection test passed');
@@ -232,7 +234,7 @@ export function registerToolCommands(program: Command): void {
           spinner.fail('Connection failed');
 
           // Update test status
-          await toolService.updateTestStatus(tool.id, 'failed');
+          await integrationService.updateTestStatus(integration.id, 'failed');
 
           ui.errorBox('Connection Error', [
             result.message || 'Unknown error',
@@ -242,22 +244,22 @@ export function registerToolCommands(program: Command): void {
           process.exit(1);
         }
       } catch (error) {
-        ui.error(error instanceof Error ? error.message : 'Failed to test tool');
+        ui.error(error instanceof Error ? error.message : 'Failed to test integration');
         process.exit(1);
       }
     });
 
-  // kahuna tool delete <name>
-  tool
+  // kahuna integration delete <name>
+  integration
     .command('delete <name>')
-    .description('Delete a tool')
+    .description('Delete an integration')
     .action(async (name: string) => {
       try {
         const userId = await getCurrentUserId(prisma);
-        const tool = await toolService.getByName(name, userId);
+        const integration = await integrationService.getByName(name, userId);
 
-        if (!tool) {
-          ui.error(`Tool not found: ${name}`);
+        if (!integration) {
+          ui.error(`Integration not found: ${name}`);
           process.exit(1);
         }
 
@@ -266,7 +268,7 @@ export function registerToolCommands(program: Command): void {
           {
             type: 'confirm',
             name: 'confirm',
-            message: `Are you sure you want to delete "${tool.name}"?`,
+            message: `Are you sure you want to delete "${integration.name}"?`,
             default: false,
           },
         ]);
@@ -276,10 +278,10 @@ export function registerToolCommands(program: Command): void {
           return;
         }
 
-        await toolService.delete(tool.id, userId);
-        ui.success(`Tool "${tool.name}" deleted successfully`);
+        await integrationService.delete(integration.id, userId);
+        ui.success(`Integration "${integration.name}" deleted successfully`);
       } catch (error) {
-        ui.error(error instanceof Error ? error.message : 'Failed to delete tool');
+        ui.error(error instanceof Error ? error.message : 'Failed to delete integration');
         process.exit(1);
       }
     });

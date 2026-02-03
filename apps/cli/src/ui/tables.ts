@@ -1,13 +1,13 @@
-import type { WorkflowTool } from '@prisma/client';
+import type { WorkflowIntegration } from '@prisma/client';
 import chalk from 'chalk';
 /**
  * Table formatting utilities
  */
 import Table from 'cli-table3';
 
-export function formatToolsTable(tools: WorkflowTool[]): string {
-  if (tools.length === 0) {
-    return chalk.yellow('No tools found');
+export function formatIntegrationsTable(integrations: WorkflowIntegration[]): string {
+  if (integrations.length === 0) {
+    return chalk.yellow('No integrations found');
   }
 
   const table = new Table({
@@ -23,19 +23,19 @@ export function formatToolsTable(tools: WorkflowTool[]): string {
     },
   });
 
-  for (const tool of tools) {
+  for (const integration of integrations) {
     const status =
-      tool.lastTestStatus === 'success'
+      integration.lastTestStatus === 'success'
         ? chalk.green('✓')
-        : tool.lastTestStatus === 'failed'
+        : integration.lastTestStatus === 'failed'
           ? chalk.red('✗ Failed')
           : chalk.gray('-');
 
-    const lastTested = tool.lastTestedAt
-      ? formatRelativeTime(tool.lastTestedAt)
+    const lastTested = integration.lastTestedAt
+      ? formatRelativeTime(integration.lastTestedAt)
       : chalk.gray('Never');
 
-    table.push([tool.name, tool.toolType, status, lastTested]);
+    table.push([integration.name, integration.integrationType, status, lastTested]);
   }
 
   return table.toString();
@@ -55,38 +55,42 @@ function formatRelativeTime(date: Date): string {
   return new Date(date).toLocaleDateString();
 }
 
-export function formatToolDetail(tool: WorkflowTool): string[] {
+export function formatIntegrationDetail(integration: WorkflowIntegration): string[] {
   const lines: string[] = [];
 
-  lines.push(chalk.bold('Name: ') + tool.name);
-  lines.push(chalk.bold('Type: ') + tool.toolType);
+  lines.push(chalk.bold('Name: ') + integration.name);
+  lines.push(chalk.bold('Type: ') + integration.integrationType);
 
-  if (tool.description) {
-    lines.push(chalk.bold('Description: ') + tool.description);
+  if (integration.description) {
+    lines.push(chalk.bold('Description: ') + integration.description);
   }
 
   lines.push('');
   lines.push(chalk.bold('Status:'));
 
-  if (tool.lastTestStatus === 'success') {
-    lines.push(`  ${chalk.green('✓')} Connected (${formatRelativeTime(tool.lastTestedAt!)})`);
-  } else if (tool.lastTestStatus === 'failed') {
-    lines.push(`  ${chalk.red('✗')} Connection failed (${formatRelativeTime(tool.lastTestedAt!)})`);
+  if (integration.lastTestStatus === 'success') {
+    lines.push(
+      `  ${chalk.green('✓')} Connected (${formatRelativeTime(integration.lastTestedAt!)})`
+    );
+  } else if (integration.lastTestStatus === 'failed') {
+    lines.push(
+      `  ${chalk.red('✗')} Connection failed (${formatRelativeTime(integration.lastTestedAt!)})`
+    );
   } else {
     lines.push(`  ${chalk.gray('○')} Not tested yet`);
   }
 
   lines.push('');
   lines.push(chalk.bold('Configuration:'));
-  const config = tool.configuration as Record<string, unknown>;
+  const config = integration.configuration as Record<string, unknown>;
   for (const [key, value] of Object.entries(config)) {
     lines.push(`  ${key}: ${value}`);
   }
 
   lines.push('');
-  lines.push(chalk.dim(`ID: ${tool.id}`));
-  lines.push(chalk.dim(`Created: ${new Date(tool.createdAt).toLocaleString()}`));
-  lines.push(chalk.dim(`Updated: ${new Date(tool.updatedAt).toLocaleString()}`));
+  lines.push(chalk.dim(`ID: ${integration.id}`));
+  lines.push(chalk.dim(`Created: ${new Date(integration.createdAt).toLocaleString()}`));
+  lines.push(chalk.dim(`Updated: ${new Date(integration.updatedAt).toLocaleString()}`));
 
   return lines;
 }

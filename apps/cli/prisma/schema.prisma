@@ -104,7 +104,7 @@ model BuildResult {
 }
 
 // =============================================================================
-// WORKFLOW DATA SOURCES & TOOLS (Infrastructure)
+// WORKFLOW DATA SOURCES & INTEGRATIONS (Infrastructure)
 // =============================================================================
 
 model WorkflowDataSource {
@@ -129,12 +129,12 @@ model WorkflowDataSource {
   @@index([isActive])
 }
 
-model WorkflowTool {
-  id          String    @id @default(cuid())
-  userId      String
-  name        String
-  description String?
-  toolType    String
+model WorkflowIntegration {
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
+  description     String?
+  integrationType String
 
   configuration        Json
   encryptedCredentials String?
@@ -147,6 +147,6 @@ model WorkflowTool {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
-  @@index([toolType])
+  @@index([integrationType])
   @@index([isActive])
 }

@@ -2,13 +2,13 @@
 
 Professional command-line interface for VCK generation and infrastructure management.
 
-## Phase 1: GitHub Tool Implementation
+## Phase 1: GitHub Integration Implementation
 
-This initial release focuses on GitHub tool management as proof of concept. The same pattern will be replicated for other tools and data sources.
+This initial release focuses on GitHub integration management as proof of concept. The same pattern will be replicated for other integrations and data sources.
 
 ## Features
 
-- ✅ **Tool Management**: Add, list, test, and delete workflow tools
+- ✅ **Integration Management**: Add, list, test, and delete workflow integrations
 - ✅ **GitHub Integration**: Connect and validate GitHub API access
 - ✅ **Beautiful CLI UX**: Modern interface with spinners, tables, and colors
 - ✅ **Secure Credentials**: Encrypted storage of sensitive data
@@ -57,33 +57,33 @@ pnpm start
 
 ## Usage
 
-### GitHub Tool Commands
+### GitHub Integration Commands
 
-#### Add a GitHub Tool
+#### Add a GitHub Integration
 
 ```bash
 # Using non-watch mode (recommended)
-pnpm dev:run tool add
+pnpm dev:run integration add
 
 # Or with built version
-pnpm start tool add
+pnpm start integration add
 
 # Or specify type explicitly
-pnpm dev:run tool add --type github
+pnpm dev:run integration add --type github
 ```
 
 You'll be prompted for:
-- **Tool name**: Friendly name (e.g., "GitHub Personal", "Company GitHub")
+- **Integration name**: Friendly name (e.g., "GitHub Personal", "Company GitHub")
 - **Description**: Optional description
 - **GitHub API URL**: Default is https://api.github.com (use custom for GitHub Enterprise)
 - **Personal Access Token**: Your GitHub PAT
 
-The tool will be tested before saving!
+The integration will be tested before saving!
 
-#### List All Tools
+#### List All Integrations
 
 ```bash
-kahuna tool list
+kahuna integration list
 ```
 
 Output:
@@ -95,16 +95,16 @@ Output:
 └─────────────────────────┴────────────┴──────────┴──────────────┘
 ```
 
-#### Show Tool Details
+#### Show Integration Details
 
 ```bash
-kahuna tool show "GitHub Personal"
+kahuna integration show "GitHub Personal"
 ```
 
-#### Test Tool Connection
+#### Test Integration Connection
 
 ```bash
-kahuna tool test "GitHub Personal"
+kahuna integration test "GitHub Personal"
 ```
 
 Output includes:
@@ -112,10 +112,10 @@ Output includes:
 - Response time
 - User information (username, name, type)
 
-#### Delete a Tool
+#### Delete an Integration
 
 ```bash
-kahuna tool delete "GitHub Personal"
+kahuna integration delete "GitHub Personal"
 ```
 
 You'll be asked to confirm before deletion.
@@ -126,9 +126,9 @@ You'll be asked to confirm before deletion.
 apps/cli/
 ├── src/
 │   ├── commands/
-│   │   └── tool.ts           # Tool commands (add, list, test, delete)
+│   │   └── integration.ts    # Integration commands (add, list, test, delete)
 │   ├── services/
-│   │   ├── tool.service.ts   # Tool CRUD operations
+│   │   ├── integration.service.ts   # Integration CRUD operations
 │   │   └── connectors/
 │   │       ├── base.connector.ts    # Connector interface
 │   │       ├── github.connector.ts  # GitHub implementation
@@ -150,7 +150,7 @@ apps/cli/
 
 The CLI uses SQLite for local storage:
 - **Location**: `apps/cli/dev.db` (created automatically)
-- **Schema**: User, Session, Project, WorkflowTool, WorkflowDataSource
+- **Schema**: User, Session, Project, WorkflowIntegration, WorkflowDataSource
 - **Encryption**: Credentials are encrypted using AES-256-GCM
 
 ## Security
@@ -162,7 +162,7 @@ The CLI uses SQLite for local storage:
 
 ## Adding More Connectors
 
-To add support for other tools (Slack, Notion, etc.):
+To add support for other integrations (Slack, Notion, etc.):
 
 1. **Create connector** in `src/services/connectors/`:
    ```typescript
@@ -181,13 +181,13 @@ To add support for other tools (Slack, Notion, etc.):
    };
    ```
 
-3. **Update tool command** prompts in `src/commands/tool.ts` for tool-specific configuration.
+3. **Update integration command** prompts in `src/commands/integration.ts` for integration-specific configuration.
 
 That's it! The rest of the infrastructure (storage, encryption, UI) is reusable.
 
 ## Next Steps
 
-- [ ] Add more tools (Slack, Notion, Jira, Zendesk)
+- [ ] Add more integrations (Slack, Notion, Jira, Zendesk)
 - [ ] Add data sources (PostgreSQL, MySQL, MongoDB, etc.)
 - [ ] Add project commands (VCK generation workflow)
 - [ ] Add configuration commands
@@ -237,11 +237,11 @@ The GitHub connector has comprehensive test coverage including:
 
 ```bash
 # Example workflow
-kahuna tool add                                    # Add GitHub tool
-kahuna tool list                                   # See your tools
-kahuna tool show "GitHub Personal"                 # View details
-kahuna tool test "GitHub Personal"                 # Test connection
-kahuna tool delete "GitHub Personal"               # Clean up
+kahuna integration add                                    # Add GitHub integration
+kahuna integration list                                   # See your integrations
+kahuna integration show "GitHub Personal"                 # View details
+kahuna integration test "GitHub Personal"                 # Test connection
+kahuna integration delete "GitHub Personal"               # Clean up
 ```
 
 ### Writing Tests for New Connectors
