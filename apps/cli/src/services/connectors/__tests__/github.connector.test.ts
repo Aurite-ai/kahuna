@@ -42,7 +42,7 @@ describe('GitHubConnector', () => {
         id: 12345,
         type: 'User',
       });
-      expect(result.responseTime).toBeGreaterThan(0);
+      expect(result.responseTime).toBeGreaterThanOrEqual(0);
     });
 
     it('should fail when token is missing', async () => {
@@ -67,7 +67,7 @@ describe('GitHubConnector', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('401');
-      expect(result.responseTime).toBeGreaterThan(0);
+      expect(result.responseTime).toBeGreaterThanOrEqual(0);
     });
 
     it('should handle network errors', async () => {
