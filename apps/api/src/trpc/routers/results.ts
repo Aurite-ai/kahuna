@@ -77,7 +77,10 @@ export const resultsRouter = router({
         },
       });
 
-      ctx.logger.info({ buildResultId: result.id, projectId: input.projectId }, 'Build result submitted');
+      ctx.logger.info(
+        { buildResultId: result.id, projectId: input.projectId },
+        'Build result submitted'
+      );
       return result;
     } catch (error) {
       if (error instanceof Error) {

@@ -106,7 +106,7 @@ const allTools = [
 async function routeToolCall(
   toolName: string,
   args: Record<string, unknown>,
-  client: KahunaClient,
+  client: KahunaClient
 ): Promise<CallToolResult> {
   switch (toolName) {
     case 'health_check': {
@@ -127,7 +127,7 @@ async function routeToolCall(
                   availableTools: allTools.map((t) => t.name),
                 },
                 null,
-                2,
+                2
               ),
             },
           ],
@@ -152,7 +152,7 @@ async function routeToolCall(
                     },
                   },
                   null,
-                  2,
+                  2
                 ),
               },
             ],
@@ -170,7 +170,7 @@ async function routeToolCall(
                     hint: 'Make sure the Kahuna API is running (pnpm --filter @kahuna/api dev)',
                   },
                   null,
-                  2,
+                  2
                 ),
               },
             ],
@@ -190,7 +190,7 @@ async function routeToolCall(
                 validActions: ['ping', 'api'],
               },
               null,
-              2,
+              2
             ),
           },
         ],
@@ -293,7 +293,7 @@ async function main() {
         tools: {},
         resources: {},
       },
-    },
+    }
   );
 
   // ---------------------------------------------------------------------------

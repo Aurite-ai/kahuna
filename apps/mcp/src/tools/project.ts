@@ -147,7 +147,7 @@ function errorResponse(message: string, details?: unknown): MCPToolResponse {
  */
 export async function projectToolHandler(
   args: Record<string, unknown>,
-  client: KahunaClient,
+  client: KahunaClient
 ): Promise<MCPToolResponse> {
   const input = args as unknown as ProjectToolInput;
   const { action, id, name, description } = input;
@@ -215,7 +215,7 @@ export async function projectToolHandler(
 
         if (!name && description === undefined) {
           return errorResponse(
-            'At least one field (name or description) must be provided for update',
+            'At least one field (name or description) must be provided for update'
           );
         }
 

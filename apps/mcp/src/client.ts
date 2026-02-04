@@ -287,7 +287,7 @@ export function createClientFromEnv(): KahunaClient {
 
   if (!sessionToken) {
     console.warn(
-      '[MCP Server] Warning: KAHUNA_SESSION_TOKEN not set. API calls will be unauthenticated.',
+      '[MCP Server] Warning: KAHUNA_SESSION_TOKEN not set. API calls will be unauthenticated.'
     );
   }
 

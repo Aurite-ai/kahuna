@@ -70,7 +70,10 @@ export const contextRouter = router({
       },
     });
 
-    ctx.logger.info({ contextFileId: contextFile.id, projectId: input.projectId }, 'Context file created');
+    ctx.logger.info(
+      { contextFileId: contextFile.id, projectId: input.projectId },
+      'Context file created'
+    );
     return contextFile;
   }),
 
