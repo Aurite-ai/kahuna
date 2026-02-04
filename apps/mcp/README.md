@@ -1,14 +1,14 @@
-# @kahuna/mcp-server
+# @kahuna/mcp
 
 MCP (Model Context Protocol) server that wraps the Kahuna tRPC API as MCP tools, allowing AI assistants like Claude to interact with Kahuna programmatically.
 
 ## Overview
 
-This package provides a bridge between AI assistants and the Kahuna platform:
+This app provides a bridge between AI assistants and the Kahuna platform:
 
 ```
 ┌─────────────────────┐     MCP Protocol      ┌─────────────────────┐
-│   Claude Desktop    │ ◄──────────────────► │  @kahuna/mcp-server │
+│   Claude Desktop    │ ◄──────────────────► │     @kahuna/mcp     │
 │   (or other client) │                       │                     │
 └─────────────────────┘                       └──────────┬──────────┘
                                                          │
@@ -30,26 +30,26 @@ From the monorepo root:
 pnpm install
 ```
 
-### 2. Build the Package
+### 2. Build the App
 
 ```bash
-pnpm --filter @kahuna/mcp-server build
+pnpm --filter @kahuna/mcp build
 ```
 
 ### 3. Configure Claude Desktop
 
 Add to your Claude Desktop configuration manually (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
-OR make claude code do it for you! 
+OR make claude code do it for you!
 
-*Imp Note:* update the args path to your local `*/packages/mcp-server/dist/index.js` path
+*Imp Note:* update the args path to your local `*/apps/mcp/dist/index.js` path
 
 ```json
 {
   "mcpServers": {
     "kahuna": {
       "command": "node",
-      "args": ["/path/to/kahuna/packages/mcp-server/dist/index.js"],
+      "args": ["/path/to/kahuna/apps/mcp/dist/index.js"],
       "env": {
         "KAHUNA_API_URL": "http://localhost:3000",
         "KAHUNA_SESSION_TOKEN": "your-session-token-here"
@@ -321,7 +321,7 @@ Use consistent response structure:
 ## Architecture
 
 ```
-packages/mcp-server/
+apps/mcp/
 ├── src/
 │   ├── index.ts          # MCP server entry point
 │   ├── client.ts         # HTTP client for Kahuna API calls
@@ -341,7 +341,7 @@ packages/mcp-server/
 
 ```bash
 # From monorepo root
-pnpm --filter @kahuna/mcp-server dev
+pnpm --filter @kahuna/mcp dev
 ```
 
 ### Testing Manually
@@ -355,7 +355,7 @@ echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | node dist/index.js
 ### Type Checking
 
 ```bash
-pnpm --filter @kahuna/mcp-server typecheck
+pnpm --filter @kahuna/mcp typecheck
 ```
 
 ## Roadmap

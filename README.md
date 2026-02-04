@@ -72,10 +72,13 @@ pnpm db:studio
 ```
 kahuna/
 ├── apps/
-│   ├── web/          # React frontend (Vite)
-│   └── api/          # Express backend
+│   ├── api/          # Express backend (tRPC + Prisma)
+│   ├── mcp/          # MCP server for AI assistants
+│   └── web/          # React frontend (Vite)
 ├── packages/
-│   └── shared/       # Shared types & utilities
+│   ├── shared/       # Shared types, schemas, utilities
+│   ├── vck-templates/# VCK content (copilot configs, frameworks)
+│   └── testing/      # Test scenarios and CLI tools
 └── docs/             # Documentation
 ```
 

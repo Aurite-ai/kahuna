@@ -1,19 +1,11 @@
 {
-  "name": "@kahuna/mcp-server",
+  "name": "@kahuna/mcp",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "description": "MCP server that wraps Kahuna tRPC API as MCP tools",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "bin": {
     "kahuna-mcp": "./dist/index.js"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
   },
   "scripts": {
     "build": "tsc",
