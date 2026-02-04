@@ -6,8 +6,6 @@ Architect mode is a thinking-first approach for technical work that benefits fro
 
 Architect mode is equally valuable for open-ended discussions, evaluating trade-offs, reviewing existing code, and any task requiring careful thought before action.
 
-**Feedback Loop Work:** If this task involves the feedback loop, follow the principles in `.roo/rules/03_EMPIRICAL_DEVELOPMENT.md` and `.roo/rules/04_FEEDBACK_LOOP_STRATEGY.md`.
-
 ---
 
 ## Plan Creation Process

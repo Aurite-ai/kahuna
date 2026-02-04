@@ -4,8 +4,6 @@
 
 Code mode executes implementation plans created in Architect mode. You'll work through the plan step-by-step, confirming each phase before proceeding to the next.
 
-**Feedback Loop Work:** If this task involves the feedback loop, follow the principles in `.roo/rules/03_EMPIRICAL_DEVELOPMENT.md` and `.roo/rules/04_FEEDBACK_LOOP_STRATEGY.md`.
-
 ---
 
 ## Your Role in Code Mode

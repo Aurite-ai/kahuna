@@ -4,9 +4,9 @@
 
 > **You cannot design your way to something you don't yet understand. You must learn your way there through rapid, measurable experiments.**
 
-The Kahuna feedback loop - the mechanism by which VCK quality improves over time - is fundamentally unknowable in advance. We cannot design the optimal solution because we don't yet know what "optimal" looks like. We can only discover it through empirical testing, measurement, and iteration.
+What makes Kahuna valuable is fundamentally unknowable in advance. We cannot design the optimal solution because we don't yet know what "optimal" looks like. We can only discover it through empirical testing, measurement, and iteration.
 
-This is not a limitation to overcome; it is the nature of the problem. Embracing this reality is what separates Kahuna 2.0's approach from Kahuna 1.0's failure.
+This is not a limitation to overcome; it is the nature of the problem.
 
 ---
 
@@ -26,17 +26,17 @@ Kahuna 1.0 had plenty of features but never achieved a working, functional produ
 
 ### Every Change is a Hypothesis
 
-When you modify feedback loop code, you are not "implementing a feature." You are running an experiment:
+When you modify core system code, you are not "implementing a feature." You are running an experiment:
 
-- **Hypothesis**: "This change will improve VCK quality as measured by [metric]"
-- **Test**: Run the change through automated testing infrastructure
+- **Hypothesis**: "This change will improve [specific capability] as measured by [metric]"
+- **Test**: Run the change and observe results
 - **Result**: Measurable outcome that either validates or invalidates the hypothesis
 
 Decisions flow from data, not intuition, preference, or "best practices."
 
 ### Simplicity is Required, Not Preferred
 
-Complex systems obscure cause and effect. When a test fails or results degrade, you need to know _why_. Complexity makes this impossible.
+Complex systems obscure cause and effect. When something fails or results degrade, you need to know _why_. Complexity makes this impossible.
 
 Therefore:
 
@@ -46,9 +46,9 @@ Therefore:
 
 ### Dependencies are Chains
 
-Any code that depends on the feedback loop, or that the feedback loop depends on, creates coupling. Coupling slows iteration. Slow iteration prevents learning.
+Any code that creates coupling slows iteration. Slow iteration prevents learning.
 
-The only dependencies that should touch the feedback loop are those that **accelerate testing and measurement**. Everything else is a chain to be avoided or broken.
+The only dependencies that should touch core functionality are those that **accelerate testing and measurement**. Everything else is a chain to be avoided or broken.
 
 ---
 
@@ -78,61 +78,6 @@ The only dependencies that should touch the feedback loop are those that **accel
 
 ---
 
-## The Meta-Loop
-
-There are two feedback loops in Kahuna:
-
-1. **The Product Loop**: User context → VCK → Agent build → Results → Learning → Better VCKs
-2. **The Development Loop**: Code change → Automated test → Results → Team analysis → Direction adjustment
-
-The development loop is what enables us to discover the product loop. Without automated testing infrastructure that provides rapid, measurable feedback on code changes, we cannot learn our way to a working product.
-
-**The testing infrastructure is the feedback loop for developing the feedback loop.** This is not an afterthought - it is as essential as the product itself.
-
----
-
-## Decision Framework
-
-When facing any development decision, work through these questions in order:
-
-```mermaid
-flowchart TD
-    START[Proposed Change] --> Q1{Does this improve the<br/>core feedback loop?}
-
-    Q1 -->|Yes - with evidence| Q2{Does it add chains<br/>that slow development?}
-    Q1 -->|No evidence| REJECT[Reject or Defer]
-
-    Q2 -->|No chains| PROCEED[Proceed]
-    Q2 -->|Adds chains| Q2A{Is improvement<br/>significant enough?}
-
-    Q2A -->|Yes - compelling| PROCEED
-    Q2A -->|Not worth it| REJECT
-
-    Q1 -->|Not loop-related| Q3{Does it harm feedback<br/>loop development?}
-
-    Q3 -->|No impact| LOWPRI[Low Priority - Maybe Later]
-    Q3 -->|Adds friction| REJECT
-```
-
-### The Three Questions
-
-1. **Does this improve the core feedback loop?**
-   - Must have measurable test results as evidence
-   - "I think it will help" is not sufficient
-   - If no clear measurement exists, define one first
-
-2. **Does this speed up (or slow down) development of the feedback loop?**
-   - Even good ideas can be rejected if they add chains
-   - The only acceptable dependencies are those that accelerate testing
-   - Ask: "Will this make the next iteration faster or slower?"
-
-3. **At minimum, does this NOT harm feedback loop development?**
-   - Features unrelated to the loop can exist if they're truly isolated
-   - But they're low priority and should never block loop work
-   - If there's any doubt about impact, defer it
-
----
-
 ## Success Criteria
 
 This philosophy is working when:
@@ -141,7 +86,7 @@ This philosophy is working when:
 - "Let's test that hypothesis" is a common response to ideas
 - Code changes are small, frequent, and measurable
 - Features are removed as readily as they're added
-- The feedback loop can change without breaking unrelated systems
+- Core systems can change without breaking unrelated code
 
 This philosophy is failing when:
 
@@ -149,4 +94,4 @@ This philosophy is failing when:
 - "We'll test it later" becomes acceptable
 - Complexity grows without corresponding capability
 - Test results are ignored in favor of intuition
-- The feedback loop becomes entangled with other systems
+- Systems become entangled and hard to change
