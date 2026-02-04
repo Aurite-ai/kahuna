@@ -109,6 +109,7 @@ Orchestrator subtask prompts specify exact paths. See `.roo/rules-orchestrator/O
 ```
 apps/
 ├── api/                    # Express backend (tRPC + Prisma)
+├── mcp/                    # MCP server for AI assistants
 └── web/                    # React frontend (Vite)
 
 packages/
