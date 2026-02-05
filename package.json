@@ -1,33 +1,33 @@
 {
-  "name": "kahuna",
+  "name": "@kahuna/mcp-server",
+  "version": "0.1.0",
+  "description": "Kahuna MCP server - Context management for AI coding assistants",
   "private": true,
   "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "kahuna-mcp": "dist/index.js"
+  },
   "scripts": {
-    "dev": "turbo dev",
-    "dev:web": "turbo dev --filter @kahuna/web",
-    "dev:api": "turbo dev --filter @kahuna/api",
-    "build": "turbo build",
-    "start": "turbo start",
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "typecheck": "turbo typecheck",
-    "test": "turbo test",
-    "clean": "rm -rf apps/*/dist packages/*/dist node_modules/.cache .turbo",
-    "db:generate": "pnpm --filter @kahuna/api db:generate",
-    "db:seed": "pnpm --filter @kahuna/api db:seed",
-    "db:migrate": "pnpm --filter @kahuna/api db:migrate",
-    "db:push": "pnpm --filter @kahuna/api db:push",
-    "db:studio": "pnpm --filter @kahuna/api db:studio",
-    "db:reset": "pnpm --filter @kahuna/api db:reset",
-    "test:init": "node packages/testing/dist/cli.js init",
-    "test:create": "node packages/testing/dist/cli.js create",
-    "test:submit": "node packages/testing/dist/cli.js submit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "turbo": "^2.0.0",
-    "typescript": "^5.9.0"
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^1.0.0"
   },
   "packageManager": "pnpm@9.15.0",
   "engines": {

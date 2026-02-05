@@ -276,7 +276,7 @@ Surfaced from Kahuna knowledge base on 2026-02-05.
 
 ## Classification Flow (MVP)
 
-For `kahuna_learn`, the MVP classification process:
+For `kahuna_learn`, the MVP classification uses **LLM agents** for all processing:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -289,20 +289,21 @@ For `kahuna_learn`, the MVP classification process:
 │   2. READ CONTENT                                                            │
 │      └── Load file, detect format (md, txt, code, etc.)                      │
 │                                                                              │
-│   3. CLASSIFY (heuristics first, LLM if needed)                              │
-│      ├── Check filename patterns (policy, spec, requirements)                │
-│      ├── Check content patterns (headings, structure)                        │
-│      └── Use LLM for ambiguous cases                                         │
+│   3. CLASSIFY (LLM agent)                                                    │
+│      └── Agent analyzes content and determines:                              │
+│          ├── Category (policy, requirement, reference, etc.)                 │
+│          ├── Subcategory                                                     │
+│          └── Confidence score                                                │
 │                                                                              │
-│   4. EXTRACT METADATA                                                        │
-│      ├── Title (from content or filename)                                    │
-│      ├── Tags (from content analysis)                                        │
-│      └── Summary (LLM-generated if needed)                                   │
+│   4. EXTRACT METADATA (LLM agent)                                            │
+│      └── Agent extracts:                                                     │
+│          ├── Title                                                           │
+│          ├── Tags                                                            │
+│          └── Summary                                                         │
 │                                                                              │
 │   5. STORE                                                                   │
 │      └── Write single .mdc file to ~/.kahuna/knowledge/[uuid].mdc            │
 │          (YAML frontmatter + markdown content)                               │
-│                                                                              │
 │                                                                              │
 │   6. REPORT                                                                  │
 │      └── Return summary of what was learned                                  │
@@ -314,7 +315,7 @@ For `kahuna_learn`, the MVP classification process:
 
 ## Surfacing Flow (MVP)
 
-For `kahuna_prepare_context`, the MVP surfacing process:
+For `kahuna_prepare_context`, the MVP surfacing uses **LLM agents** for relevance:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -324,30 +325,25 @@ For `kahuna_prepare_context`, the MVP surfacing process:
 │   1. RECEIVE TASK                                                           │
 │      └── Get task description + optional file hints                         │
 │                                                                             │
-│   2. PARSE INTENT                                                           │
-│      ├── Extract keywords                                                   │
-│      ├── Identify topic areas                                               │
-│      └── Note file references                                               │
+│   2. PARSE INTENT (LLM agent)                                               │
+│      └── Agent analyzes task and determines:                                │
+│          ├── What knowledge categories are relevant                         │
+│          ├── Key concepts and topics                                        │
+│          └── Search criteria                                                │
 │                                                                             │
-│   3. SEARCH KNOWLEDGE BASE                                                  │
-│      ├── Scan ~/.kahuna/knowledge/ metadata                                 │
-│      ├── Score relevance by:                                                │
-│      │   ├── Tag matches                                                    │
-│      │   ├── Category matches                                               │
-│      │   ├── Title/content keyword matches                                  │
-│      │   └── Project relevance (same project = higher)                      │
-│      └── Rank results                                                       │
+│   3. SEARCH KNOWLEDGE BASE (LLM agent)                                      │
+│      └── Agent reviews entries and scores relevance:                        │
+│          ├── Read metadata from ~/.kahuna/knowledge/                        │
+│          ├── Score each entry for task relevance                            │
+│          └── Rank and select top entries                                    │
 │                                                                             │
-│   4. SELECT TOP N                                                           │
-│      └── Take most relevant entries (configurable, default: 5-10)           │
-│                                                                             │
-│   5. SURFACE TO context/                                                    │
+│   4. SURFACE TO context/                                                    │
 │      ├── Clear context/task/ (task-specific, replaced each task)            │
 │      ├── Preserve context/[curated]/ (e.g., langgraph/)                     │
 │      ├── Copy/transform selected entries to context/task/                   │
 │      └── Regenerate README.md with updated navigation                       │
 │                                                                             │
-│   6. REPORT                                                                 │
+│   5. REPORT                                                                 │
 │      └── Return summary of what was surfaced                                │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -357,36 +353,50 @@ For `kahuna_prepare_context`, the MVP surfacing process:
 
 ## Evolution Path
 
-The knowledge architecture evolves from simple to sophisticated:
+The knowledge architecture follows an **agents-first** approach: start with flexible LLM agents, then optimize for cost/speed once behavior is validated.
 
-### Phase 1: Classify and Copy (MVP)
+### Phase 1: Agent-Powered MVP (Current)
+
+**Why agents first:**
+- Easy to set up and iterate on
+- Flexible - can adjust behavior through prompts
+- High quality results from day one
+- Validates what behavior we actually need
+
+**Trade-offs we accept:**
+- Higher cost per operation (LLM API calls)
+- Slower than heuristics
+- These are acceptable during development
 
 **kahuna_learn:**
-- Accept files
-- Basic category classification
-- Store original content with metadata
+- LLM agent classifies files (category, subcategory, confidence)
+- LLM agent extracts metadata (title, tags, summary)
+- Store processed content with metadata
 
 **kahuna_prepare_context:**
-- Accept task description
-- Simple keyword search on metadata/content
-- Copy relevant files to project's context/
+- LLM agent analyzes task intent
+- LLM agent scores knowledge base entries for relevance
+- Surface top entries to project's context/
 - Generate README.md
 
-**Value:** Files are organized and searchable. Context is surfaced per-task.
+**Value:** High-quality classification and surfacing from the start.
 
-### Phase 2: Agent-Enhanced Content
+### Phase 2: Optimize Hot Paths
 
-**kahuna_learn improvements:**
-- Agents rewrite files into structured markdown
-- Extract key points, summaries
-- Normalize format for consistency
+Once we understand what works, replace expensive agent calls with cheaper alternatives:
 
-**kahuna_prepare_context improvements:**
-- Agents synthesize new documents from multiple sources
-- Pull relevant portions from several files into one context doc
-- Prepare context in `~/.kahuna/prepared/`, then copy to project
+**Candidates for optimization:**
+- Classification → Heuristics (filename patterns, content structure)
+- Metadata extraction → Regex + templates
+- Relevance scoring → Embeddings + vector search
+- Intent parsing → Keyword extraction
 
-**Value:** Context is higher quality, more focused.
+**Keep agents for:**
+- Ambiguous cases (fallback when heuristics uncertain)
+- Complex synthesis tasks
+- Quality validation
+
+**Value:** Reduced cost and latency while maintaining quality.
 
 ### Phase 3: Intelligent Knowledge Management
 
@@ -407,17 +417,19 @@ The knowledge architecture evolves from simple to sophisticated:
 1. **Knowledge base structure**
    - `~/.kahuna/knowledge/` folder structure
    - `~/.kahuna/conversations/` for processed conversation logs
-   - `metadata.json` format
+   - `.mdc` format (YAML frontmatter + markdown)
    - Basic file storage
 
-2. **Classification (kahuna_learn)**
+2. **Classification agents (kahuna_learn)**
    - Accept files
-   - Basic category classification (heuristics)
-   - Store original content with metadata
+   - LLM agent for category classification
+   - LLM agent for metadata extraction (title, tags, summary)
+   - Store processed content with metadata
 
-3. **Surfacing (kahuna_prepare_context)**
+3. **Surfacing agents (kahuna_prepare_context)**
    - Accept task description
-   - Simple keyword search
+   - LLM agent for intent analysis
+   - LLM agent for relevance scoring
    - Copy relevant entries to context/
    - Generate README.md
 
@@ -545,3 +557,4 @@ confidence: 0.95
 - v2.3 (2026-02-05): Changed to .mdc format (YAML frontmatter + markdown) instead of folder+JSON
 - v2.4 (2026-02-05): Fixed Tool Interactions to use .mdc; resolved context merging question
 - v3.0 (2026-02-05): Promoted to docs/design/; updated links and status to Final
+- v3.1 (2026-02-05): Agents-first approach: LLM agents for MVP, optimize later for cost/speed
