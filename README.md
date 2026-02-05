@@ -50,6 +50,36 @@ pnpm db:reset
 pnpm db:studio
 ```
 
+## MCP Server Setup
+
+The MCP server allows AI assistants (Claude Desktop, etc.) to interact with Kahuna programmatically.
+
+```bash
+# Build the MCP server
+pnpm --filter @kahuna/mcp build
+```
+
+Add to Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "kahuna": {
+      "command": "node",
+      "args": ["/path/to/kahuna/apps/mcp/dist/index.js"],
+      "env": {
+        "KAHUNA_API_URL": "http://localhost:3000",
+        "KAHUNA_SESSION_TOKEN": "your-session-token"
+      }
+    }
+  }
+}
+```
+
+> **Note:** Update the `args` path to your local installation. `KAHUNA_SESSION_TOKEN` for now is a placeholder until we finalize we need to add authentication to mcp. 
+
+For detailed documentation, available tools, and development instructions, see [apps/mcp/README.md](apps/mcp/README.md).
+
 ## Scripts
 
 | Command          | Description                   |
