@@ -50,3 +50,7 @@ docs/internal/
 agent-dev/
 **/.venv/**
 projects/
+
+# Knowledge base (processed conversations)
+knowledge/
+!knowledge/.gitkeep

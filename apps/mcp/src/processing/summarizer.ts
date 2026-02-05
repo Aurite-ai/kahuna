@@ -1,0 +1,213 @@
+/**
+ * Stage 2: Summary Agent
+ *
+ * Uses Sonnet 4.5 to generate structured summaries from clean conversation markdown.
+ */
+
+import Anthropic from "@anthropic-ai/sdk";
+import { ConversationSummarySchema } from "./schemas.js";
+import { getConversationSummaryJsonSchema } from "./schemas.js";
+import type { ConversationSummary } from "./types.js";
+
+/**
+ * Simple token estimation based on character count.
+ * Claude uses roughly 4 characters per token on average.
+ */
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+/**
+ * Split markdown at message boundaries for chunking.
+ */
+export function chunkConversation(markdown: string, maxTokens: number): string[] {
+  const estimatedTotal = estimateTokens(markdown);
+
+  if (estimatedTotal <= maxTokens) {
+    return [markdown];
+  }
+
+  const chunks: string[] = [];
+
+  // Extract frontmatter to include in each chunk
+  const frontmatterMatch = markdown.match(/^---\n[\s\S]*?\n---\n/);
+  const frontmatter = frontmatterMatch ? frontmatterMatch[0] : "";
+  const content = frontmatter ? markdown.slice(frontmatter.length) : markdown;
+
+  // Split by top-level headings (## User, ## Assistant)
+  const sections = content.split(/(?=^## )/m);
+
+  let currentChunk = frontmatter;
+  let currentTokens = estimateTokens(frontmatter);
+
+  for (const section of sections) {
+    const sectionTokens = estimateTokens(section);
+
+    if (currentTokens + sectionTokens > maxTokens && currentChunk !== frontmatter) {
+      // Save current chunk and start new one
+      chunks.push(currentChunk);
+      currentChunk = frontmatter;
+      currentTokens = estimateTokens(frontmatter);
+    }
+
+    currentChunk += section;
+    currentTokens += sectionTokens;
+  }
+
+  // Don't forget the last chunk
+  if (currentChunk !== frontmatter) {
+    chunks.push(currentChunk);
+  }
+
+  return chunks;
+}
+
+/**
+ * The prompt template for summarization.
+ */
+const SUMMARIZATION_PROMPT = `You are a technical documentation agent. Your task is to read a coding copilot conversation and produce a structured summary.
+
+The conversation is between a user and an AI coding assistant. Extract:
+- What the user was trying to accomplish
+- Key decisions made and why
+- Files that were created or modified
+- The outcome of the conversation
+
+Be concise but capture the important context that would help someone understand what happened without reading the full conversation.
+
+Focus on:
+- WHY decisions were made, not just what
+- Problems encountered and how they were resolved
+- The final state of the work
+
+Conversation:
+`;
+
+/**
+ * Initialize the Anthropic client.
+ */
+function getAnthropicClient(): Anthropic {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error("ANTHROPIC_API_KEY environment variable is required");
+  }
+  return new Anthropic({ apiKey });
+}
+
+/**
+ * Summarize a single chunk of conversation.
+ */
+async function summarizeChunk(
+  client: Anthropic,
+  markdown: string,
+  priorSummary?: string
+): Promise<ConversationSummary> {
+  let prompt = SUMMARIZATION_PROMPT + markdown;
+
+  if (priorSummary) {
+    prompt = `Previous chunk summary for context:\n${priorSummary}\n\n${prompt}`;
+  }
+
+  const response = await client.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 4096,
+    tools: [
+      {
+        name: "create_summary",
+        description: "Create a structured summary of the conversation",
+        input_schema: getConversationSummaryJsonSchema() as Anthropic.Tool.InputSchema,
+      },
+    ],
+    tool_choice: { type: "tool", name: "create_summary" },
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+  });
+
+  // Extract the tool use result
+  const toolUse = response.content.find((block) => block.type === "tool_use");
+  if (!toolUse || toolUse.type !== "tool_use") {
+    throw new Error("No tool use in response");
+  }
+
+  // Validate the result against our schema
+  const result = ConversationSummarySchema.parse(toolUse.input);
+
+  return result;
+}
+
+/**
+ * Main summarization function with chunking support.
+ */
+export async function summarizeConversation(
+  markdown: string,
+  maxChunkTokens = 80000 // Leave room for prompt and response
+): Promise<ConversationSummary> {
+  const client = getAnthropicClient();
+  const chunks = chunkConversation(markdown, maxChunkTokens);
+
+  if (chunks.length === 1) {
+    // Single chunk - straightforward summarization
+    return summarizeChunk(client, chunks[0]);
+  }
+
+  // Multiple chunks - chain summaries
+  console.log(`Processing ${chunks.length} chunks...`);
+
+  let priorSummary: string | undefined;
+
+  for (let i = 0; i < chunks.length; i++) {
+    console.log(`  Processing chunk ${i + 1}/${chunks.length}...`);
+
+    const summary = await summarizeChunk(client, chunks[i], priorSummary);
+
+    if (i < chunks.length - 1) {
+      // Not the last chunk - create a summary string for context
+      priorSummary = `Title: ${summary.title}\nSummary: ${summary.summary}\nDecisions: ${summary.decisions.map((d) => d.decision).join("; ")}`;
+    } else {
+      // Last chunk - return the final summary
+      return summary;
+    }
+  }
+
+  // This shouldn't happen, but TypeScript needs it
+  throw new Error("No chunks to process");
+}
+
+/**
+ * Retry wrapper for API calls.
+ */
+export async function summarizeWithRetry(
+  markdown: string,
+  maxRetries = 3
+): Promise<ConversationSummary> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await summarizeConversation(markdown);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Check if it's a retryable error
+      const isRetryable =
+        lastError.message.includes("rate_limit") ||
+        lastError.message.includes("overloaded") ||
+        lastError.message.includes("timeout");
+
+      if (!isRetryable || attempt === maxRetries) {
+        throw lastError;
+      }
+
+      // Exponential backoff
+      const delay = 2 ** attempt * 1000;
+      console.log(`Retry ${attempt}/${maxRetries} after ${delay}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}

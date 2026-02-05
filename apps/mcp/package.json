@@ -11,11 +11,15 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cli": "tsx src/cli.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@trpc/client": "^11.9.0",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
     "zod": "^4.3.6"
   },
   "devDependencies": {
