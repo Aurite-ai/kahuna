@@ -75,16 +75,21 @@ model Project {
 // =============================================================================
 
 model ContextFile {
-  id        String   @id @default(cuid())
-  projectId String
-  filename  String
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  projectId  String
+  filename   String
+  content    String
+  category   String?  // business-info | technical-info | code
+  confidence Float?   // 0-1 confidence score from categorization
+  reasoning  String?  // Why this category was chosen
+  metadata   String?  // JSON blob containing rich metadata (entities, tags, summary, etc.)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+  @@index([category])
 }
 
 model VckGeneration {

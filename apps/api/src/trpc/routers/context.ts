@@ -10,6 +10,10 @@ const createContextInput = z.object({
   projectId: z.string().cuid(),
   filename: z.string().min(1, 'Filename is required').max(255),
   content: z.string(),
+  category: z.enum(['business-info', 'technical-info', 'code']).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  reasoning: z.string().optional(),
+  metadata: z.record(z.string(), z.any()).optional(), // JSON object with rich metadata
 });
 
 /**
@@ -19,6 +23,10 @@ const updateContextInput = z.object({
   id: z.string().cuid(),
   filename: z.string().min(1, 'Filename is required').max(255).optional(),
   content: z.string().optional(),
+  category: z.enum(['business-info', 'technical-info', 'code']).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  reasoning: z.string().optional(),
+  metadata: z.record(z.string(), z.any()).optional(), // JSON object with rich metadata
 });
 
 /**
@@ -67,11 +75,15 @@ export const contextRouter = router({
         projectId: input.projectId,
         filename: input.filename,
         content: input.content,
+        category: input.category,
+        confidence: input.confidence,
+        reasoning: input.reasoning,
+        metadata: input.metadata ? JSON.stringify(input.metadata) : null,
       },
     });
 
     ctx.logger.info(
-      { contextFileId: contextFile.id, projectId: input.projectId },
+      { contextFileId: contextFile.id, projectId: input.projectId, category: input.category },
       'Context file created'
     );
     return contextFile;
@@ -161,12 +173,27 @@ export const contextRouter = router({
     }
 
     // Build update data (only include provided fields)
-    const updateData: { filename?: string; content?: string } = {};
+    const updateData: {
+      filename?: string;
+      content?: string;
+      category?: string;
+      confidence?: number;
+      reasoning?: string;
+    } = {};
     if (input.filename !== undefined) {
       updateData.filename = input.filename;
     }
     if (input.content !== undefined) {
       updateData.content = input.content;
+    }
+    if (input.category !== undefined) {
+      updateData.category = input.category;
+    }
+    if (input.confidence !== undefined) {
+      updateData.confidence = input.confidence;
+    }
+    if (input.reasoning !== undefined) {
+      updateData.reasoning = input.reasoning;
     }
 
     const updated = await ctx.prisma.contextFile.update({
