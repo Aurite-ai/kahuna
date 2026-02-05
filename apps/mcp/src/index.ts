@@ -41,6 +41,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { type KahunaClient, createClientFromEnv } from './client.js';
+import { initializeTool } from './tools/initialize.js';
 import { projectTool } from './tools/project.js';
 
 // =============================================================================
@@ -89,6 +90,7 @@ Actions:
  */
 const allTools = [
   healthCheckTool,
+  initializeTool.definition,
   projectTool.definition,
   // Add more tools here as they're implemented:
   // contextTool.definition,
@@ -197,6 +199,9 @@ async function routeToolCall(
         isError: true,
       };
     }
+
+    case 'initialize':
+      return initializeTool.handler(args);
 
     case 'manage_projects':
       return projectTool.handler(args, client);
