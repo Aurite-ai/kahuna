@@ -327,7 +327,6 @@ export function formatAsMarkdown(
   lines.push("");
 
   let currentSkillName = "";
-  let lastDepth = 0;
 
   for (const msg of messages) {
     const headingLevel = "#".repeat(Math.min(msg.depth + 2, 6));
@@ -367,8 +366,6 @@ export function formatAsMarkdown(
         lines.push("");
         break;
     }
-
-    lastDepth = msg.depth;
   }
 
   return lines.join("\n");

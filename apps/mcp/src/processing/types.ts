@@ -167,3 +167,52 @@ export interface ConversationSummary {
   filesModified: string[];
   confidence: number;
 }
+
+// =============================================================================
+// Sync State Types (Iteration 2)
+// =============================================================================
+
+/**
+ * State tracking for individual conversation.
+ */
+export interface ConversationState {
+  sourcePath: string; // Path to JSONL file
+  sourceHash: string; // MD5 hash of source file
+  outputPath: string; // Path to summary file
+  processedAt: string; // ISO timestamp
+  chunked: boolean; // Whether chunking was used
+  chunkCount?: number; // Number of chunks if chunked
+}
+
+/**
+ * Global sync state stored in knowledge/.sync-state.json
+ */
+export interface SyncState {
+  version: number;
+  lastSync: string; // ISO timestamp
+  conversations: {
+    [sessionId: string]: ConversationState;
+  };
+}
+
+/**
+ * Result of a sync operation.
+ */
+export interface SyncResult {
+  success: boolean;
+  processed: number; // New conversations processed
+  updated: number; // Changed conversations reprocessed
+  skipped: number; // Already current, no changes
+  failed: number; // Errors during processing
+  errors?: string[]; // Error messages if any
+  duration_ms: number; // Total processing time
+}
+
+/**
+ * Options for the sync operation.
+ */
+export interface SyncOptions {
+  force?: boolean; // Reprocess all, ignore state
+  conversationsDir?: string; // Override default source dir
+  knowledgeDir?: string; // Override default output dir
+}

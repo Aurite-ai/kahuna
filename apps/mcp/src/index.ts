@@ -42,6 +42,7 @@ import {
 
 import { type KahunaClient, createClientFromEnv } from './client.js';
 import { projectTool } from './tools/project.js';
+import { syncTool } from './tools/sync.js';
 
 // =============================================================================
 // SERVER CONFIGURATION
@@ -57,7 +58,7 @@ const SERVER_VERSION = '0.0.1';
 const healthCheckTool = {
   name: 'health_check',
   description: `Check if the Kahuna MCP server is running correctly.
-  
+
 This tool helps verify the MCP connection is working. It can optionally
 ping the Kahuna API to verify end-to-end connectivity.
 
@@ -90,6 +91,7 @@ Actions:
 const allTools = [
   healthCheckTool,
   projectTool.definition,
+  syncTool.definition,
   // Add more tools here as they're implemented:
   // contextTool.definition,
   // vckTool.definition,
@@ -200,6 +202,9 @@ async function routeToolCall(
 
     case 'manage_projects':
       return projectTool.handler(args, client);
+
+    case 'sync_conversations':
+      return syncTool.handler(args);
 
     // Add more tool handlers here:
     // case 'manage_context_files':

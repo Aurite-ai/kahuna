@@ -5,6 +5,7 @@
  *   pnpm --filter @kahuna/mcp cli process <jsonl-path>
  *   pnpm --filter @kahuna/mcp cli process --project <claude-project-path>
  *   pnpm --filter @kahuna/mcp cli process --latest <claude-project-path>
+ *   pnpm --filter @kahuna/mcp cli sync [--force]
  */
 
 // Load environment variables from .env file
@@ -16,6 +17,7 @@ import * as path from "node:path";
 import { Command } from "commander";
 import { preprocessJsonl } from "./processing/preprocessor.js";
 import { summarizeConversation } from "./processing/summarizer.js";
+import { syncConversations } from "./processing/sync.js";
 import type { ConversationSummary, SessionMetadata } from "./processing/types.js";
 
 const program = new Command();
@@ -248,6 +250,39 @@ program
       }
     } catch (error) {
       console.error("Processing failed:", error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("sync")
+  .description("Sync all conversation logs from Claude Code to the knowledge base")
+  .option("--force", "Reprocess all conversations, even if already processed")
+  .action(async (options: { force?: boolean }) => {
+    try {
+      console.log("Starting conversation sync...\n");
+
+      const result = await syncConversations({ force: options.force });
+
+      console.log("\n=== Sync Complete ===");
+      console.log(`  Processed: ${result.processed} (new)`);
+      console.log(`  Updated:   ${result.updated} (changed)`);
+      console.log(`  Skipped:   ${result.skipped} (unchanged)`);
+      console.log(`  Failed:    ${result.failed}`);
+      console.log(`  Duration:  ${(result.duration_ms / 1000).toFixed(1)}s`);
+
+      if (result.errors && result.errors.length > 0) {
+        console.log("\nErrors:");
+        for (const error of result.errors) {
+          console.log(`  - ${error}`);
+        }
+      }
+
+      if (!result.success) {
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error("Sync failed:", error);
       process.exit(1);
     }
   });

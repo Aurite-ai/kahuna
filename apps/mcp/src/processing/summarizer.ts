@@ -73,6 +73,16 @@ The conversation is between a user and an AI coding assistant. Extract:
 - Files that were created or modified
 - The outcome of the conversation
 
+**Voice and Perspective:**
+Write in third person, objective voice. Refer to the participants as "the user"
+and "the copilot" (or "the AI assistant"). Do not use first person.
+
+Good: "The copilot created a design document after gathering requirements."
+Bad: "I created a design document after gathering requirements."
+
+Good: "The user requested a new authentication system."
+Bad: "You requested a new authentication system."
+
 Be concise but capture the important context that would help someone understand what happened without reading the full conversation.
 
 Focus on:
@@ -140,11 +150,48 @@ async function summarizeChunk(
 }
 
 /**
+ * Format cumulative context for chunk chaining.
+ * Includes all important information from previous chunks.
+ */
+function formatCumulativeContext(
+  summary: ConversationSummary,
+  cumulativeDecisions: string[],
+  cumulativeFilesCreated: string[],
+  cumulativeFilesModified: string[]
+): string {
+  const parts: string[] = [
+    "Previous chunks summary:",
+    `- Title: ${summary.title}`,
+    `- Summary so far: ${summary.summary}`,
+  ];
+
+  if (cumulativeDecisions.length > 0) {
+    parts.push(`- Decisions made: ${cumulativeDecisions.join("; ")}`);
+  }
+
+  if (cumulativeFilesCreated.length > 0) {
+    parts.push(`- Files created: ${cumulativeFilesCreated.join(", ")}`);
+  }
+
+  if (cumulativeFilesModified.length > 0) {
+    parts.push(`- Files modified: ${cumulativeFilesModified.join(", ")}`);
+  }
+
+  parts.push(
+    "",
+    "Continue summarizing from where we left off. The final chunk should produce",
+    "a consolidated summary that covers the entire conversation."
+  );
+
+  return parts.join("\n");
+}
+
+/**
  * Main summarization function with chunking support.
  */
 export async function summarizeConversation(
   markdown: string,
-  maxChunkTokens = 80000 // Leave room for prompt and response
+  maxChunkTokens = 100000 // Leave room for prompt and response (Sonnet has 200k context)
 ): Promise<ConversationSummary> {
   const client = getAnthropicClient();
   const chunks = chunkConversation(markdown, maxChunkTokens);
@@ -154,19 +201,33 @@ export async function summarizeConversation(
     return summarizeChunk(client, chunks[0]);
   }
 
-  // Multiple chunks - chain summaries
+  // Multiple chunks - chain summaries with cumulative context
   console.log(`Processing ${chunks.length} chunks...`);
 
   let priorSummary: string | undefined;
+  let cumulativeDecisions: string[] = [];
+  let cumulativeFilesCreated: string[] = [];
+  let cumulativeFilesModified: string[] = [];
 
   for (let i = 0; i < chunks.length; i++) {
     console.log(`  Processing chunk ${i + 1}/${chunks.length}...`);
 
     const summary = await summarizeChunk(client, chunks[i], priorSummary);
 
+    // Accumulate context from this chunk
+    const newDecisions = summary.decisions.map((d) => d.decision);
+    cumulativeDecisions = [...new Set([...cumulativeDecisions, ...newDecisions])];
+    cumulativeFilesCreated = [...new Set([...cumulativeFilesCreated, ...summary.filesCreated])];
+    cumulativeFilesModified = [...new Set([...cumulativeFilesModified, ...summary.filesModified])];
+
     if (i < chunks.length - 1) {
-      // Not the last chunk - create a summary string for context
-      priorSummary = `Title: ${summary.title}\nSummary: ${summary.summary}\nDecisions: ${summary.decisions.map((d) => d.decision).join("; ")}`;
+      // Not the last chunk - create cumulative context for next chunk
+      priorSummary = formatCumulativeContext(
+        summary,
+        cumulativeDecisions,
+        cumulativeFilesCreated,
+        cumulativeFilesModified
+      );
     } else {
       // Last chunk - return the final summary
       return summary;
