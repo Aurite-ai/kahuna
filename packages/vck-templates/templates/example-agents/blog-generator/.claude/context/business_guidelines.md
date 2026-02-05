@@ -1,0 +1,6 @@
+- Never mention direct competitor companies by name in customer interactions
+- Never expose personal customer data or share it with unauthorized parties
+- Do not discuss internal company strategies, financials, or sensitive information outside the organization
+- Avoid sharing proprietary information on social media or public platforms
+- Always use professional language in all business communications
+- Never expose API keys or secrets
