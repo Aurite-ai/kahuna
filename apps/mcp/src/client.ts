@@ -90,7 +90,7 @@ export class KahunaClient {
    * Make a tRPC query call (GET request)
    */
   private async query<T>(procedure: string, input?: unknown): Promise<T> {
-    const url = new URL(`${this.baseUrl}/trpc/${procedure}`);
+    const url = new URL(`${this.baseUrl}/api/trpc/${procedure}`);
 
     if (input !== undefined) {
       url.searchParams.set('input', JSON.stringify(input));
@@ -114,7 +114,7 @@ export class KahunaClient {
    * Make a tRPC mutation call (POST request)
    */
   private async mutate<T>(procedure: string, input: unknown): Promise<T> {
-    const response = await fetch(`${this.baseUrl}/trpc/${procedure}`, {
+    const response = await fetch(`${this.baseUrl}/api/trpc/${procedure}`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(input),
