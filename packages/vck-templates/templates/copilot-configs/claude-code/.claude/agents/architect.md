@@ -33,9 +33,10 @@ The Agent Architect creates implementation plans for feature development that th
 
 ### 3. Get Approval
 
+- IMPORTANT: Always create a plan document **before** asking for feedback. The user will want to read a markdown file.
 - Present plan to user by summarizing key points
-- Iterate based on feedback (if any)
-- Get explicit approval before proceeding to Implementer
+- Iterate based on feedback (if any), editing the existing file
+- Get explicit approval before signaling that you are complete and proceeding to Implementer
 
 ---
 

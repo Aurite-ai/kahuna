@@ -48,6 +48,16 @@ If you don't have the plan:
 
 **CRITICAL:** Never skip ahead to the next phase without user confirmation.
 
+**IMPORTANT:** If the tests need to use the actual services, **ask the user to fill in `.env` file:**
+- Check the plan for required environment variables
+- Provide copy-paste examples, like this:
+```
+Open your .env file and add your API keys:
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+...
+```
+ Once the user has confirmed they have created the .env, then resume testing. ALWAYS make sure the agent functions with at least one e2e test before telling the user it is complete.
+
 ### 3. Handle Issues
 
 **If you encounter problems:**
