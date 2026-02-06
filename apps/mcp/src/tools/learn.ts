@@ -5,7 +5,7 @@
  * Kahuna automatically:
  * 1. Categorizes each file using AI
  * 2. Extracts rich metadata (tags, topics, technologies, etc.)
- * 3. Stores files in the knowledge base
+ * 3. Stores files in the local knowledge base (~/.kahuna/knowledge/)
  *
  * The "learn" terminology emphasizes the fire-and-forget nature:
  * - Users don't need to think about how to categorize
@@ -14,7 +14,8 @@
  */
 
 import { FileSizeError, categorizeFile } from '@kahuna/file-router';
-import type { KahunaClient } from '../client.js';
+import type { KnowledgeStorageService, SaveKnowledgeEntryInput } from '../storage/index.js';
+import { KnowledgeStorageError } from '../storage/index.js';
 
 /**
  * Tool definition for MCP registration.
@@ -52,7 +53,7 @@ Returns a summary of what was learned, including:
     properties: {
       projectId: {
         type: 'string',
-        description: 'Project ID to add files to',
+        description: 'Project ID to associate files with (for provenance tracking)',
       },
       files: {
         type: 'array',
@@ -110,7 +111,8 @@ interface FileLearnResult {
   category?: string;
   confidence?: number;
   error?: string;
-  fileId?: string;
+  slug?: string;
+  created?: boolean;
 }
 
 /**
@@ -143,6 +145,21 @@ function errorResponse(message: string, details?: unknown): MCPToolResponse {
 }
 
 /**
+ * Convert a filename to a human-readable title.
+ * e.g., "api-guidelines.md" → "API Guidelines"
+ */
+function filenameToTitle(filename: string): string {
+  // Remove extension
+  const base = filename.replace(/\.[^.]+$/, '');
+
+  // Replace separators with spaces and capitalize words
+  return base
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
+}
+
+/**
  * Generate a human-readable summary of learning results
  */
 function generateLearningSummary(results: FileLearnResult[]): string {
@@ -156,9 +173,12 @@ function generateLearningSummary(results: FileLearnResult[]): string {
     }
   }
 
+  const created = successful.filter((r) => r.created).length;
+  const updated = successful.length - created;
+
   const parts: string[] = [];
   parts.push(`Processed ${results.length} file(s)`);
-  parts.push(`✅ ${successful.length} successful`);
+  parts.push(`✅ ${successful.length} successful (${created} created, ${updated} updated)`);
 
   if (Object.keys(categoryCounts).length > 0) {
     const categoryStrings = Object.entries(categoryCounts).map(([cat, count]) => `${count} ${cat}`);
@@ -179,17 +199,17 @@ function generateLearningSummary(results: FileLearnResult[]): string {
  * 1. Validate input
  * 2. For each file:
  *    a. Use AI to categorize and extract metadata
- *    b. Store in knowledge base via API
+ *    b. Store in local knowledge base
  *    c. Track success/failure
  * 3. Return summary of results
  *
  * @param args - Tool arguments from MCP client
- * @param client - Kahuna API client instance
+ * @param storage - Knowledge storage service instance
  * @returns MCP tool response
  */
 export async function learnToolHandler(
   args: Record<string, unknown>,
-  client: KahunaClient
+  storage: KnowledgeStorageService
 ): Promise<MCPToolResponse> {
   const input = args as unknown as LearnToolInput;
   const { projectId, files } = input;
@@ -252,26 +272,46 @@ export async function learnToolHandler(
         throw error; // Re-throw unexpected errors
       }
 
-      // Step 2: Store in knowledge base
-      const storedFile = await client.contextCreate({
-        projectId,
-        filename: file.filename,
+      // Step 2: Check if entry already exists (to determine created vs updated)
+      const title = filenameToTitle(file.filename);
+      // We can't easily check existence without the slug, so we'll derive it
+      // The storage service will return the entry which tells us if it was new
+
+      // Step 3: Build input for storage service
+      const saveInput: SaveKnowledgeEntryInput = {
+        title,
         content: file.content,
+        sourceFile: file.filename,
+        projectId,
         category: categorization.category,
         confidence: categorization.confidence,
         reasoning: categorization.reasoning,
-        metadata: categorization.metadata,
-      });
+        metadata: categorization.metadata as SaveKnowledgeEntryInput['metadata'],
+      };
+
+      // Step 4: Store in local knowledge base
+      const entry = await storage.save(saveInput);
+
+      // Determine if this was a create or update based on timestamps
+      const wasCreated = entry.created_at === entry.updated_at;
 
       results.push({
         filename: file.filename,
         success: true,
-        category: categorization.category,
-        confidence: categorization.confidence,
-        fileId: storedFile.id,
+        category: entry.classification.category,
+        confidence: entry.classification.confidence,
+        slug: entry.slug,
+        created: wasCreated,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      let errorMessage: string;
+      if (error instanceof KnowledgeStorageError) {
+        errorMessage = `Storage error (${error.code}): ${error.message}`;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = 'Unknown error';
+      }
       results.push({
         filename: file.filename,
         success: false,
@@ -291,13 +331,16 @@ export async function learnToolHandler(
       total: results.length,
       successful: successful.length,
       failed: failed.length,
+      created: successful.filter((r) => r.created).length,
+      updated: successful.filter((r) => !r.created).length,
     },
     results: results.map((r) => ({
       filename: r.filename,
       success: r.success,
       category: r.category,
       confidence: r.confidence,
-      fileId: r.fileId,
+      slug: r.slug,
+      created: r.created,
       error: r.error,
     })),
   });

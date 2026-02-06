@@ -1,7 +1,7 @@
 /**
  * Storage module for local knowledge base
  *
- * Provides types and utilities for managing .mdc files in ~/.kahuna/knowledge/
+ * Provides types, utilities, and services for managing .mdc files in ~/.kahuna/knowledge/
  */
 
 // Types
@@ -30,3 +30,6 @@ export {
   generateMdcFile,
   type ParsedMdcFile,
 } from './utils.js';
+
+// Storage Service
+export { FileKnowledgeStorageService } from './knowledge-storage.js';

@@ -41,6 +41,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { type KahunaClient, createClientFromEnv } from './client.js';
+import { FileKnowledgeStorageService, type KnowledgeStorageService } from './storage/index.js';
 import { contextTool } from './tools/context.js';
 import { learnTool } from './tools/learn.js';
 import { prepareContextTool } from './tools/prepare-context.js';
@@ -60,7 +61,7 @@ const SERVER_VERSION = '0.0.1';
 const healthCheckTool = {
   name: 'health_check',
   description: `Check if the Kahuna MCP server is running correctly.
-  
+
 This tool helps verify the MCP connection is working. It can optionally
 ping the Kahuna API to verify end-to-end connectivity.
 
@@ -111,7 +112,8 @@ const allTools = [
 async function routeToolCall(
   toolName: string,
   args: Record<string, unknown>,
-  client: KahunaClient
+  client: KahunaClient,
+  storage: KnowledgeStorageService
 ): Promise<CallToolResult> {
   switch (toolName) {
     case 'health_check': {
@@ -207,7 +209,7 @@ async function routeToolCall(
       return projectTool.handler(args, client);
 
     case 'kahuna_learn':
-      return learnTool.handler(args, client);
+      return learnTool.handler(args, storage);
 
     case 'kahuna_prepare_context':
       return prepareContextTool.handler(args, client);
@@ -294,6 +296,9 @@ async function main() {
   // Create API client from environment
   const client = createClientFromEnv();
 
+  // Create local knowledge storage service
+  const storage = new FileKnowledgeStorageService();
+
   // Create MCP server
   const server = new Server(
     {
@@ -326,7 +331,7 @@ async function main() {
    */
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-    return routeToolCall(name, args ?? {}, client);
+    return routeToolCall(name, args ?? {}, client, storage);
   });
 
   // ---------------------------------------------------------------------------
