@@ -29,6 +29,10 @@ export interface ContextFile {
   filename: string;
   content: string;
   fileType: string;
+  category?: string;
+  confidence?: number;
+  reasoning?: string;
+  metadata?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -188,13 +192,16 @@ export class KahunaClient {
   // ===========================================================================
 
   /**
-   * Create a context file
+   * Create a context file with optional categorization metadata
    */
   async contextCreate(input: {
     projectId: string;
     filename: string;
     content: string;
-    fileType: string;
+    category?: string;
+    confidence?: number;
+    reasoning?: string;
+    metadata?: Record<string, unknown>;
   }): Promise<ContextFile> {
     return this.mutate<ContextFile>('context.create', input);
   }
