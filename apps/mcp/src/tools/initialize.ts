@@ -21,9 +21,10 @@ This tool copies the Claude Code copilot configuration from Kahuna's VCK templat
 to the specified directory. It sets up:
 - .claude/settings.json - Permissions and default mode
 - .claude/rules/ - Project rules and guidelines
-- .claude/skills/ - Architect and code skills
-- .claude/context/, .claude/plans/ - Empty directories for working files
-- CLAUDE.md - Main copilot instructions
+- .claude/skills/ - Skills
+- .claude/agents/ - Subagents
+- .claude/context/, .claude/plans/ - Empty directories for context and plan files
+- .claude/CLAUDE.md - Main copilot instructions
 
 The configuration includes the orchestrator workflow that guides Claude through
 proper architect → code → test cycles for agent development.
