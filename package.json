@@ -13,7 +13,7 @@
     "format": "biome format --write .",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
-    "clean": "rm -rf apps/*/dist packages/*/dist node_modules/.cache .turbo",
+    "clean": "rm -rf apps/*/dist packages/*/dist apps/*/tsconfig.tsbuildinfo packages/*/tsconfig.tsbuildinfo node_modules/.cache .turbo",
     "db:generate": "pnpm --filter @kahuna/api db:generate",
     "db:seed": "pnpm --filter @kahuna/api db:seed",
     "db:migrate": "pnpm --filter @kahuna/api db:migrate",
