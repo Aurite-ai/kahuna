@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Load environment variables from .env file
+import 'dotenv/config';
+
 /**
  * Kahuna MCP Server
  *
@@ -42,10 +45,8 @@ import {
 
 import { type KahunaClient, createClientFromEnv } from './client.js';
 import { FileKnowledgeStorageService, type KnowledgeStorageService } from './storage/index.js';
-import { contextTool } from './tools/context.js';
 import { learnTool } from './tools/learn.js';
 import { prepareContextTool } from './tools/prepare-context.js';
-import { projectTool } from './tools/project.js';
 
 // =============================================================================
 // SERVER CONFIGURATION
@@ -84,25 +85,16 @@ Actions:
 /**
  * All registered tools.
  * Add new tool imports here as they are created.
- *
- * Example of adding a new tool:
- * 1. Create src/tools/context.ts following the project.ts pattern
- * 2. Import: import { contextTool } from './tools/context.js';
- * 3. Add to this array: contextTool.definition
- * 4. Add handler routing in the CallToolRequestSchema handler below
  */
 const allTools = [
   healthCheckTool,
-  projectTool.definition,
   learnTool.definition,
   prepareContextTool.definition,
-  contextTool.definition, // Keep for manual operations (update, delete, get specific file)
-  // Add more tools here as they're implemented:
-  // vckTool.definition,
-  // resultsTool.definition,
-  // orgRulesTool.definition,
-  // itRulesTool.definition,
-  // promptsTool.definition,
+  // Future tools:
+  // setupTool.definition,
+  // askTool.definition,
+  // reviewTool.definition,
+  // syncTool.definition,
 ];
 
 /**
@@ -205,23 +197,21 @@ async function routeToolCall(
       };
     }
 
-    case 'manage_projects':
-      return projectTool.handler(args, client);
-
     case 'kahuna_learn':
       return learnTool.handler(args, storage);
 
     case 'kahuna_prepare_context':
       return prepareContextTool.handler(args, storage);
 
-    case 'manage_context_files':
-      return contextTool.handler(args, client);
-
-    // Add more tool handlers here:
-    // case 'generate_vck':
-    //   return vckTool.handler(args, client);
-    // case 'manage_build_results':
-    //   return resultsTool.handler(args, client);
+    // Future tool handlers:
+    // case 'kahuna_setup':
+    //   return setupTool.handler(args, storage);
+    // case 'kahuna_ask':
+    //   return askTool.handler(args, storage);
+    // case 'kahuna_review':
+    //   return reviewTool.handler(args, storage);
+    // case 'kahuna_sync':
+    //   return syncTool.handler(args, storage);
 
     default:
       return {

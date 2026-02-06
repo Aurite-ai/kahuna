@@ -1,0 +1,39 @@
+---
+type: knowledge
+title: Api Guidelines
+summary: This file contains technical guidelines for designing RESTful APIs, including the recommendation to use JWT tokens for authentication.
+created_at: 2026-02-06T23:03:02.130Z
+updated_at: 2026-02-06T23:03:02.130Z
+source:
+  file: api-guidelines.md
+  project: test-project
+  path: null
+classification:
+  category: reference
+  confidence: 0.9
+  reasoning: This file contains technical information about API design and authentication, with a focus on using RESTful patterns and JWT tokens. It does not contain business-specific content or substantial code examples, so the 'technical-info' category is the most appropriate.
+  tags:
+    - api-guidelines
+    - authentication
+    - jwt
+  topics:
+    - api-design
+    - authentication
+  entities:
+    technologies:
+      - REST
+    frameworks:
+      - <UNKNOWN>
+    libraries:
+      - <UNKNOWN>
+    apis:
+      - JWT
+status: active
+---
+
+# API Guidelines
+
+Use RESTful patterns.
+
+## Authentication
+Use JWT tokens for authentication.
