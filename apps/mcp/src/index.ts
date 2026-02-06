@@ -212,7 +212,7 @@ async function routeToolCall(
       return learnTool.handler(args, storage);
 
     case 'kahuna_prepare_context':
-      return prepareContextTool.handler(args, client);
+      return prepareContextTool.handler(args, storage);
 
     case 'manage_context_files':
       return contextTool.handler(args, client);

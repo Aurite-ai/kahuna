@@ -202,9 +202,7 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
 
       // Filter by category (can be single or array)
       if (filter.category) {
-        const categories = Array.isArray(filter.category)
-          ? filter.category
-          : [filter.category];
+        const categories = Array.isArray(filter.category) ? filter.category : [filter.category];
         if (!categories.includes(entry.classification.category)) {
           return false;
         }
@@ -212,9 +210,7 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
 
       // Filter by tags (entries must have at least one matching tag)
       if (filter.tags && filter.tags.length > 0) {
-        const hasMatchingTag = filter.tags.some((tag) =>
-          entry.classification.tags.includes(tag)
-        );
+        const hasMatchingTag = filter.tags.some((tag) => entry.classification.tags.includes(tag));
         if (!hasMatchingTag) {
           return false;
         }
@@ -372,9 +368,7 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
       const files = await fs.readdir(this.baseDir);
       const mdcFiles = files.filter((f) => f.endsWith('.mdc'));
 
-      await Promise.all(
-        mdcFiles.map((filename) => fs.unlink(path.join(this.baseDir, filename)))
-      );
+      await Promise.all(mdcFiles.map((filename) => fs.unlink(path.join(this.baseDir, filename))));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         // Directory doesn't exist, nothing to clear

@@ -6,10 +6,7 @@
  */
 
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import type {
-  KnowledgeCategory,
-  KnowledgeEntryFrontmatter,
-} from './types.js';
+import type { KnowledgeCategory, KnowledgeEntryFrontmatter } from './types.js';
 
 /**
  * Generate URL-safe slug from title
@@ -134,10 +131,7 @@ export function parseMdcFile(content: string): ParsedMdcFile {
  * @param body - Markdown content body
  * @returns Complete .mdc file content string
  */
-export function generateMdcFile(
-  frontmatter: KnowledgeEntryFrontmatter,
-  body: string
-): string {
+export function generateMdcFile(frontmatter: KnowledgeEntryFrontmatter, body: string): string {
   const yamlContent = stringifyYaml(frontmatter, {
     lineWidth: 0, // Don't wrap long lines
     defaultStringType: 'PLAIN', // Use plain strings when possible

@@ -16,7 +16,7 @@
  * - Upgradeable to embeddings later
  */
 
-import type { ContextFile, KahunaClient } from '../client.js';
+import type { KnowledgeEntry, KnowledgeStorageService } from '../storage/index.js';
 
 /**
  * Tool definition for MCP registration.
@@ -58,7 +58,7 @@ Returns the most relevant files with:
     properties: {
       projectId: {
         type: 'string',
-        description: 'Project ID to retrieve context from',
+        description: 'Project ID (optional, for filtering by source project)',
       },
       taskDescription: {
         type: 'string',
@@ -74,7 +74,7 @@ Returns the most relevant files with:
         description: 'Filter by specific categories (optional)',
         items: {
           type: 'string',
-          enum: ['business-info', 'technical-info', 'code'],
+          enum: ['policy', 'requirement', 'reference', 'decision', 'pattern', 'context'],
         },
       },
       minRelevanceScore: {
@@ -83,7 +83,7 @@ Returns the most relevant files with:
         default: 1,
       },
     },
-    required: ['projectId', 'taskDescription'],
+    required: ['taskDescription'],
   },
 };
 
@@ -91,10 +91,10 @@ Returns the most relevant files with:
  * Input type for the tool.
  */
 interface PrepareContextInput {
-  projectId: string;
+  projectId?: string;
   taskDescription: string;
   maxFiles?: number;
-  categories?: Array<'business-info' | 'technical-info' | 'code'>;
+  categories?: Array<'policy' | 'requirement' | 'reference' | 'decision' | 'pattern' | 'context'>;
   minRelevanceScore?: number;
 }
 
@@ -113,7 +113,7 @@ interface MCPToolResponse {
 /**
  * Ranked file with relevance information
  */
-interface RankedFile extends ContextFile {
+interface RankedEntry extends KnowledgeEntry {
   relevanceScore: number;
   matchedTags?: string[];
   matchedTopics?: string[];
@@ -151,18 +151,6 @@ function errorResponse(message: string, details?: unknown): MCPToolResponse {
 }
 
 /**
- * Parse metadata JSON string to object
- */
-function parseMetadata(metadataString?: string): Record<string, unknown> | null {
-  if (!metadataString) return null;
-  try {
-    return JSON.parse(metadataString) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Calculate text similarity between two strings (simple word overlap)
  */
 function calculateSimilarity(text1: string, text2: string): number {
@@ -180,32 +168,33 @@ function calculateSimilarity(text1: string, text2: string): number {
 }
 
 /**
- * Rank files by relevance to task description using metadata
+ * Rank entries by relevance to task description using metadata
  *
  * Scoring weights:
  * - Tag match: 3 points per matching tag
  * - Topic match: 2 points per matching topic
  * - Entity match: 2 points per matching entity (technology, framework, library, API)
  * - Summary similarity: 0-3 points based on text overlap
- * - Filename match: 1 point if task mentions filename
+ * - Title match: 1 point if task mentions title
+ * - Category relevance: 0.5 points for category keyword match
  */
-function rankFilesByMetadata(files: ContextFile[], taskDescription: string): RankedFile[] {
+function rankEntriesByMetadata(entries: KnowledgeEntry[], taskDescription: string): RankedEntry[] {
   const taskLower = taskDescription.toLowerCase();
   const taskWords = taskLower.split(/\s+/);
 
-  return files
-    .map((file) => {
+  return entries
+    .map((entry) => {
       let score = 0;
       const matchedTags: string[] = [];
       const matchedTopics: string[] = [];
       const matchedEntities: string[] = [];
       const reasons: string[] = [];
 
-      const metadata = parseMetadata(file.metadata);
+      const classification = entry.classification;
 
       // 1. Tag matching (weight: 3)
-      if (metadata?.tags && Array.isArray(metadata.tags)) {
-        for (const tag of metadata.tags as string[]) {
+      if (classification.tags && classification.tags.length > 0) {
+        for (const tag of classification.tags) {
           if (taskLower.includes(tag.toLowerCase()) || taskWords.includes(tag.toLowerCase())) {
             score += 3;
             matchedTags.push(tag);
@@ -214,8 +203,8 @@ function rankFilesByMetadata(files: ContextFile[], taskDescription: string): Ran
       }
 
       // 2. Topic matching (weight: 2)
-      if (metadata?.topics && Array.isArray(metadata.topics)) {
-        for (const topic of metadata.topics as string[]) {
+      if (classification.topics && classification.topics.length > 0) {
+        for (const topic of classification.topics) {
           if (taskLower.includes(topic.toLowerCase())) {
             score += 2;
             matchedTopics.push(topic);
@@ -224,16 +213,14 @@ function rankFilesByMetadata(files: ContextFile[], taskDescription: string): Ran
       }
 
       // 3. Entity matching (weight: 2)
-      if (metadata?.entities && typeof metadata.entities === 'object') {
-        const entities = metadata.entities as Record<string, unknown>;
-        const allEntities: string[] = [];
-
-        // Collect all entity types
-        for (const value of Object.values(entities)) {
-          if (Array.isArray(value)) {
-            allEntities.push(...(value as string[]));
-          }
-        }
+      if (classification.entities) {
+        const entities = classification.entities;
+        const allEntities: string[] = [
+          ...(entities.technologies || []),
+          ...(entities.frameworks || []),
+          ...(entities.libraries || []),
+          ...(entities.apis || []),
+        ];
 
         for (const entity of allEntities) {
           if (taskLower.includes(entity.toLowerCase())) {
@@ -244,8 +231,8 @@ function rankFilesByMetadata(files: ContextFile[], taskDescription: string): Ran
       }
 
       // 4. Summary similarity (weight: 0-3)
-      if (metadata?.summary && typeof metadata.summary === 'string') {
-        const similarity = calculateSimilarity(metadata.summary, taskDescription);
+      if (entry.summary) {
+        const similarity = calculateSimilarity(entry.summary, taskDescription);
         const summaryScore = Math.round(similarity * 3);
         if (summaryScore > 0) {
           score += summaryScore;
@@ -253,24 +240,24 @@ function rankFilesByMetadata(files: ContextFile[], taskDescription: string): Ran
         }
       }
 
-      // 5. Filename match (weight: 1)
-      if (taskLower.includes(file.filename.toLowerCase())) {
+      // 5. Title match (weight: 1)
+      if (taskLower.includes(entry.title.toLowerCase())) {
         score += 1;
-        reasons.push('filename mentioned');
+        reasons.push('title mentioned');
       }
 
       // 6. Category relevance (small boost)
-      if (file.category) {
-        if (
-          (file.category === 'code' && /implement|build|create|write|code/.test(taskLower)) ||
-          (file.category === 'business-info' &&
-            /policy|rule|business|requirement/.test(taskLower)) ||
-          (file.category === 'technical-info' &&
-            /api|architecture|integration|spec/.test(taskLower))
-        ) {
-          score += 0.5;
-          reasons.push(`${file.category} category relevant`);
-        }
+      const category = classification.category;
+      if (
+        (category === 'pattern' && /implement|build|create|write|code/.test(taskLower)) ||
+        (category === 'policy' && /policy|rule|business|requirement/.test(taskLower)) ||
+        (category === 'reference' && /api|architecture|integration|spec/.test(taskLower)) ||
+        (category === 'requirement' && /requirement|spec|must|should/.test(taskLower)) ||
+        (category === 'decision' && /decision|why|rationale|chose/.test(taskLower)) ||
+        (category === 'context' && /context|background|overview/.test(taskLower))
+      ) {
+        score += 0.5;
+        reasons.push(`${category} category relevant`);
       }
 
       // Generate reasoning
@@ -288,7 +275,7 @@ function rankFilesByMetadata(files: ContextFile[], taskDescription: string): Ran
       reasoning = reasons.length > 0 ? reasons.join(' | ') : 'no direct matches';
 
       return {
-        ...file,
+        ...entry,
         relevanceScore: score,
         matchedTags,
         matchedTopics,
@@ -302,21 +289,21 @@ function rankFilesByMetadata(files: ContextFile[], taskDescription: string): Ran
 /**
  * Format context for copilot consumption
  */
-function formatContextForCopilot(files: RankedFile[]): string {
+function formatContextForCopilot(entries: RankedEntry[]): string {
   const lines: string[] = [];
 
   lines.push('# Prepared Context for Task\n');
 
-  for (const file of files) {
-    lines.push(`## ${file.filename}`);
-    lines.push(`**Category:** ${file.category || 'unknown'}`);
-    lines.push(`**Relevance:** ${file.relevanceScore.toFixed(1)}/10`);
-    if (file.relevanceReasoning) {
-      lines.push(`**Why relevant:** ${file.relevanceReasoning}`);
+  for (const entry of entries) {
+    lines.push(`## ${entry.title}`);
+    lines.push(`**Category:** ${entry.classification.category}`);
+    lines.push(`**Relevance:** ${entry.relevanceScore.toFixed(1)}/10`);
+    if (entry.relevanceReasoning) {
+      lines.push(`**Why relevant:** ${entry.relevanceReasoning}`);
     }
     lines.push('');
     lines.push('```');
-    lines.push(file.content);
+    lines.push(entry.content);
     lines.push('```');
     lines.push('');
   }
@@ -325,12 +312,12 @@ function formatContextForCopilot(files: RankedFile[]): string {
 }
 
 /**
- * Count files by category
+ * Count entries by category
  */
-function countByCategory(files: RankedFile[]): Record<string, number> {
+function countByCategory(entries: RankedEntry[]): Record<string, number> {
   const counts: Record<string, number> = {};
-  for (const file of files) {
-    const cat = file.category || 'unknown';
+  for (const entry of entries) {
+    const cat = entry.classification.category || 'unknown';
     counts[cat] = (counts[cat] || 0) + 1;
   }
   return counts;
@@ -341,38 +328,34 @@ function countByCategory(files: RankedFile[]): Record<string, number> {
  *
  * Process flow:
  * 1. Validate input
- * 2. Fetch all files from project
+ * 2. Fetch all active entries from local storage
  * 3. Filter by category if specified
- * 4. Rank files by relevance using metadata
+ * 4. Rank entries by relevance using metadata
  * 5. Apply minimum relevance threshold
- * 6. Take top N files
+ * 6. Take top N entries
  * 7. Format for copilot consumption
  *
  * @param args - Tool arguments from MCP client
- * @param client - Kahuna API client instance
+ * @param storage - Knowledge storage service instance
  * @returns MCP tool response
  */
 export async function prepareContextToolHandler(
   args: Record<string, unknown>,
-  client: KahunaClient
+  storage: KnowledgeStorageService
 ): Promise<MCPToolResponse> {
   const input = args as unknown as PrepareContextInput;
-  const { projectId, taskDescription, maxFiles = 10, categories, minRelevanceScore = 1 } = input;
+  const { taskDescription, maxFiles = 10, categories, minRelevanceScore = 1 } = input;
 
   // Validate input
-  if (!projectId) {
-    return errorResponse('Missing required parameter: projectId');
-  }
-
   if (!taskDescription) {
     return errorResponse('Missing required parameter: taskDescription');
   }
 
   try {
-    // Step 1: Fetch all files
-    const allFiles = await client.contextList({ projectId });
+    // Step 1: Fetch all active entries from local storage
+    const allEntries = await storage.list({ status: 'active' });
 
-    if (allFiles.length === 0) {
+    if (allEntries.length === 0) {
       return successResponse({
         message: 'No files found in knowledge base',
         hint: 'Use kahuna_learn to add files to the knowledge base first',
@@ -386,31 +369,38 @@ export async function prepareContextToolHandler(
     }
 
     // Step 2: Filter by category if specified
-    let candidates = allFiles;
+    let candidates = allEntries;
     if (categories && categories.length > 0) {
-      candidates = allFiles.filter(
-        (f) =>
-          f.category &&
-          categories.includes(f.category as 'business-info' | 'technical-info' | 'code')
-      );
+      candidates = allEntries.filter((entry) => {
+        const entryCategory = entry.classification.category;
+        return categories.includes(
+          entryCategory as
+            | 'policy'
+            | 'requirement'
+            | 'reference'
+            | 'decision'
+            | 'pattern'
+            | 'context'
+        );
+      });
     }
 
     // Step 3: Rank by relevance
-    const rankedFiles = rankFilesByMetadata(candidates, taskDescription);
+    const rankedEntries = rankEntriesByMetadata(candidates, taskDescription);
 
     // Step 4: Apply minimum relevance threshold
-    const relevantFiles = rankedFiles.filter((f) => f.relevanceScore >= minRelevanceScore);
+    const relevantEntries = rankedEntries.filter((e) => e.relevanceScore >= minRelevanceScore);
 
-    // Step 5: Take top N files
-    const selectedFiles = relevantFiles.slice(0, maxFiles);
+    // Step 5: Take top N entries
+    const selectedEntries = relevantEntries.slice(0, maxFiles);
 
-    if (selectedFiles.length === 0) {
+    if (selectedEntries.length === 0) {
       return successResponse({
         message: `No files met the minimum relevance score of ${minRelevanceScore}`,
         hint: 'Try lowering minRelevanceScore or rephrasing your task description',
         selectedFiles: [],
         summary: {
-          totalFiles: allFiles.length,
+          totalFiles: allEntries.length,
           selectedFiles: 0,
           categories: {},
         },
@@ -418,37 +408,37 @@ export async function prepareContextToolHandler(
     }
 
     // Step 6: Format for copilot
-    const formattedContext = formatContextForCopilot(selectedFiles);
+    const formattedContext = formatContextForCopilot(selectedEntries);
 
     return successResponse({
-      message: `Prepared ${selectedFiles.length} relevant file(s) for: "${taskDescription}"`,
+      message: `Prepared ${selectedEntries.length} relevant file(s) for: "${taskDescription}"`,
       summary: {
-        totalFiles: allFiles.length,
+        totalFiles: allEntries.length,
         candidateFiles: candidates.length,
-        selectedFiles: selectedFiles.length,
+        selectedFiles: selectedEntries.length,
         avgRelevanceScore: (
-          selectedFiles.reduce((sum, f) => sum + f.relevanceScore, 0) / selectedFiles.length
+          selectedEntries.reduce((sum, e) => sum + e.relevanceScore, 0) / selectedEntries.length
         ).toFixed(2),
-        categories: countByCategory(selectedFiles),
+        categories: countByCategory(selectedEntries),
       },
-      selectedFiles: selectedFiles.map((f) => ({
-        filename: f.filename,
-        fileId: f.id,
-        category: f.category,
-        relevanceScore: f.relevanceScore.toFixed(1),
-        reasoning: f.relevanceReasoning,
-        matchedTags: f.matchedTags,
-        matchedTopics: f.matchedTopics,
-        matchedEntities: f.matchedEntities,
+      selectedFiles: selectedEntries.map((e) => ({
+        title: e.title,
+        slug: e.slug,
+        category: e.classification.category,
+        relevanceScore: e.relevanceScore.toFixed(1),
+        reasoning: e.relevanceReasoning,
+        matchedTags: e.matchedTags,
+        matchedTopics: e.matchedTopics,
+        matchedEntities: e.matchedEntities,
         // Include content for direct use
-        content: f.content,
+        content: e.content,
       })),
       formattedContext, // Ready-to-use formatted context
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return errorResponse(`Failed to prepare context: ${errorMessage}`, {
-      hint: 'Check if the API server is running and you have valid authentication',
+      hint: 'Check if the knowledge base directory is accessible (~/.kahuna/knowledge/)',
     });
   }
 }

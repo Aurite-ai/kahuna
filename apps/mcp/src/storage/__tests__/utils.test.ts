@@ -4,12 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { KnowledgeEntryFrontmatter } from '../types.js';
-import {
-  generateMdcFile,
-  generateSlug,
-  mapCategory,
-  parseMdcFile,
-} from '../utils.js';
+import { generateMdcFile, generateSlug, mapCategory, parseMdcFile } from '../utils.js';
 
 describe('generateSlug', () => {
   it('converts basic title to lowercase hyphenated slug', () => {
@@ -116,9 +111,7 @@ This is the content body.`;
 
     expect(result.frontmatter.type).toBe('knowledge');
     expect(result.frontmatter.title).toBe('API Design Guidelines');
-    expect(result.frontmatter.summary).toBe(
-      'REST API design standards for the organization.'
-    );
+    expect(result.frontmatter.summary).toBe('REST API design standards for the organization.');
     expect(result.frontmatter.classification.category).toBe('policy');
     expect(result.frontmatter.classification.confidence).toBe(0.92);
     expect(result.frontmatter.classification.tags).toEqual(['rest', 'api']);
@@ -126,9 +119,7 @@ This is the content body.`;
   });
 
   it('throws on missing frontmatter', () => {
-    expect(() => parseMdcFile('No frontmatter here')).toThrow(
-      'missing frontmatter delimiters'
-    );
+    expect(() => parseMdcFile('No frontmatter here')).toThrow('missing frontmatter delimiters');
   });
 
   it('throws on invalid YAML', () => {
@@ -274,9 +265,7 @@ describe('generateMdcFile', () => {
     expect(parsed.frontmatter.classification.category).toBe(
       sampleFrontmatter.classification.category
     );
-    expect(parsed.frontmatter.classification.tags).toEqual(
-      sampleFrontmatter.classification.tags
-    );
+    expect(parsed.frontmatter.classification.tags).toEqual(sampleFrontmatter.classification.tags);
     expect(parsed.body).toBe(body);
   });
 

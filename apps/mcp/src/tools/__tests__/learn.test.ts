@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  KnowledgeEntry,
-  KnowledgeStorageService,
-} from '../../storage/index.js';
+import type { KnowledgeEntry, KnowledgeStorageService } from '../../storage/index.js';
 import { KnowledgeStorageError } from '../../storage/index.js';
 import { learnToolDefinition, learnToolHandler } from '../learn.js';
 
@@ -121,7 +118,10 @@ describe('learnToolHandler', () => {
 
   describe('input validation', () => {
     it('returns error when projectId is missing', async () => {
-      const result = await learnToolHandler({ files: [{ filename: 'test.md', content: 'test' }] }, mockStorage);
+      const result = await learnToolHandler(
+        { files: [{ filename: 'test.md', content: 'test' }] },
+        mockStorage
+      );
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
@@ -279,8 +279,12 @@ describe('learnToolHandler', () => {
     it('processes multiple files successfully', async () => {
       const now = new Date().toISOString();
       vi.mocked(mockStorage.save)
-        .mockResolvedValueOnce(createMockEntry({ slug: 'file-one', created_at: now, updated_at: now }))
-        .mockResolvedValueOnce(createMockEntry({ slug: 'file-two', created_at: now, updated_at: now }))
+        .mockResolvedValueOnce(
+          createMockEntry({ slug: 'file-one', created_at: now, updated_at: now })
+        )
+        .mockResolvedValueOnce(
+          createMockEntry({ slug: 'file-two', created_at: now, updated_at: now })
+        )
         .mockResolvedValueOnce(
           createMockEntry({
             slug: 'file-three',
@@ -312,7 +316,9 @@ describe('learnToolHandler', () => {
     it('handles partial failures', async () => {
       const now = new Date().toISOString();
       vi.mocked(mockStorage.save)
-        .mockResolvedValueOnce(createMockEntry({ slug: 'good-file', created_at: now, updated_at: now }))
+        .mockResolvedValueOnce(
+          createMockEntry({ slug: 'good-file', created_at: now, updated_at: now })
+        )
         .mockRejectedValueOnce(new KnowledgeStorageError('Write failed', 'WRITE_ERROR'));
 
       const result = await learnToolHandler(

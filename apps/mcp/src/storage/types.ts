@@ -148,11 +148,7 @@ export interface HealthCheckResult {
 /**
  * Error codes for storage operations
  */
-export type KnowledgeStorageErrorCode =
-  | 'NOT_FOUND'
-  | 'PARSE_ERROR'
-  | 'WRITE_ERROR'
-  | 'DIR_ERROR';
+export type KnowledgeStorageErrorCode = 'NOT_FOUND' | 'PARSE_ERROR' | 'WRITE_ERROR' | 'DIR_ERROR';
 
 /**
  * Custom error class for storage operations

@@ -16,7 +16,10 @@ describe('FileKnowledgeStorageService', () => {
 
   // Create a fresh test directory before each test
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `kahuna-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = path.join(
+      os.tmpdir(),
+      `kahuna-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    );
     storage = new FileKnowledgeStorageService(testDir);
   });
 
@@ -30,7 +33,9 @@ describe('FileKnowledgeStorageService', () => {
   });
 
   // Helper to create a valid input
-  function createTestInput(overrides: Partial<SaveKnowledgeEntryInput> = {}): SaveKnowledgeEntryInput {
+  function createTestInput(
+    overrides: Partial<SaveKnowledgeEntryInput> = {}
+  ): SaveKnowledgeEntryInput {
     return {
       title: 'Test Entry',
       content: '# Test Content\n\nThis is test content.',
@@ -100,7 +105,7 @@ describe('FileKnowledgeStorageService', () => {
       const entry1 = await storage.save(input1);
 
       // Small delay to ensure different timestamp
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       const entry2 = await storage.save(input2);
 
@@ -111,12 +116,15 @@ describe('FileKnowledgeStorageService', () => {
 
       // Verify only one file exists
       const files = await fs.readdir(testDir);
-      expect(files.filter(f => f.includes('same-title'))).toHaveLength(1);
+      expect(files.filter((f) => f.includes('same-title'))).toHaveLength(1);
     });
 
     it('maps AI categories correctly', async () => {
       const businessInput = createTestInput({ title: 'Business Doc', category: 'business-info' });
-      const technicalInput = createTestInput({ title: 'Technical Doc', category: 'technical-info' });
+      const technicalInput = createTestInput({
+        title: 'Technical Doc',
+        category: 'technical-info',
+      });
       const codeInput = createTestInput({ title: 'Code Doc', category: 'code' });
 
       const businessEntry = await storage.save(businessInput);
@@ -170,28 +178,34 @@ describe('FileKnowledgeStorageService', () => {
   describe('list()', () => {
     beforeEach(async () => {
       // Create multiple test entries
-      await storage.save(createTestInput({
-        title: 'API Guidelines',
-        category: 'policy',
-        metadata: { tags: ['api', 'rest'], topics: ['backend'], summary: 'API stuff' },
-      }));
-      await storage.save(createTestInput({
-        title: 'React Patterns',
-        category: 'pattern',
-        metadata: { tags: ['react', 'frontend'], topics: ['ui'], summary: 'React stuff' },
-      }));
-      await storage.save(createTestInput({
-        title: 'Database Schema',
-        category: 'reference',
-        metadata: { tags: ['database', 'sql'], topics: ['backend'], summary: 'DB stuff' },
-      }));
+      await storage.save(
+        createTestInput({
+          title: 'API Guidelines',
+          category: 'policy',
+          metadata: { tags: ['api', 'rest'], topics: ['backend'], summary: 'API stuff' },
+        })
+      );
+      await storage.save(
+        createTestInput({
+          title: 'React Patterns',
+          category: 'pattern',
+          metadata: { tags: ['react', 'frontend'], topics: ['ui'], summary: 'React stuff' },
+        })
+      );
+      await storage.save(
+        createTestInput({
+          title: 'Database Schema',
+          category: 'reference',
+          metadata: { tags: ['database', 'sql'], topics: ['backend'], summary: 'DB stuff' },
+        })
+      );
     });
 
     it('returns all entries without filter', async () => {
       const entries = await storage.list();
 
       expect(entries).toHaveLength(3);
-      const titles = entries.map(e => e.title);
+      const titles = entries.map((e) => e.title);
       expect(titles).toContain('API Guidelines');
       expect(titles).toContain('React Patterns');
       expect(titles).toContain('Database Schema');
@@ -208,7 +222,7 @@ describe('FileKnowledgeStorageService', () => {
       const entries = await storage.list({ category: ['policy', 'pattern'] });
 
       expect(entries).toHaveLength(2);
-      const titles = entries.map(e => e.title);
+      const titles = entries.map((e) => e.title);
       expect(titles).toContain('API Guidelines');
       expect(titles).toContain('React Patterns');
     });
@@ -217,17 +231,19 @@ describe('FileKnowledgeStorageService', () => {
       const entries = await storage.list({ tags: ['api', 'react'] });
 
       expect(entries).toHaveLength(2);
-      const titles = entries.map(e => e.title);
+      const titles = entries.map((e) => e.title);
       expect(titles).toContain('API Guidelines');
       expect(titles).toContain('React Patterns');
     });
 
     it('filters by contentSearch (content match)', async () => {
       // Add specific content to search for
-      await storage.save(createTestInput({
-        title: 'Unique Search Target',
-        content: 'This contains searchable unicorn keyword',
-      }));
+      await storage.save(
+        createTestInput({
+          title: 'Unique Search Target',
+          content: 'This contains searchable unicorn keyword',
+        })
+      );
 
       const entries = await storage.list({ contentSearch: 'unicorn' });
 
@@ -251,10 +267,12 @@ describe('FileKnowledgeStorageService', () => {
 
     it('filters by project', async () => {
       // Add entry with different project
-      await storage.save(createTestInput({
-        title: 'Other Project Entry',
-        projectId: 'other-project',
-      }));
+      await storage.save(
+        createTestInput({
+          title: 'Other Project Entry',
+          projectId: 'other-project',
+        })
+      );
 
       const entries = await storage.list({ project: 'other-project' });
 
@@ -275,12 +293,14 @@ describe('FileKnowledgeStorageService', () => {
     });
 
     it('combines multiple filters', async () => {
-      await storage.save(createTestInput({
-        title: 'Combined Filter Target',
-        category: 'pattern',
-        projectId: 'special-project',
-        metadata: { tags: ['unique-tag'], topics: [], summary: '' },
-      }));
+      await storage.save(
+        createTestInput({
+          title: 'Combined Filter Target',
+          category: 'pattern',
+          projectId: 'special-project',
+          metadata: { tags: ['unique-tag'], topics: [], summary: '' },
+        })
+      );
 
       const entries = await storage.list({
         category: 'pattern',
@@ -383,7 +403,7 @@ describe('FileKnowledgeStorageService', () => {
       const saved = await storage.save(createTestInput({ title: 'Archive Timestamp' }));
 
       // Small delay to ensure different timestamp
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       await storage.delete('archive-timestamp', false);
 
@@ -455,7 +475,7 @@ describe('FileKnowledgeStorageService', () => {
 
       const files = await fs.readdir(testDir);
       expect(files).toContain('other-file.txt');
-      expect(files.filter(f => f.endsWith('.mdc'))).toHaveLength(0);
+      expect(files.filter((f) => f.endsWith('.mdc'))).toHaveLength(0);
     });
   });
 
@@ -534,7 +554,7 @@ describe('FileKnowledgeStorageService', () => {
         createTestInput({ title: 'Concurrent Three' }),
       ];
 
-      const entries = await Promise.all(inputs.map(input => storage.save(input)));
+      const entries = await Promise.all(inputs.map((input) => storage.save(input)));
 
       expect(entries).toHaveLength(3);
       const list = await storage.list();
