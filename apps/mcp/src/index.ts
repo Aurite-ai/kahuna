@@ -42,6 +42,8 @@ import {
 
 import { type KahunaClient, createClientFromEnv } from './client.js';
 import { contextTool } from './tools/context.js';
+import { learnTool } from './tools/learn.js';
+import { prepareContextTool } from './tools/prepare-context.js';
 import { projectTool } from './tools/project.js';
 
 // =============================================================================
@@ -91,7 +93,9 @@ Actions:
 const allTools = [
   healthCheckTool,
   projectTool.definition,
-  contextTool.definition,
+  learnTool.definition,
+  prepareContextTool.definition,
+  contextTool.definition, // Keep for manual operations (update, delete, get specific file)
   // Add more tools here as they're implemented:
   // vckTool.definition,
   // resultsTool.definition,
@@ -201,6 +205,12 @@ async function routeToolCall(
 
     case 'manage_projects':
       return projectTool.handler(args, client);
+
+    case 'kahuna_learn':
+      return learnTool.handler(args, client);
+
+    case 'kahuna_prepare_context':
+      return prepareContextTool.handler(args, client);
 
     case 'manage_context_files':
       return contextTool.handler(args, client);

@@ -138,7 +138,8 @@ export class KahunaClient {
     };
 
     if (this.sessionToken) {
-      headers.Cookie = `kahuna_session=${this.sessionToken}`;
+      // Cookie name must match what the API expects (kahuna.sid)
+      headers.Cookie = `kahuna.sid=${this.sessionToken}`;
     }
 
     return headers;
