@@ -29,7 +29,7 @@ const DEFAULT_SPLIT_OPTIONS: Required<SplitOptions> = {
 /**
  * Validate input content before attempting to split
  */
-function validateSplitInput(filename: string, content: string, options: Required<SplitOptions>) {
+function validateSplitInput(filename: string, content: string, _options: Required<SplitOptions>) {
   // Check for empty content
   if (!content || content.trim().length === 0) {
     throw new EmptyContentError();

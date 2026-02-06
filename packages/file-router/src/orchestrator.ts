@@ -150,8 +150,8 @@ export async function categorizeWithHybridSupport(
 async function handleSplitError(
   error: HybridSplitError,
   filename: string,
-  content: string,
-  options: CategorizationOptions
+  _content: string,
+  _options: CategorizationOptions
 ): Promise<CategorizeWithHybridResult> {
   // For unsplittable hybrids, return as single file with dual tags
   if (error instanceof UnsplittableHybridError) {
