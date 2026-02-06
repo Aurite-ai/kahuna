@@ -249,6 +249,10 @@ export async function initializeToolHandler(
       );
     }
 
+    message.push(
+      'Next steps: Advise the user to stop the current Claude Code instance with Ctrl+C and restart it in order to refresh the conversation to use the new files'
+    );
+
     return successResponse({
       message: message.join('\n'),
       targetPath: absoluteTargetPath,
