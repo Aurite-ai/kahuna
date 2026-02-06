@@ -11,16 +11,20 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@kahuna/file-router": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@trpc/client": "^11.9.0",
+    "yaml": "^2.4.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "tsx": "^4.19.0"
+    "tsx": "^4.19.0",
+    "vitest": "^3.1.0"
   }
 }

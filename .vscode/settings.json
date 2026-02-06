@@ -16,6 +16,7 @@
   },
   "files.associations": {
     "*.tsx": "typescriptreact",
-    "*.ts": "typescript"
+    "*.ts": "typescript",
+     "*.mdc": "markdown"
   }
 }
