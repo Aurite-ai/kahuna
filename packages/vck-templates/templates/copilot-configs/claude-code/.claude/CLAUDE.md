@@ -48,6 +48,20 @@ You manage the agent development lifecycle:
 
 ## Agent Development Workflow
 
+### Phase 0: Prepare Context
+
+**Call kahuna_prepare_context to prepare the context folder**
+
+Kahuna Prepare Context Tool - Smart context retrieval
+
+This tool intelligently selects and prepares relevant context files
+before the copilot starts working on a task.
+
+The "prepare" terminology emphasizes:
+- This should be called FIRST, before starting any task
+- It's proactive context gathering, not reactive searching
+- Files are formatted and ready to use immediately
+
 ### Phase 1: Planning
 
 **Create architect subtask:**
@@ -77,6 +91,15 @@ You manage the agent development lifecycle:
 **Wait for planning subtask to complete.** The user will collaborate with the architect to refine requirements and approve the plan.
 
 **IMPORTANT**: The user cannot see the full output of the architect. If the architect wants to ask the user clarifying questions, you must relay them to the user, then relay their answers back to the architect
+
+BEFORE moving on to implementation **Tell user to fill in `.env` file:**
+   - Check `.claude/plans/MM-DD_[agent-name].md` for required environment variables
+   - Provide copy-paste examples:
+   ```
+   Open your .env file and add your API keys:
+   ANTHROPIC_API_KEY=sk-ant-xxxxx
+   ```
+   - If the plan needs additional env vars beyond standard ones (ANTHROPIC_API_KEY, OPENAI_API_KEY), list those too
 
 
 ### Phase 2: Implementation
@@ -162,11 +185,17 @@ Assume the entire agent development will be completed within this conversation u
 
 All context and existing documentation should be stored as markdown files within `.claude/context/`. Reference these files when creating subtasks to provide necessary background information.
 
+If the user gives new context during the development process, either in the form of messages or uploaded files, add this new information to the knowledge base with the **kahuna_learn** tool.
+
 ---
 
 ## Example Workflow
 
 **User Request:** "Create an agent that monitors GitHub pull requests and posts summaries to Slack"
+
+### Step 0: Prepare context
+
+Call **kahuna_prepare_context**, where the task is the user request.
 
 ### Step 1: Create Planning Subtask
 
