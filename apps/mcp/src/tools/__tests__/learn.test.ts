@@ -1,3 +1,4 @@
+import * as fs from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KnowledgeEntry, KnowledgeStorageService } from '../../storage/index.js';
 import { KnowledgeStorageError } from '../../storage/index.js';
@@ -17,6 +18,14 @@ vi.mock('@kahuna/file-router', () => ({
       this.name = 'FileSizeError';
     }
   },
+}));
+
+// Mock node:fs/promises
+vi.mock('node:fs/promises', () => ({
+  stat: vi.fn(),
+  readdir: vi.fn(),
+  readFile: vi.fn(),
+  access: vi.fn(),
 }));
 
 import { FileSizeError, categorizeFile } from '@kahuna/file-router';
@@ -77,21 +86,31 @@ describe('learnToolDefinition', () => {
     expect(learnToolDefinition.name).toBe('kahuna_learn');
   });
 
-  it('requires projectId and files', () => {
-    expect(learnToolDefinition.inputSchema.required).toContain('projectId');
-    expect(learnToolDefinition.inputSchema.required).toContain('files');
+  it('requires paths', () => {
+    expect(learnToolDefinition.inputSchema.required).toContain('paths');
+    expect(learnToolDefinition.inputSchema.required).not.toContain('projectId');
+    expect(learnToolDefinition.inputSchema.required).not.toContain('files');
   });
 
-  it('defines file schema with filename and content', () => {
-    const fileSchema = learnToolDefinition.inputSchema.properties.files.items;
-    expect(fileSchema.required).toContain('filename');
-    expect(fileSchema.required).toContain('content');
+  it('has optional description', () => {
+    expect(learnToolDefinition.inputSchema.properties.description).toBeDefined();
+    expect(learnToolDefinition.inputSchema.required).not.toContain('description');
+  });
+
+  it('defines paths as array of strings', () => {
+    const pathsSchema = learnToolDefinition.inputSchema.properties.paths;
+    expect(pathsSchema.type).toBe('array');
+    expect(pathsSchema.items.type).toBe('string');
   });
 });
 
 describe('learnToolHandler', () => {
   let mockStorage: KnowledgeStorageService;
   const mockCategorizeFile = vi.mocked(categorizeFile);
+  const mockFsStat = vi.mocked(fs.stat);
+  const mockFsReaddir = vi.mocked(fs.readdir);
+  const mockFsReadFile = vi.mocked(fs.readFile);
+  const mockFsAccess = vi.mocked(fs.access);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -114,59 +133,65 @@ describe('learnToolHandler', () => {
         summary: 'API documentation',
       },
     });
+
+    // Default file system mocks
+    mockFsAccess.mockResolvedValue(undefined);
+    mockFsStat.mockResolvedValue({
+      isDirectory: () => false,
+      isFile: () => true,
+    } as unknown as Awaited<ReturnType<typeof fs.stat>>);
+    mockFsReadFile.mockResolvedValue('# Test Content\n\nSome content here.');
   });
 
   describe('input validation', () => {
-    it('returns error when projectId is missing', async () => {
-      const result = await learnToolHandler(
-        { files: [{ filename: 'test.md', content: 'test' }] },
-        mockStorage
-      );
+    it('returns error when paths is missing', async () => {
+      const result = await learnToolHandler({}, mockStorage);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
       expect(response.success).toBe(false);
-      expect(response.error).toContain('projectId');
+      expect(response.error).toContain('paths');
     });
 
-    it('returns error when files array is missing', async () => {
-      const result = await learnToolHandler({ projectId: 'test-project' }, mockStorage);
+    it('returns error when paths array is empty', async () => {
+      const result = await learnToolHandler({ paths: [] }, mockStorage);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
       expect(response.success).toBe(false);
-      expect(response.error).toContain('files');
+      expect(response.error).toContain('paths');
     });
 
-    it('returns error when files array is empty', async () => {
-      const result = await learnToolHandler({ projectId: 'test-project', files: [] }, mockStorage);
+    it('returns error when no accessible files found', async () => {
+      mockFsAccess.mockRejectedValue(new Error('ENOENT'));
+
+      const result = await learnToolHandler({ paths: ['/nonexistent/file.md'] }, mockStorage);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
       expect(response.success).toBe(false);
-      expect(response.error).toContain('files');
+      expect(response.error).toContain('No accessible files');
+    });
+  });
+
+  describe('file reading from disk', () => {
+    it('reads file content from provided path', async () => {
+      vi.mocked(mockStorage.save).mockResolvedValue(createMockEntry());
+
+      await learnToolHandler({ paths: ['docs/api-guidelines.md'] }, mockStorage);
+
+      expect(mockFsAccess).toHaveBeenCalledWith('docs/api-guidelines.md');
+      expect(mockFsReadFile).toHaveBeenCalledWith('docs/api-guidelines.md', 'utf-8');
     });
 
-    it('handles file with missing filename', async () => {
-      const result = await learnToolHandler(
-        { projectId: 'test-project', files: [{ content: 'test' }] },
-        mockStorage
-      );
+    it('handles file read errors gracefully', async () => {
+      mockFsReadFile.mockRejectedValue(new Error('Permission denied'));
+
+      const result = await learnToolHandler({ paths: ['docs/protected.md'] }, mockStorage);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.results[0].success).toBe(false);
-      expect(response.data.results[0].error).toContain('filename');
-    });
-
-    it('handles file with missing content', async () => {
-      const result = await learnToolHandler(
-        { projectId: 'test-project', files: [{ filename: 'test.md' }] },
-        mockStorage
-      );
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.data.results[0].success).toBe(false);
-      expect(response.data.results[0].error).toContain('content');
+      expect(response.data.results[0].error).toContain('Failed to read file');
     });
   });
 
@@ -182,13 +207,7 @@ describe('learnToolHandler', () => {
 
       vi.mocked(mockStorage.save).mockResolvedValue(savedEntry);
 
-      const result = await learnToolHandler(
-        {
-          projectId: 'test-project',
-          files: [{ filename: 'api-guidelines.md', content: '# API Guidelines\n\nUse REST.' }],
-        },
-        mockStorage
-      );
+      const result = await learnToolHandler({ paths: ['docs/api-guidelines.md'] }, mockStorage);
 
       expect(result.isError).toBeUndefined();
       const response = JSON.parse(result.content[0].text);
@@ -199,26 +218,37 @@ describe('learnToolHandler', () => {
       expect(response.data.summary.created).toBe(1);
     });
 
-    it('calls storage.save with correct input', async () => {
+    it('calls storage.save with correct input including sourcePath', async () => {
+      vi.mocked(mockStorage.save).mockResolvedValue(createMockEntry());
+
+      await learnToolHandler({ paths: ['src/test-file.md'] }, mockStorage);
+
+      expect(mockStorage.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Test File',
+          sourceFile: 'test-file.md',
+          sourcePath: 'src/test-file.md',
+          category: 'technical-info',
+          confidence: 0.9,
+          reasoning: 'Test categorization',
+        })
+      );
+    });
+
+    it('includes description in reasoning when provided', async () => {
       vi.mocked(mockStorage.save).mockResolvedValue(createMockEntry());
 
       await learnToolHandler(
         {
-          projectId: 'my-project',
-          files: [{ filename: 'test-file.md', content: 'Test content' }],
+          paths: ['docs/api.md'],
+          description: 'Our API design standards',
         },
         mockStorage
       );
 
       expect(mockStorage.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: 'Test File',
-          content: 'Test content',
-          sourceFile: 'test-file.md',
-          projectId: 'my-project',
-          category: 'technical-info',
-          confidence: 0.9,
-          reasoning: 'Test categorization',
+          reasoning: expect.stringContaining('Our API design standards'),
         })
       );
     });
@@ -228,16 +258,13 @@ describe('learnToolHandler', () => {
 
       // Test various filename formats
       const testCases = [
-        { filename: 'api-guidelines.md', expectedTitle: 'Api Guidelines' },
-        { filename: 'README.txt', expectedTitle: 'README' },
-        { filename: 'my_config_file.yaml', expectedTitle: 'My Config File' },
+        { path: 'docs/api-guidelines.md', expectedTitle: 'Api Guidelines' },
+        { path: 'README.txt', expectedTitle: 'README' },
+        { path: 'src/my_config_file.yaml', expectedTitle: 'My Config File' },
       ];
 
-      for (const { filename, expectedTitle } of testCases) {
-        await learnToolHandler(
-          { projectId: 'test', files: [{ filename, content: 'test' }] },
-          mockStorage
-        );
+      for (const { path: filePath, expectedTitle } of testCases) {
+        await learnToolHandler({ paths: [filePath] }, mockStorage);
 
         expect(mockStorage.save).toHaveBeenLastCalledWith(
           expect.objectContaining({ title: expectedTitle })
@@ -259,13 +286,7 @@ describe('learnToolHandler', () => {
 
       vi.mocked(mockStorage.save).mockResolvedValue(savedEntry);
 
-      const result = await learnToolHandler(
-        {
-          projectId: 'test-project',
-          files: [{ filename: 'api-guidelines.md', content: '# Updated API Guidelines' }],
-        },
-        mockStorage
-      );
+      const result = await learnToolHandler({ paths: ['docs/api-guidelines.md'] }, mockStorage);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.success).toBe(true);
@@ -276,7 +297,7 @@ describe('learnToolHandler', () => {
   });
 
   describe('multiple files', () => {
-    it('processes multiple files successfully', async () => {
+    it('processes multiple file paths successfully', async () => {
       const now = new Date().toISOString();
       vi.mocked(mockStorage.save)
         .mockResolvedValueOnce(
@@ -295,12 +316,7 @@ describe('learnToolHandler', () => {
 
       const result = await learnToolHandler(
         {
-          projectId: 'test-project',
-          files: [
-            { filename: 'file-one.md', content: 'Content 1' },
-            { filename: 'file-two.md', content: 'Content 2' },
-            { filename: 'file-three.md', content: 'Content 3' },
-          ],
+          paths: ['file-one.md', 'file-two.md', 'file-three.md'],
         },
         mockStorage
       );
@@ -323,11 +339,7 @@ describe('learnToolHandler', () => {
 
       const result = await learnToolHandler(
         {
-          projectId: 'test-project',
-          files: [
-            { filename: 'good-file.md', content: 'Good content' },
-            { filename: 'bad-file.md', content: 'Bad content' },
-          ],
+          paths: ['good-file.md', 'bad-file.md'],
         },
         mockStorage
       );
@@ -346,13 +358,7 @@ describe('learnToolHandler', () => {
     it('handles FileSizeError from categorization', async () => {
       mockCategorizeFile.mockRejectedValueOnce(new FileSizeError(500000, 400000));
 
-      const result = await learnToolHandler(
-        {
-          projectId: 'test-project',
-          files: [{ filename: 'large-file.md', content: 'x'.repeat(500000) }],
-        },
-        mockStorage
-      );
+      const result = await learnToolHandler({ paths: ['large-file.md'] }, mockStorage);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.results[0].success).toBe(false);
@@ -363,13 +369,7 @@ describe('learnToolHandler', () => {
     it('handles missing Anthropic API key', async () => {
       mockCategorizeFile.mockRejectedValueOnce(new Error('ANTHROPIC_API_KEY is not set'));
 
-      const result = await learnToolHandler(
-        {
-          projectId: 'test-project',
-          files: [{ filename: 'test.md', content: 'test' }],
-        },
-        mockStorage
-      );
+      const result = await learnToolHandler({ paths: ['test.md'] }, mockStorage);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.results[0].success).toBe(false);
@@ -387,13 +387,7 @@ describe('learnToolHandler', () => {
         new KnowledgeStorageError('Directory not accessible', 'DIR_ERROR')
       );
 
-      const result = await learnToolHandler(
-        {
-          projectId: 'test-project',
-          files: [{ filename: 'test.md', content: 'test' }],
-        },
-        mockStorage
-      );
+      const result = await learnToolHandler({ paths: ['test.md'] }, mockStorage);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.results[0].success).toBe(false);
@@ -404,13 +398,7 @@ describe('learnToolHandler', () => {
     it('handles unexpected errors', async () => {
       mockCategorizeFile.mockRejectedValueOnce(new Error('Unexpected network error'));
 
-      const result = await learnToolHandler(
-        {
-          projectId: 'test-project',
-          files: [{ filename: 'test.md', content: 'test' }],
-        },
-        mockStorage
-      );
+      const result = await learnToolHandler({ paths: ['test.md'] }, mockStorage);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.results[0].success).toBe(false);
@@ -425,13 +413,7 @@ describe('learnToolHandler', () => {
         createMockEntry({ created_at: now, updated_at: now })
       );
 
-      const result = await learnToolHandler(
-        {
-          projectId: 'test-project',
-          files: [{ filename: 'test.md', content: 'test' }],
-        },
-        mockStorage
-      );
+      const result = await learnToolHandler({ paths: ['test.md'] }, mockStorage);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.message).toContain('Processed 1 file(s)');
@@ -470,16 +452,7 @@ describe('learnToolHandler', () => {
           })
         );
 
-      const result = await learnToolHandler(
-        {
-          projectId: 'test-project',
-          files: [
-            { filename: 'ref.md', content: 'reference content' },
-            { filename: 'policy.md', content: 'policy content' },
-          ],
-        },
-        mockStorage
-      );
+      const result = await learnToolHandler({ paths: ['ref.md', 'policy.md'] }, mockStorage);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.message).toContain('reference');

@@ -23,67 +23,43 @@ import type { KnowledgeEntry, KnowledgeStorageService } from '../storage/index.j
  */
 export const prepareContextToolDefinition = {
   name: 'kahuna_prepare_context',
-  description: `Prepare relevant context BEFORE starting a task. Call this FIRST to gather the knowledge you need.
+  description: `Prepare the context/ folder with relevant knowledge for a task.
 
-**What This Tool Does:**
-Analyzes your task description and intelligently selects the most relevant files from the knowledge base.
+USE THIS TOOL WHEN:
+- Starting any new task or feature
+- User describes what they want to build
+- Before beginning implementation work
+- User asks "what do we know about X"
 
-**Smart Selection:**
-- Matches task keywords with file tags
-- Identifies related topics and concepts
-- Finds files mentioning relevant technologies
-- Considers file summaries for semantic matches
-- Ranks by relevance score
+This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from context/ files.
 
-**When to Use:**
-- At the start of ANY task
-- Before implementing features
-- When troubleshooting issues
-- To understand project context
+**Examples:**
+- Starting a task: task="Add rate limiting to the search tool"
+- With files you'll touch: task="Refactor error handling in tools", files=["src/agent/tools.py"]
+- Exploring a topic: task="Understand our API design patterns"
 
-**Usage Pattern:**
-"Prepare context for implementing user authentication"
-"Get ready to work on payment integration"
-"I need context for debugging the API"
-
-**Response:**
-Returns the most relevant files with:
-- File content ready to use
-- Relevance scores and reasoning
-- Category breakdown
-- Formatted for immediate consumption`,
+**Hints:**
+- Call ONCE at task start, then work from context/ files
+- Natural language task description works best
+- After calling, read context/README.md for navigation
+- If you need more context mid-task, use kahuna_ask instead`,
 
   inputSchema: {
     type: 'object' as const,
     properties: {
-      projectId: {
+      task: {
         type: 'string',
-        description: 'Project ID (optional, for filtering by source project)',
+        description: 'What you are trying to do. Be specific for better results.',
       },
-      taskDescription: {
-        type: 'string',
-        description: 'Describe what you are about to do. Be specific for better results.',
-      },
-      maxFiles: {
-        type: 'number',
-        description: 'Maximum number of files to return (default: 10)',
-        default: 10,
-      },
-      categories: {
+      files: {
         type: 'array',
-        description: 'Filter by specific categories (optional)',
+        description: 'Optional: Files you will be working with (helps with relevance)',
         items: {
           type: 'string',
-          enum: ['policy', 'requirement', 'reference', 'decision', 'pattern', 'context'],
         },
       },
-      minRelevanceScore: {
-        type: 'number',
-        description: 'Minimum relevance score (0-10, default: 1)',
-        default: 1,
-      },
     },
-    required: ['taskDescription'],
+    required: ['task'],
   },
 };
 
@@ -91,11 +67,8 @@ Returns the most relevant files with:
  * Input type for the tool.
  */
 interface PrepareContextInput {
-  projectId?: string;
-  taskDescription: string;
-  maxFiles?: number;
-  categories?: Array<'policy' | 'requirement' | 'reference' | 'decision' | 'pattern' | 'context'>;
-  minRelevanceScore?: number;
+  task: string;
+  files?: string[];
 }
 
 /**
@@ -168,6 +141,24 @@ function calculateSimilarity(text1: string, text2: string): number {
 }
 
 /**
+ * Extract keywords from file paths for relevance matching
+ */
+function extractFileKeywords(files: string[]): string[] {
+  const keywords: string[] = [];
+  for (const file of files) {
+    // Extract filename and path components
+    const parts = file.split(/[/\\]/).filter(Boolean);
+    for (const part of parts) {
+      // Remove extension and split by separators
+      const baseName = part.replace(/\.[^.]+$/, '');
+      const words = baseName.split(/[-_.]/).filter((w) => w.length > 2);
+      keywords.push(...words.map((w) => w.toLowerCase()));
+    }
+  }
+  return [...new Set(keywords)];
+}
+
+/**
  * Rank entries by relevance to task description using metadata
  *
  * Scoring weights:
@@ -177,8 +168,13 @@ function calculateSimilarity(text1: string, text2: string): number {
  * - Summary similarity: 0-3 points based on text overlap
  * - Title match: 1 point if task mentions title
  * - Category relevance: 0.5 points for category keyword match
+ * - File keyword match: 2 points per keyword match from working files
  */
-function rankEntriesByMetadata(entries: KnowledgeEntry[], taskDescription: string): RankedEntry[] {
+function rankEntriesByMetadata(
+  entries: KnowledgeEntry[],
+  taskDescription: string,
+  fileKeywords: string[] = []
+): RankedEntry[] {
   const taskLower = taskDescription.toLowerCase();
   const taskWords = taskLower.split(/\s+/);
 
@@ -199,6 +195,11 @@ function rankEntriesByMetadata(entries: KnowledgeEntry[], taskDescription: strin
             score += 3;
             matchedTags.push(tag);
           }
+          // Also check against file keywords
+          if (fileKeywords.includes(tag.toLowerCase())) {
+            score += 2;
+            if (!matchedTags.includes(tag)) matchedTags.push(tag);
+          }
         }
       }
 
@@ -208,6 +209,11 @@ function rankEntriesByMetadata(entries: KnowledgeEntry[], taskDescription: strin
           if (taskLower.includes(topic.toLowerCase())) {
             score += 2;
             matchedTopics.push(topic);
+          }
+          // Also check against file keywords
+          if (fileKeywords.includes(topic.toLowerCase())) {
+            score += 2;
+            if (!matchedTopics.includes(topic)) matchedTopics.push(topic);
           }
         }
       }
@@ -226,6 +232,11 @@ function rankEntriesByMetadata(entries: KnowledgeEntry[], taskDescription: strin
           if (taskLower.includes(entity.toLowerCase())) {
             score += 2;
             matchedEntities.push(entity);
+          }
+          // Also check against file keywords
+          if (fileKeywords.includes(entity.toLowerCase())) {
+            score += 2;
+            if (!matchedEntities.includes(entity)) matchedEntities.push(entity);
           }
         }
       }
@@ -289,24 +300,42 @@ function rankEntriesByMetadata(entries: KnowledgeEntry[], taskDescription: strin
 /**
  * Format context for copilot consumption
  */
-function formatContextForCopilot(entries: RankedEntry[]): string {
+function formatContextForCopilot(entries: RankedEntry[], task: string): string {
   const lines: string[] = [];
 
-  lines.push('# Prepared Context for Task\n');
+  lines.push('# Context Ready\n');
+  lines.push(`**Task:** ${task}\n`);
+
+  if (entries.length === 0) {
+    lines.push('No relevant context found in the knowledge base.\n');
+    lines.push('<hints>');
+    lines.push('- Use kahuna_learn to add files to the knowledge base');
+    lines.push('- Try rephrasing the task description');
+    lines.push('</hints>');
+    return lines.join('\n');
+  }
+
+  lines.push('## Relevant Context Surfaced\n');
+  lines.push('| Topic | File | Why Relevant |');
+  lines.push('|-------|------|--------------|');
 
   for (const entry of entries) {
-    lines.push(`## ${entry.title}`);
-    lines.push(`**Category:** ${entry.classification.category}`);
-    lines.push(`**Relevance:** ${entry.relevanceScore.toFixed(1)}/10`);
-    if (entry.relevanceReasoning) {
-      lines.push(`**Why relevant:** ${entry.relevanceReasoning}`);
-    }
-    lines.push('');
-    lines.push('```');
-    lines.push(entry.content);
-    lines.push('```');
-    lines.push('');
+    const file = `context/${entry.slug}.md`;
+    lines.push(`| ${entry.title} | ${file} | ${entry.relevanceReasoning} |`);
   }
+
+  lines.push('\n## Start Here\n');
+
+  for (let i = 0; i < Math.min(3, entries.length); i++) {
+    const entry = entries[i];
+    lines.push(`${i + 1}. **Read ${entry.slug}.md** - ${entry.summary || entry.title}`);
+  }
+
+  lines.push('\n<hints>');
+  lines.push('- Context folder is ready - read files directly');
+  lines.push('- If you need more context mid-task, use kahuna_ask');
+  lines.push('- After completing work, use kahuna_learn to capture learnings');
+  lines.push('</hints>');
 
   return lines.join('\n');
 }
@@ -329,7 +358,7 @@ function countByCategory(entries: RankedEntry[]): Record<string, number> {
  * Process flow:
  * 1. Validate input
  * 2. Fetch all active entries from local storage
- * 3. Filter by category if specified
+ * 3. Extract keywords from working files (if provided)
  * 4. Rank entries by relevance using metadata
  * 5. Apply minimum relevance threshold
  * 6. Take top N entries
@@ -344,11 +373,15 @@ export async function prepareContextToolHandler(
   storage: KnowledgeStorageService
 ): Promise<MCPToolResponse> {
   const input = args as unknown as PrepareContextInput;
-  const { taskDescription, maxFiles = 10, categories, minRelevanceScore = 1 } = input;
+  const { task, files = [] } = input;
+
+  // Internal defaults (not exposed to user)
+  const maxFiles = 10;
+  const minRelevanceScore = 1;
 
   // Validate input
-  if (!taskDescription) {
-    return errorResponse('Missing required parameter: taskDescription');
+  if (!task) {
+    return errorResponse('Missing required parameter: task');
   }
 
   try {
@@ -365,28 +398,18 @@ export async function prepareContextToolHandler(
           selectedFiles: 0,
           categories: {},
         },
+        formattedContext: formatContextForCopilot([], task),
       });
     }
 
-    // Step 2: Filter by category if specified
-    let candidates = allEntries;
-    if (categories && categories.length > 0) {
-      candidates = allEntries.filter((entry) => {
-        const entryCategory = entry.classification.category;
-        return categories.includes(
-          entryCategory as
-            | 'policy'
-            | 'requirement'
-            | 'reference'
-            | 'decision'
-            | 'pattern'
-            | 'context'
-        );
-      });
-    }
+    // Step 2: Extract keywords from working files
+    const fileKeywords = extractFileKeywords(files);
+
+    // Optionally read content from working files to boost relevance
+    // (future enhancement - for now just use path keywords)
 
     // Step 3: Rank by relevance
-    const rankedEntries = rankEntriesByMetadata(candidates, taskDescription);
+    const rankedEntries = rankEntriesByMetadata(allEntries, task, fileKeywords);
 
     // Step 4: Apply minimum relevance threshold
     const relevantEntries = rankedEntries.filter((e) => e.relevanceScore >= minRelevanceScore);
@@ -396,25 +419,25 @@ export async function prepareContextToolHandler(
 
     if (selectedEntries.length === 0) {
       return successResponse({
-        message: `No files met the minimum relevance score of ${minRelevanceScore}`,
-        hint: 'Try lowering minRelevanceScore or rephrasing your task description',
+        message: 'No files met the minimum relevance threshold',
+        hint: 'Try rephrasing your task description or use kahuna_learn to add more context',
         selectedFiles: [],
         summary: {
           totalFiles: allEntries.length,
           selectedFiles: 0,
           categories: {},
         },
+        formattedContext: formatContextForCopilot([], task),
       });
     }
 
     // Step 6: Format for copilot
-    const formattedContext = formatContextForCopilot(selectedEntries);
+    const formattedContext = formatContextForCopilot(selectedEntries, task);
 
     return successResponse({
-      message: `Prepared ${selectedEntries.length} relevant file(s) for: "${taskDescription}"`,
+      message: `Prepared ${selectedEntries.length} relevant file(s) for: "${task}"`,
       summary: {
         totalFiles: allEntries.length,
-        candidateFiles: candidates.length,
         selectedFiles: selectedEntries.length,
         avgRelevanceScore: (
           selectedEntries.reduce((sum, e) => sum + e.relevanceScore, 0) / selectedEntries.length

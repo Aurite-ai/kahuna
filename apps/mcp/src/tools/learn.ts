@@ -3,16 +3,19 @@
  *
  * This tool allows users to "throw files" at Kahuna's knowledge base.
  * Kahuna automatically:
- * 1. Categorizes each file using AI
- * 2. Extracts rich metadata (tags, topics, technologies, etc.)
- * 3. Stores files in the local knowledge base (~/.kahuna/knowledge/)
+ * 1. Reads files from disk (supports files and folders)
+ * 2. Categorizes each file using AI
+ * 3. Extracts rich metadata (tags, topics, technologies, etc.)
+ * 4. Stores files in the local knowledge base (~/.kahuna/knowledge/)
  *
  * The "learn" terminology emphasizes the fire-and-forget nature:
  * - Users don't need to think about how to categorize
- * - Copilot doesn't need to consider where files go
- * - Just "learn from these files" and Kahuna handles the rest
+ * - Copilot doesn't need to read file contents first
+ * - Just "learn from these paths" and Kahuna handles the rest
  */
 
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { FileSizeError, categorizeFile } from '@kahuna/file-router';
 import type { KnowledgeStorageService, SaveKnowledgeEntryInput } from '../storage/index.js';
 import { KnowledgeStorageError } from '../storage/index.js';
@@ -22,60 +25,50 @@ import { KnowledgeStorageError } from '../storage/index.js';
  */
 export const learnToolDefinition = {
   name: 'kahuna_learn',
-  description: `Feed files to Kahuna's knowledge base. Just throw your files at Kahuna - it will automatically categorize and organize them.
+  description: `Send files or folders to Kahuna to learn from and add to the knowledge base.
 
-**What Kahuna Does Automatically:**
-- Categorizes files (business-info, technical-info, or code)
-- Extracts metadata: tags, topics, technologies, frameworks
-- Generates summaries
-- Identifies code elements (functions, classes, imports)
-- Detects document structure
+USE THIS TOOL WHEN:
+- User shares files/folders and wants Kahuna to "learn" from them
+- User provides policy documents, specs, or reference materials
+- User says "here's our...", "learn this", "add this to context"
+- After completing work the user wants preserved as knowledge
 
-**You can upload:**
-- Single files
-- Multiple files at once (batch upload)
+Kahuna's agents will:
+1. Read files from the provided paths
+2. Classify what kind of knowledge each file contains
+3. Store in ~/.kahuna knowledge base with metadata
+4. Files will be available for future context surfacing
 
-**Usage Pattern:**
-"Learn from this API documentation"
-"Add these configuration files to the knowledge base"
-"Here are the project files - learn from them"
+**Examples:**
+- Single file: paths=["docs/api-guidelines.md"]
+- Entire folder: paths=["docs/"]
+- Multiple paths: paths=["docs/api-guidelines.md", "specs/"]
 
-**Response:**
-Returns a summary of what was learned, including:
-- Number of files processed
-- Categories assigned
-- Any errors encountered
+**Hints:**
+- Accepts both files AND folders - folders are processed recursively
+- Description helps classification but isn't required
+- Files go to ~/.kahuna knowledge base, NOT directly to context/
+- Use kahuna_prepare_context to surface learned knowledge
 
 **File Size Limit:** 400KB per file (~100k tokens)`,
 
   inputSchema: {
     type: 'object' as const,
     properties: {
-      projectId: {
-        type: 'string',
-        description: 'Project ID to associate files with (for provenance tracking)',
-      },
-      files: {
+      paths: {
         type: 'array',
-        description: 'Files to learn from (can be single or multiple)',
+        description: 'File or folder paths to process (relative or absolute)',
         items: {
-          type: 'object',
-          properties: {
-            filename: {
-              type: 'string',
-              description: 'Name of the file (helps with categorization)',
-            },
-            content: {
-              type: 'string',
-              description: 'File content to analyze and store',
-            },
-          },
-          required: ['filename', 'content'],
+          type: 'string',
         },
         minItems: 1,
       },
+      description: {
+        type: 'string',
+        description: 'Optional description of what these files contain / why they matter',
+      },
     },
-    required: ['projectId', 'files'],
+    required: ['paths'],
   },
 };
 
@@ -83,11 +76,8 @@ Returns a summary of what was learned, including:
  * Input type for the tool.
  */
 interface LearnToolInput {
-  projectId: string;
-  files: Array<{
-    filename: string;
-    content: string;
-  }>;
+  paths: string[];
+  description?: string;
 }
 
 /**
@@ -150,7 +140,7 @@ function errorResponse(message: string, details?: unknown): MCPToolResponse {
  */
 function filenameToTitle(filename: string): string {
   // Remove extension
-  const base = filename.replace(/\.[^.]+$/, '');
+  const base = path.basename(filename).replace(/\.[^.]+$/, '');
 
   // Replace separators with spaces and capitalize words
   return base
@@ -193,15 +183,92 @@ function generateLearningSummary(results: FileLearnResult[]): string {
 }
 
 /**
+ * Check if a path is a directory
+ */
+async function isDirectory(filePath: string): Promise<boolean> {
+  try {
+    const stats = await fs.stat(filePath);
+    return stats.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get all files in a directory recursively
+ */
+async function getFilesRecursively(dirPath: string): Promise<string[]> {
+  const files: string[] = [];
+
+  async function walk(currentPath: string): Promise<void> {
+    const entries = await fs.readdir(currentPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(currentPath, entry.name);
+
+      // Skip hidden files and common non-content directories
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        await walk(fullPath);
+      } else if (entry.isFile()) {
+        files.push(fullPath);
+      }
+    }
+  }
+
+  await walk(dirPath);
+  return files;
+}
+
+/**
+ * Resolve paths to a list of files (expanding directories)
+ */
+async function resolvePaths(paths: string[]): Promise<{ files: string[]; errors: string[] }> {
+  const files: string[] = [];
+  const errors: string[] = [];
+
+  for (const inputPath of paths) {
+    try {
+      // Check if path exists
+      await fs.access(inputPath);
+
+      if (await isDirectory(inputPath)) {
+        // Recursively get all files in directory
+        const dirFiles = await getFilesRecursively(inputPath);
+        files.push(...dirFiles);
+      } else {
+        files.push(inputPath);
+      }
+    } catch (error) {
+      errors.push(`Path not accessible: ${inputPath}`);
+    }
+  }
+
+  return { files, errors };
+}
+
+/**
+ * Read file content from disk
+ */
+async function readFileContent(filePath: string): Promise<string> {
+  return fs.readFile(filePath, 'utf-8');
+}
+
+/**
  * Handle the kahuna_learn tool call.
  *
  * Process flow:
  * 1. Validate input
- * 2. For each file:
- *    a. Use AI to categorize and extract metadata
- *    b. Store in local knowledge base
- *    c. Track success/failure
- * 3. Return summary of results
+ * 2. Resolve paths (expand directories)
+ * 3. For each file:
+ *    a. Read content from disk
+ *    b. Use AI to categorize and extract metadata
+ *    c. Store in local knowledge base
+ *    d. Track success/failure
+ * 4. Return summary of results
  *
  * @param args - Tool arguments from MCP client
  * @param storage - Knowledge storage service instance
@@ -212,34 +279,55 @@ export async function learnToolHandler(
   storage: KnowledgeStorageService
 ): Promise<MCPToolResponse> {
   const input = args as unknown as LearnToolInput;
-  const { projectId, files } = input;
+  const { paths, description } = input;
 
   // Validate input
-  if (!projectId) {
-    return errorResponse('Missing required parameter: projectId');
+  if (!paths || !Array.isArray(paths) || paths.length === 0) {
+    return errorResponse('Missing or empty paths array', {
+      hint: 'Provide at least one file or folder path',
+    });
   }
 
-  if (!files || !Array.isArray(files) || files.length === 0) {
-    return errorResponse('Missing or empty files array', {
-      hint: 'Provide at least one file with filename and content',
+  // Resolve paths to files
+  const { files, errors: pathErrors } = await resolvePaths(paths);
+
+  if (files.length === 0) {
+    return errorResponse('No accessible files found in provided paths', {
+      pathErrors,
+      hint: 'Check that the paths exist and are accessible',
     });
   }
 
   // Process each file
   const results: FileLearnResult[] = [];
 
-  for (const file of files) {
-    if (!file.filename || !file.content) {
-      results.push({
-        filename: file.filename || 'unknown',
-        success: false,
-        error: 'Missing filename or content',
-      });
-      continue;
-    }
+  // Add path errors as failed results
+  for (const pathError of pathErrors) {
+    results.push({
+      filename: pathError,
+      success: false,
+      error: pathError,
+    });
+  }
+
+  for (const filePath of files) {
+    const filename = path.basename(filePath);
 
     try {
-      // Step 1: Use AI to categorize and extract metadata
+      // Step 1: Read file content from disk
+      let content: string;
+      try {
+        content = await readFileContent(filePath);
+      } catch (error) {
+        results.push({
+          filename: filePath,
+          success: false,
+          error: `Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
+        continue;
+      }
+
+      // Step 2: Use AI to categorize and extract metadata
       let categorization: {
         category: string;
         confidence: number;
@@ -248,12 +336,12 @@ export async function learnToolHandler(
       };
 
       try {
-        categorization = await categorizeFile(file.filename, file.content);
+        categorization = await categorizeFile(filename, content);
       } catch (error: unknown) {
         // Handle categorization errors
         if (error instanceof FileSizeError) {
           results.push({
-            filename: file.filename,
+            filename: filePath,
             success: false,
             error: `File too large: ${error.fileSize} bytes (limit: ${error.limit})`,
           });
@@ -262,7 +350,7 @@ export async function learnToolHandler(
 
         if (error instanceof Error && error.message.includes('ANTHROPIC_API_KEY')) {
           results.push({
-            filename: file.filename,
+            filename: filePath,
             success: false,
             error: 'AI categorization unavailable: Anthropic API key not configured',
           });
@@ -272,20 +360,18 @@ export async function learnToolHandler(
         throw error; // Re-throw unexpected errors
       }
 
-      // Step 2: Check if entry already exists (to determine created vs updated)
-      const title = filenameToTitle(file.filename);
-      // We can't easily check existence without the slug, so we'll derive it
-      // The storage service will return the entry which tells us if it was new
-
       // Step 3: Build input for storage service
+      const title = filenameToTitle(filename);
       const saveInput: SaveKnowledgeEntryInput = {
         title,
-        content: file.content,
-        sourceFile: file.filename,
-        projectId,
+        content,
+        sourceFile: filename,
+        sourcePath: filePath,
         category: categorization.category,
         confidence: categorization.confidence,
-        reasoning: categorization.reasoning,
+        reasoning: description
+          ? `${categorization.reasoning} (User note: ${description})`
+          : categorization.reasoning,
         metadata: categorization.metadata as SaveKnowledgeEntryInput['metadata'],
       };
 
@@ -296,7 +382,7 @@ export async function learnToolHandler(
       const wasCreated = entry.created_at === entry.updated_at;
 
       results.push({
-        filename: file.filename,
+        filename: filePath,
         success: true,
         category: entry.classification.category,
         confidence: entry.classification.confidence,
@@ -313,7 +399,7 @@ export async function learnToolHandler(
         errorMessage = 'Unknown error';
       }
       results.push({
-        filename: file.filename,
+        filename: filePath,
         success: false,
         error: errorMessage,
       });

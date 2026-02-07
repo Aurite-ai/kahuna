@@ -19,9 +19,12 @@ import { KnowledgeStorageError } from './types.js';
 import { generateMdcFile, generateSlug, mapCategory, parseMdcFile } from './utils.js';
 
 /**
- * Default base directory for knowledge storage
+ * Get the base directory for knowledge storage.
+ * Uses KAHUNA_KNOWLEDGE_DIR env var if set, otherwise defaults to .kahuna-knowledge/
  */
-const DEFAULT_BASE_DIR = '.kahuna/knowledge';
+function getDefaultBaseDir(): string {
+  return process.env.KAHUNA_KNOWLEDGE_DIR || '.kahuna-knowledge';
+}
 
 /**
  * File-based implementation of KnowledgeStorageService
@@ -39,7 +42,7 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
    *
    * @param baseDir - Directory for storing .mdc files (defaults to .kahuna/knowledge/)
    */
-  constructor(baseDir: string = DEFAULT_BASE_DIR) {
+  constructor(baseDir: string = getDefaultBaseDir()) {
     this.baseDir = baseDir;
   }
 
