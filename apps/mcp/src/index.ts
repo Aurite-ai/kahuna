@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Load environment variables from .env file
+import 'dotenv/config';
+
 /**
  * Kahuna MCP Server
  *
@@ -41,9 +44,10 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { type KahunaClient, createClientFromEnv } from './client.js';
-import { contextTool } from './tools/context.js';
+import { FileKnowledgeStorageService, type KnowledgeStorageService } from './storage/index.js';
 import { initializeTool } from './tools/initialize.js';
-import { projectTool } from './tools/project.js';
+import { learnTool } from './tools/learn.js';
+import { prepareContextTool } from './tools/prepare-context.js';
 
 // =============================================================================
 // SERVER CONFIGURATION
@@ -59,7 +63,7 @@ const SERVER_VERSION = '0.0.1';
 const healthCheckTool = {
   name: 'health_check',
   description: `Check if the Kahuna MCP server is running correctly.
-  
+
 This tool helps verify the MCP connection is working. It can optionally
 ping the Kahuna API to verify end-to-end connectivity.
 
@@ -82,24 +86,17 @@ Actions:
 /**
  * All registered tools.
  * Add new tool imports here as they are created.
- *
- * Example of adding a new tool:
- * 1. Create src/tools/context.ts following the project.ts pattern
- * 2. Import: import { contextTool } from './tools/context.js';
- * 3. Add to this array: contextTool.definition
- * 4. Add handler routing in the CallToolRequestSchema handler below
  */
 const allTools = [
   healthCheckTool,
   initializeTool.definition,
-  projectTool.definition,
-  contextTool.definition,
-  // Add more tools here as they're implemented:
-  // vckTool.definition,
-  // resultsTool.definition,
-  // orgRulesTool.definition,
-  // itRulesTool.definition,
-  // promptsTool.definition,
+  learnTool.definition,
+  prepareContextTool.definition,
+  // Future tools:
+  // setupTool.definition,
+  // askTool.definition,
+  // reviewTool.definition,
+  // syncTool.definition,
 ];
 
 /**
@@ -109,7 +106,8 @@ const allTools = [
 async function routeToolCall(
   toolName: string,
   args: Record<string, unknown>,
-  client: KahunaClient
+  client: KahunaClient,
+  storage: KnowledgeStorageService
 ): Promise<CallToolResult> {
   switch (toolName) {
     case 'health_check': {
@@ -204,17 +202,21 @@ async function routeToolCall(
     case 'initialize':
       return initializeTool.handler(args);
 
-    case 'manage_projects':
-      return projectTool.handler(args, client);
+    case 'kahuna_learn':
+      return learnTool.handler(args, storage);
 
-    case 'manage_context_files':
-      return contextTool.handler(args, client);
+    case 'kahuna_prepare_context':
+      return prepareContextTool.handler(args, storage);
 
-    // Add more tool handlers here:
-    // case 'generate_vck':
-    //   return vckTool.handler(args, client);
-    // case 'manage_build_results':
-    //   return resultsTool.handler(args, client);
+    // Future tool handlers:
+    // case 'kahuna_setup':
+    //   return setupTool.handler(args, storage);
+    // case 'kahuna_ask':
+    //   return askTool.handler(args, storage);
+    // case 'kahuna_review':
+    //   return reviewTool.handler(args, storage);
+    // case 'kahuna_sync':
+    //   return syncTool.handler(args, storage);
 
     default:
       return {
@@ -289,6 +291,9 @@ async function main() {
   // Create API client from environment
   const client = createClientFromEnv();
 
+  // Create local knowledge storage service
+  const storage = new FileKnowledgeStorageService();
+
   // Create MCP server
   const server = new Server(
     {
@@ -321,7 +326,7 @@ async function main() {
    */
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-    return routeToolCall(name, args ?? {}, client);
+    return routeToolCall(name, args ?? {}, client, storage);
   });
 
   // ---------------------------------------------------------------------------

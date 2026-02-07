@@ -36,8 +36,8 @@ export function buildCategorizationPrompt(filename: string, content: string): st
 1. **Categorize** the file into the most appropriate category
 2. **Extract metadata** to enrich the file's context:
    - **Entities**: Technologies, frameworks, languages, APIs, databases, libraries mentioned
-   - **Tags**: 5-10 descriptive keywords (e.g., "authentication", "payment-processing", "user-management")
-   - **Topics**: 3-5 key concepts or subjects covered (e.g., "JWT Authentication", "Database Migration")
+   - **Tags**: 5-10 descriptive keywords, MAXIMUM 10 (e.g., "authentication", "payment-processing", "user-management")
+   - **Topics**: 3-5 key concepts or subjects covered, MAXIMUM 5 (e.g., "JWT Authentication", "Database Migration")
    - **Summary**: 2-4 sentence overview of what this file contains/does
    - **Code elements** (for code files): Key functions, classes, imports, exports
    - **Sections** (for documentation): Main section headings

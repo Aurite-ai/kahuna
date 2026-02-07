@@ -31,11 +31,17 @@ export const FileMetadataSchema = z.object({
     })
     .optional(),
 
-  // Auto-generated tags (max 10)
-  tags: z.array(z.string()).max(10).optional(),
+  // Auto-generated tags (truncate to 10 if LLM over-generates)
+  tags: z
+    .array(z.string())
+    .optional()
+    .transform((arr) => arr?.slice(0, 10)),
 
-  // Key topics/concepts (max 5)
-  topics: z.array(z.string()).max(5).optional(),
+  // Key topics/concepts (truncate to 5 if LLM over-generates)
+  topics: z
+    .array(z.string())
+    .optional()
+    .transform((arr) => arr?.slice(0, 5)),
 
   // Brief summary (3-5 sentences)
   summary: z.string().optional(),
