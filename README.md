@@ -59,7 +59,19 @@ The MCP server allows AI assistants (Claude Desktop, etc.) to interact with Kahu
 pnpm --filter @kahuna/mcp build
 ```
 
-Add to Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+### Option A: Using Claude MCP CLI (Recommended)
+
+Run this command from your terminal:
+
+```bash
+claude mcp add kahuna --transport stdio --env KAHUNA_API_URL=http://localhost:3000 -- node /path/to/kahuna/apps/mcp/dist/index.js
+```
+
+> **Note:** Update the path `/path/to/kahuna/apps/mcp/dist/index.js` to your local kahuna git repo directory.
+
+### Option B: Manual Configuration
+
+Create a `.mcp.json` file in your project's `.claude/` directory :
 
 ```json
 {
@@ -76,7 +88,9 @@ Add to Claude Desktop config (`~/Library/Application Support/Claude/claude_deskt
 }
 ```
 
-> **Note:** Update the `args` path to your local installation. `KAHUNA_SESSION_TOKEN` for now is a placeholder until we finalize we need to add authentication to mcp. 
+> **Note:**
+1. Update the `args` path to your local git repo directory path`/path/to/kahuna/apps/`.
+2. `KAHUNA_SESSION_TOKEN` for now is a placeholder until we finalize we need to add authentication to mcp. 
 
 For detailed documentation, available tools, and development instructions, see [apps/mcp/README.md](apps/mcp/README.md).
 
