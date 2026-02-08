@@ -45,6 +45,7 @@ import {
 
 import { type KahunaClient, createClientFromEnv } from './client.js';
 import { FileKnowledgeStorageService, type KnowledgeStorageService } from './storage/index.js';
+import { initializeTool } from './tools/initialize.js';
 import { learnTool } from './tools/learn.js';
 import { prepareContextTool } from './tools/prepare-context.js';
 
@@ -88,6 +89,7 @@ Actions:
  */
 const allTools = [
   healthCheckTool,
+  initializeTool.definition,
   learnTool.definition,
   prepareContextTool.definition,
   // Future tools:
@@ -196,6 +198,9 @@ async function routeToolCall(
         isError: true,
       };
     }
+
+    case 'initialize':
+      return initializeTool.handler(args);
 
     case 'kahuna_learn':
       return learnTool.handler(args, storage);

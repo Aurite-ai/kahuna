@@ -84,6 +84,34 @@ The Kahuna tools should now be available in Claude.
 
 ## Available Tools
 
+### `initialize`
+
+Initialize a new project with Kahuna copilot configuration. This tool copies the Claude Code copilot configuration from Kahuna's VCK templates to your current working directory.
+
+**What it sets up:**
+- `.claude/settings.json` - Permissions and default mode
+- `.claude/rules/` - Project rules and guidelines
+- `.claude/skills/` - Architect and code skills
+- `.claude/context/`, `.claude/plans/` - Empty directories for working files
+- `CLAUDE.md` - Main copilot instructions
+
+**Parameters:**
+- `targetPath` (required) - Directory to initialize.
+- `overwrite` (optional) - Whether to overwrite existing files. Defaults to false.
+
+**Examples:**
+
+```json
+// Initialize current directory
+{ "targetPath": "." }
+
+// Initialize specific path
+{ "targetPath": "/path/to/my-agent-project" }
+
+// Overwrite existing files
+{ "targetPath": ".", "overwrite": true }
+```
+
 ### `health_check`
 
 Verify the MCP server is running correctly. Useful for testing your setup.
