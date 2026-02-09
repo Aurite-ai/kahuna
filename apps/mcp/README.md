@@ -38,11 +38,19 @@ pnpm --filter @kahuna/mcp build
 
 ### 3. Configure Claude Desktop
 
-Add to your Claude Desktop configuration manually (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+**Option A: Using Claude MCP CLI (Recommended)**
 
-OR make claude code do it for you!
+Run this command from your terminal:
 
-*Imp Note:* update the args path to your local `*/apps/mcp/dist/index.js` path
+```bash
+claude mcp add kahuna --transport stdio --env KAHUNA_API_URL=http://localhost:3000 -- node /path/to/kahuna/apps/mcp/dist/index.js
+```
+
+> **Note:** Update the path `/path/to/kahuna/apps/mcp/dist/index.js` to your local kahuna git repo directory.
+
+**Option B: Manual Configuration (Project-Specific)**
+
+Create a `.mcp.json` file in your project's `.claude/` directory :
 
 ```json
 {
@@ -58,6 +66,9 @@ OR make claude code do it for you!
   }
 }
 ```
+> **Note:** 
+1. Update the `args` path to your local git repo directory path`/path/to/kahuna/apps/`.
+2. `KAHUNA_SESSION_TOKEN` for now is a placeholder until we finalize we need to add authentication to mcp. 
 
 ### 4. Start the Kahuna API
 
