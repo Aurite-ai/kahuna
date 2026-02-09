@@ -46,8 +46,6 @@ importers:
         specifier: ^3.1.0
         version: 3.2.4(@types/node@22.19.7)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  packages/shared: {}
-
   packages/testing:
     dependencies:
       commander:
@@ -59,10 +57,6 @@ importers:
         version: 22.19.7
 
   packages/vck-templates:
-    dependencies:
-      '@kahuna/shared':
-        specifier: workspace:*
-        version: link:../shared
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

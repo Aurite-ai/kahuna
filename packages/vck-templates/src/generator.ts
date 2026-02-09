@@ -5,13 +5,13 @@
  * Isolated from HTTP concerns for easy testing.
  */
 
-import type { VCK } from '@kahuna/shared';
 import {
   getCopilotConfigFiles,
   getCopilotConfigTemplate,
   getFrameworkFiles,
   getFrameworkTemplate,
 } from './templates.js';
+import type { VCK } from './types.js';
 import type { VCKGeneratorInput } from './types.js';
 
 /**
