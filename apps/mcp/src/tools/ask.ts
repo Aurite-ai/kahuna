@@ -1,20 +1,25 @@
 /**
- * Kahuna Ask Tool - Enterprise Q&A with AI synthesis
+ * Kahuna Ask Tool - Simple Q&A with AI agent
  *
  * This tool provides intelligent question answering using the knowledge base.
- * It searches for relevant entries, synthesizes answers using Claude,
- * and provides source attribution with confidence scoring.
+ * An internal agent explores the knowledge base files to find and synthesize answers.
  *
- * Features:
- * - LLM-powered answer synthesis
- * - Source attribution with relevance scoring
- * - Confidence indicators (high/medium/low)
- * - Follow-up suggestions
- * - Knowledge gap detection
+ * Flow:
+ * 1. Copilot calls ask tool with question
+ * 2. Question goes to internal agent
+ * 3. Agent sees file names in knowledge base
+ * 4. Agent reads files as needed to answer the question
+ * 5. Agent responds with answer
+ * 6. Answer returned to Copilot
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { KnowledgeEntry, KnowledgeStorageService } from '../storage/index.js';
+import type {
+  ContentBlock,
+  Tool,
+  ToolResultBlockParam,
+} from '@anthropic-ai/sdk/resources/messages';
+import type { KnowledgeStorageService } from '../storage/index.js';
 
 /**
  * Tool definition for MCP registration.
@@ -40,7 +45,7 @@ Searches the knowledge base and synthesizes an answer with source citations.
 - Searches knowledge base with AI-powered answer synthesis
 - Use for quick questions mid-task
 - For comprehensive context setup, use kahuna_prepare_context instead
-- Returns answer with source citations and confidence level`,
+- Returns answer with source citations`,
 
   inputSchema: {
     type: 'object' as const,
@@ -74,40 +79,6 @@ interface MCPToolResponse {
 }
 
 /**
- * Source information for an answer
- */
-interface AnswerSource {
-  title: string;
-  slug: string;
-  relevanceScore: number;
-  excerpt: string;
-  category: string;
-}
-
-/**
- * Structured answer result
- */
-interface AnswerResult {
-  answer: string;
-  confidence: 'high' | 'medium' | 'low';
-  sources: AnswerSource[];
-  suggestedFollowups: string[];
-  gapDetection?: {
-    hasGap: boolean;
-    missingInfo?: string;
-    suggestion?: string;
-  };
-}
-
-/**
- * Ranked entry with relevance information
- */
-interface RankedEntry extends KnowledgeEntry {
-  relevanceScore: number;
-  matchedTerms: string[];
-}
-
-/**
  * Helper to create a success response.
  */
 function successResponse(data: unknown): MCPToolResponse {
@@ -137,347 +108,166 @@ function errorResponse(message: string, details?: unknown): MCPToolResponse {
 }
 
 /**
- * Extract keywords from a question for searching
+ * Internal tools for the agent to explore the knowledge base
  */
-function extractKeywords(question: string): string[] {
-  // Remove common question words and punctuation
-  const stopWords = new Set([
-    'what',
-    'why',
-    'how',
-    'when',
-    'where',
-    'who',
-    'which',
-    'is',
-    'are',
-    'was',
-    'were',
-    'do',
-    'does',
-    'did',
-    'the',
-    'a',
-    'an',
-    'and',
-    'or',
-    'but',
-    'in',
-    'on',
-    'at',
-    'to',
-    'for',
-    'of',
-    'with',
-    'by',
-    'from',
-    'as',
-    'into',
-    'through',
-    'about',
-    'our',
-    'we',
-    'i',
-    'you',
-    'it',
-    'this',
-    'that',
-    'have',
-    'has',
-    'had',
-    'be',
-    'been',
-    'being',
-    'can',
-    'could',
-    'should',
-    'would',
-    'may',
-    'might',
-    'must',
-    'will',
-    'shall',
-  ]);
-
-  return question
-    .toLowerCase()
-    .replace(/[?!.,;:'"()[\]{}]/g, '')
-    .split(/\s+/)
-    .filter((word) => word.length > 2 && !stopWords.has(word));
-}
+const agentTools: Tool[] = [
+  {
+    name: 'list_knowledge_files',
+    description:
+      'List all files in the knowledge base. Returns file names (slugs) and titles to help you decide which files to read.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'read_knowledge_file',
+    description:
+      'Read the full content of a specific knowledge base file. Use this after listing files to read ones that seem relevant to the question.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        slug: {
+          type: 'string',
+          description: 'The file slug (filename without extension) to read',
+        },
+      },
+      required: ['slug'],
+    },
+  },
+];
 
 /**
- * Calculate relevance score for an entry based on question keywords
+ * Execute an agent tool call
  */
-function calculateRelevance(entry: KnowledgeEntry, keywords: string[]): RankedEntry {
-  let score = 0;
-  const matchedTerms: string[] = [];
-
-  const titleLower = entry.title.toLowerCase();
-  const summaryLower = entry.summary.toLowerCase();
-  const contentLower = entry.content.toLowerCase();
-
-  for (const keyword of keywords) {
-    // Title match (highest weight)
-    if (titleLower.includes(keyword)) {
-      score += 5;
-      matchedTerms.push(`title:${keyword}`);
-    }
-
-    // Summary match (high weight)
-    if (summaryLower.includes(keyword)) {
-      score += 3;
-      if (!matchedTerms.includes(`title:${keyword}`)) {
-        matchedTerms.push(`summary:${keyword}`);
+async function executeAgentTool(
+  toolName: string,
+  toolInput: Record<string, unknown>,
+  storage: KnowledgeStorageService
+): Promise<string> {
+  switch (toolName) {
+    case 'list_knowledge_files': {
+      const entries = await storage.list({ status: 'active' });
+      if (entries.length === 0) {
+        return 'No files in knowledge base.';
       }
+      const fileList = entries.map((e) => `- ${e.slug}: "${e.title}"`).join('\n');
+      return `Knowledge base files:\n${fileList}`;
     }
 
-    // Content match (medium weight)
-    if (contentLower.includes(keyword)) {
-      score += 2;
-      if (!matchedTerms.some((t) => t.endsWith(keyword))) {
-        matchedTerms.push(`content:${keyword}`);
+    case 'read_knowledge_file': {
+      const slug = toolInput.slug as string;
+      const entry = await storage.get(slug);
+      if (!entry) {
+        return `File not found: ${slug}`;
       }
+      return `# ${entry.title}\n\n${entry.content}`;
     }
 
-    // Tag match (high weight)
-    if (entry.classification.tags.some((tag) => tag.toLowerCase().includes(keyword))) {
-      score += 4;
-      matchedTerms.push(`tag:${keyword}`);
-    }
-
-    // Topic match (high weight)
-    if (entry.classification.topics.some((topic) => topic.toLowerCase().includes(keyword))) {
-      score += 3;
-      matchedTerms.push(`topic:${keyword}`);
-    }
-
-    // Entity match (high weight)
-    const entities = entry.classification.entities;
-    const allEntities = [
-      ...entities.technologies,
-      ...entities.frameworks,
-      ...entities.libraries,
-      ...entities.apis,
-    ];
-    if (allEntities.some((e) => e.toLowerCase().includes(keyword))) {
-      score += 4;
-      matchedTerms.push(`entity:${keyword}`);
-    }
+    default:
+      return `Unknown tool: ${toolName}`;
   }
-
-  return {
-    ...entry,
-    relevanceScore: score,
-    matchedTerms: [...new Set(matchedTerms)],
-  };
 }
 
 /**
- * Extract a relevant excerpt from content
- */
-function extractExcerpt(content: string, keywords: string[], maxLength = 200): string {
-  const lines = content.split('\n').filter((line) => line.trim());
-
-  // Find lines containing keywords
-  for (const line of lines) {
-    const lineLower = line.toLowerCase();
-    if (keywords.some((kw) => lineLower.includes(kw))) {
-      if (line.length <= maxLength) {
-        return line.trim();
-      }
-      return `${line.substring(0, maxLength - 3).trim()}...`;
-    }
-  }
-
-  // Fallback to first meaningful line
-  for (const line of lines) {
-    if (line.length > 20 && !line.startsWith('#')) {
-      if (line.length <= maxLength) {
-        return line.trim();
-      }
-      return `${line.substring(0, maxLength - 3).trim()}...`;
-    }
-  }
-
-  return `${content.substring(0, maxLength - 3).trim()}...`;
-}
-
-/**
- * Determine confidence level based on source relevance
- */
-function determineConfidence(sources: AnswerSource[]): 'high' | 'medium' | 'low' {
-  if (sources.length === 0) return 'low';
-
-  const topScore = sources[0].relevanceScore;
-  const avgScore = sources.reduce((sum, s) => sum + s.relevanceScore, 0) / sources.length;
-
-  if (topScore >= 10 && avgScore >= 5) return 'high';
-  if (topScore >= 5 || avgScore >= 3) return 'medium';
-  return 'low';
-}
-
-/**
- * Format the answer for display
- */
-function formatAnswer(result: AnswerResult, question: string): string {
-  const lines: string[] = [];
-
-  // Confidence indicator
-  const confidenceEmoji = {
-    high: '🟢 High',
-    medium: '🟡 Medium',
-    low: '🔴 Low',
-  }[result.confidence];
-
-  lines.push('# Answer\n');
-  lines.push(`**Question:** ${question}\n`);
-  lines.push(`**Confidence:** ${confidenceEmoji}\n`);
-
-  // Main answer
-  lines.push(result.answer);
-  lines.push('');
-
-  // Sources
-  if (result.sources.length > 0) {
-    lines.push('## Sources\n');
-    for (let i = 0; i < result.sources.length; i++) {
-      const source = result.sources[i];
-      const badge =
-        i === 0 ? '✓ Primary' : source.relevanceScore >= 5 ? '✓ Supporting' : '○ Related';
-      lines.push(
-        `${i + 1}. **${source.title}** (\`${source.slug}.mdc\`) - ${badge} (score: ${source.relevanceScore.toFixed(1)})`
-      );
-      lines.push(`   > ${source.excerpt}`);
-    }
-    lines.push('');
-  }
-
-  // Gap detection
-  if (result.gapDetection?.hasGap) {
-    lines.push('## ⚠️ Knowledge Gap Detected\n');
-    if (result.gapDetection.missingInfo) {
-      lines.push(`- ${result.gapDetection.missingInfo}`);
-    }
-    if (result.gapDetection.suggestion) {
-      lines.push(`- **Suggestion:** ${result.gapDetection.suggestion}`);
-    }
-    lines.push('');
-  }
-
-  // Follow-up suggestions
-  if (result.suggestedFollowups.length > 0) {
-    lines.push('<hints>');
-    lines.push('**Related questions you might ask:**');
-    for (const followup of result.suggestedFollowups) {
-      lines.push(`- "${followup}"`);
-    }
-    lines.push('- If you need broader context, use kahuna_prepare_context');
-    lines.push('</hints>');
-  } else {
-    lines.push('<hints>');
-    lines.push('- If you need broader context, use kahuna_prepare_context');
-    lines.push('- Use kahuna_learn to add more knowledge to the base');
-    lines.push('</hints>');
-  }
-
-  return lines.join('\n');
-}
-
-/**
- * Synthesize answer using Claude
+ * Synthesize answer using an agentic Claude loop
+ *
+ * The agent has tools to explore the knowledge base and will
+ * read files as needed to answer the question.
  */
 async function synthesizeAnswer(
   question: string,
-  relevantEntries: RankedEntry[],
-  _keywords: string[]
-): Promise<{
-  answer: string;
-  suggestedFollowups: string[];
-  gapDetection?: { hasGap: boolean; missingInfo?: string; suggestion?: string };
-}> {
+  storage: KnowledgeStorageService
+): Promise<string> {
   const client = new Anthropic();
 
-  // Format context from entries
-  const contextParts = relevantEntries.map((entry, i) => {
-    return `## Source ${i + 1}: ${entry.title} (relevance: ${entry.relevanceScore.toFixed(1)})
-Category: ${entry.classification.category}
-Tags: ${entry.classification.tags.join(', ') || 'none'}
+  const systemPrompt = `You are a knowledge assistant for an enterprise codebase. Your job is to answer questions using the knowledge base.
 
-${entry.content}`;
-  });
+You have tools to:
+1. List all files in the knowledge base (see their names/titles)
+2. Read specific files that seem relevant
 
-  const prompt = `You are a knowledge assistant for an enterprise codebase. Answer the question based ONLY on the provided context.
+Process:
+1. First, list the knowledge base files to see what's available
+2. Based on the file names/titles, read the ones that might help answer the question
+3. Synthesize an answer from what you find
+4. If you can't find the answer, say so clearly
 
-Question: ${question}
+Guidelines:
+- Only answer based on what you find in the knowledge base
+- Cite your sources (mention which files you found the info in)
+- Be concise but complete
+- If the knowledge base doesn't have the answer, say "I couldn't find information about this in the knowledge base"`;
 
-Available Knowledge:
-${contextParts.join('\n\n---\n\n')}
+  const messages: Anthropic.MessageParam[] = [
+    {
+      role: 'user',
+      content: question,
+    },
+  ];
 
-Instructions:
-1. Answer based ONLY on the provided context - do not make up information
-2. If information is incomplete, clearly state what's missing
-3. Cite sources by name (e.g., "According to the API Standards document...")
-4. If the context doesn't contain the answer, say so clearly
-5. Format for technical users (use bullet points, code blocks if relevant)
-6. Be concise but complete
+  // Agentic loop - let Claude use tools until it has an answer
+  const maxIterations = 10;
+  for (let i = 0; i < maxIterations; i++) {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      system: systemPrompt,
+      tools: agentTools,
+      messages,
+    });
 
-Respond with a JSON object:
-{
-  "answer": "Your synthesized answer here",
-  "suggestedFollowups": ["Follow-up question 1", "Follow-up question 2"],
-  "hasKnowledgeGap": true/false,
-  "missingInfo": "What information is missing (if any)",
-  "suggestion": "What should be documented (if gap exists)"
-}`;
-
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 1500,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  // Parse the response
-  const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
-
-  // Try to parse as JSON
-  try {
-    // Extract JSON from response (it might be wrapped in markdown code blocks)
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        answer: parsed.answer || responseText,
-        suggestedFollowups: parsed.suggestedFollowups || [],
-        gapDetection: parsed.hasKnowledgeGap
-          ? {
-              hasGap: true,
-              missingInfo: parsed.missingInfo,
-              suggestion: parsed.suggestion,
-            }
-          : undefined,
-      };
+    // Check if we're done (no more tool use)
+    if (response.stop_reason === 'end_turn') {
+      // Extract the final text response
+      const textBlock = response.content.find((block) => block.type === 'text');
+      return textBlock?.type === 'text' ? textBlock.text : 'No answer generated.';
     }
-  } catch {
-    // JSON parsing failed, use raw response
+
+    // Process tool uses
+    const toolUseBlocks = response.content.filter((block) => block.type === 'tool_use');
+
+    if (toolUseBlocks.length === 0) {
+      // No tool use and not end_turn - extract any text
+      const textBlock = response.content.find((block) => block.type === 'text');
+      return textBlock?.type === 'text' ? textBlock.text : 'No answer generated.';
+    }
+
+    // Add assistant's response to messages
+    messages.push({
+      role: 'assistant',
+      content: response.content,
+    });
+
+    // Execute tools and add results
+    const toolResults: ToolResultBlockParam[] = [];
+    for (const block of toolUseBlocks) {
+      if (block.type === 'tool_use') {
+        const result = await executeAgentTool(
+          block.name,
+          block.input as Record<string, unknown>,
+          storage
+        );
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: result,
+        });
+      }
+    }
+
+    messages.push({
+      role: 'user',
+      content: toolResults,
+    });
   }
 
-  // Fallback: use raw response
-  return {
-    answer: responseText,
-    suggestedFollowups: [],
-  };
+  return 'Agent reached maximum iterations without completing the answer.';
 }
 
 /**
  * Handle the kahuna_ask tool call.
- *
- * Process flow:
- * 1. Validate input
- * 2. Extract keywords from question
- * 3. Search and rank knowledge base entries
- * 4. Synthesize answer using Claude
- * 5. Return formatted answer
  *
  * @param args - Tool arguments from MCP client
  * @param storage - Knowledge storage service instance
@@ -498,81 +288,12 @@ export async function askToolHandler(
   }
 
   try {
-    // Step 1: Get all active entries
-    const allEntries = await storage.list({ status: 'active' });
+    // Let the agent answer the question
+    const answer = await synthesizeAnswer(question, storage);
 
-    if (allEntries.length === 0) {
-      return successResponse({
-        message: 'No knowledge base entries found',
-        answer: formatAnswer(
-          {
-            answer:
-              'The knowledge base is empty. No information is available to answer your question.',
-            confidence: 'low',
-            sources: [],
-            suggestedFollowups: [],
-            gapDetection: {
-              hasGap: true,
-              missingInfo: 'Knowledge base is empty',
-              suggestion: 'Use kahuna_learn to add files to the knowledge base',
-            },
-          },
-          question
-        ),
-      });
-    }
-
-    // Step 2: Extract keywords from question
-    const keywords = extractKeywords(question);
-
-    if (keywords.length === 0) {
-      return errorResponse('Could not extract meaningful keywords from question', {
-        hint: 'Try asking a more specific question with clear keywords',
-      });
-    }
-
-    // Step 3: Rank entries by relevance
-    const rankedEntries = allEntries
-      .map((entry) => calculateRelevance(entry, keywords))
-      .filter((entry) => entry.relevanceScore > 0)
-      .sort((a, b) => b.relevanceScore - a.relevanceScore);
-
-    // Take top entries for synthesis
-    const topEntries = rankedEntries.slice(0, 5);
-
-    // Step 4: Build sources
-    const sources: AnswerSource[] = topEntries.map((entry) => ({
-      title: entry.title,
-      slug: entry.slug,
-      relevanceScore: entry.relevanceScore,
-      excerpt: extractExcerpt(entry.content, keywords),
-      category: entry.classification.category,
-    }));
-
-    // Step 5: Determine confidence
-    const confidence = determineConfidence(sources);
-
-    // Step 6: Synthesize answer using LLM
-    const synthesis = await synthesizeAnswer(question, topEntries, keywords);
-
-    // Build result
-    const result: AnswerResult = {
-      answer: synthesis.answer,
-      confidence,
-      sources,
-      suggestedFollowups: synthesis.suggestedFollowups,
-      gapDetection: synthesis.gapDetection,
-    };
-
-    // Step 7: Return formatted response
     return successResponse({
-      message: `Answer synthesized with ${confidence} confidence from ${sources.length} source(s)`,
-      answer: formatAnswer(result, question),
-      confidence: result.confidence,
-      sources: result.sources,
-      suggestedFollowups: result.suggestedFollowups,
-      gapDetection: result.gapDetection,
-      keywords,
+      question,
+      answer,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

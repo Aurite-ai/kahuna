@@ -2,26 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KnowledgeEntry, KnowledgeStorageService } from '../../storage/index.js';
 import { askToolDefinition, askToolHandler } from '../ask.js';
 
-// Mock the Anthropic client - use a factory function to ensure fresh mock each time
-const createMockAnthropicClient = () => ({
-  messages: {
-    create: vi.fn().mockResolvedValue({
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            answer: 'This is a synthesized answer based on the context.',
-            suggestedFollowups: ['What about error handling?', 'How do we test this?'],
-            hasKnowledgeGap: false,
-          }),
-        },
-      ],
-    }),
-  },
-});
+// Mock Anthropic client - simulates agentic tool use flow
+const mockCreate = vi.fn();
 
 vi.mock('@anthropic-ai/sdk', () => ({
-  default: vi.fn(() => createMockAnthropicClient()),
+  default: vi.fn(() => ({
+    messages: {
+      create: mockCreate,
+    },
+  })),
 }));
 
 /**
@@ -140,267 +129,32 @@ describe('askToolHandler', () => {
     });
   });
 
-  describe('empty knowledge base', () => {
-    it('handles empty knowledge base gracefully', async () => {
-      vi.mocked(mockStorage.list).mockResolvedValue([]);
-
-      const result = await askToolHandler({ question: 'What is the API rate limit?' }, mockStorage);
-
-      expect(result.isError).toBeUndefined();
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
-      expect(response.data.message).toContain('No knowledge base entries found');
-    });
-  });
-
-  describe('keyword extraction', () => {
-    it('returns error when no meaningful keywords can be extracted', async () => {
-      vi.mocked(mockStorage.list).mockResolvedValue([createMockEntry()]);
-
-      const result = await askToolHandler({ question: 'Is it the what?' }, mockStorage);
-
-      expect(result.isError).toBe(true);
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(false);
-      expect(response.error).toContain('Could not extract meaningful keywords');
-    });
-  });
-
-  describe('relevance ranking', () => {
-    it('ranks entries with matching title higher', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'unrelated',
-          title: 'Unrelated Topic',
-          content: 'Nothing relevant here.',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['other'],
-            topics: ['other'],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-        createMockEntry({
-          slug: 'auth-guide',
-          title: 'Authentication Guide',
-          content: 'This is about authentication patterns.',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['authentication', 'security'],
-            topics: ['auth'],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await askToolHandler(
-        { question: 'How does authentication work?' },
-        mockStorage
-      );
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
-      expect(response.data.sources[0].slug).toBe('auth-guide');
-    });
-
-    it('ranks entries with matching tags higher', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'api-entry',
-          title: 'API Documentation',
-          content: 'API documentation content.',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['api', 'rest', 'documentation'],
-            topics: ['api'],
-            entities: { technologies: ['REST'], frameworks: [], libraries: [], apis: ['REST API'] },
-          },
-        }),
-        createMockEntry({
-          slug: 'other-entry',
-          title: 'Other Document',
-          content: 'Some other content.',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['database'],
-            topics: ['data'],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await askToolHandler(
-        { question: 'What REST API endpoints exist?' },
-        mockStorage
-      );
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
-      expect(response.data.sources[0].slug).toBe('api-entry');
-    });
-
-    it('scores content matches', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'rate-limit-doc',
-          title: 'Configuration Guide',
-          content: 'The rate limit is set to 100 requests per minute for API calls.',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['config'],
-            topics: ['configuration'],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await askToolHandler({ question: 'What is the rate limit?' }, mockStorage);
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
-      expect(response.data.sources.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('confidence scoring', () => {
-    it('returns high confidence when sources are highly relevant', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'auth-guide',
-          title: 'Authentication Configuration',
-          summary: 'How to configure authentication in the system',
-          content: 'Authentication is configured using JWT tokens...',
-          classification: {
-            category: 'reference',
-            confidence: 0.95,
-            reasoning: 'Test',
-            tags: ['authentication', 'jwt', 'security', 'configuration'],
-            topics: ['authentication', 'security'],
-            entities: {
-              technologies: ['JWT', 'OAuth2'],
-              frameworks: [],
-              libraries: [],
-              apis: [],
+  describe('agentic flow', () => {
+    it('calls synthesizeAnswer with Claude tool use loop', async () => {
+      // Simulate agent listing files, then returning final answer
+      mockCreate
+        .mockResolvedValueOnce({
+          stop_reason: 'tool_use',
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tool_1',
+              name: 'list_knowledge_files',
+              input: {},
             },
-          },
-        }),
-        createMockEntry({
-          slug: 'security-policy',
-          title: 'Security Policy',
-          summary: 'Security policies for authentication',
-          content: 'Our authentication security policy requires...',
-          classification: {
-            category: 'policy',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['security', 'authentication', 'policy'],
-            topics: ['security'],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
+          ],
+        })
+        .mockResolvedValueOnce({
+          stop_reason: 'end_turn',
+          content: [
+            {
+              type: 'text',
+              text: 'Based on the knowledge base, the answer is: Testing is done with Vitest.',
+            },
+          ],
+        });
 
-      const result = await askToolHandler(
-        { question: 'How do we configure authentication security?' },
-        mockStorage
-      );
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
-      expect(['high', 'medium']).toContain(response.data.confidence);
-    });
-
-    it('returns low confidence when no relevant sources found', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'unrelated',
-          title: 'Database Schema',
-          content: 'The database schema includes...',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['database', 'schema'],
-            topics: ['data'],
-            entities: { technologies: ['PostgreSQL'], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await askToolHandler(
-        { question: 'What payment gateway do we use?' },
-        mockStorage
-      );
-
-      const response = JSON.parse(result.content[0].text);
-      // If no matches, sources will be empty or have low scores
-      if (response.data.sources && response.data.sources.length > 0) {
-        expect(response.data.confidence).toBe('low');
-      }
-    });
-  });
-
-  describe('response format', () => {
-    it('includes formatted answer with sources', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'api-docs',
-          title: 'API Documentation',
-          content: 'The API uses REST endpoints for all operations.',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['api', 'rest'],
-            topics: ['api'],
-            entities: { technologies: ['REST'], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await askToolHandler({ question: 'What type of API do we use?' }, mockStorage);
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
-      expect(response.data.answer).toBeDefined();
-      expect(response.data.answer).toContain('# Answer');
-      expect(response.data.answer).toContain('**Question:**');
-      expect(response.data.answer).toContain('**Confidence:**');
-    });
-
-    it('includes sources with excerpts', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'test-doc',
-          title: 'Test Document',
-          content: 'This is the relevant test content about testing frameworks.',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['test', 'testing'],
-            topics: ['testing'],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
+      vi.mocked(mockStorage.list).mockResolvedValue([createMockEntry()]);
 
       const result = await askToolHandler(
         { question: 'What testing framework do we use?' },
@@ -408,33 +162,157 @@ describe('askToolHandler', () => {
       );
 
       const response = JSON.parse(result.content[0].text);
-      expect(response.data.sources).toBeDefined();
-      expect(response.data.sources.length).toBeGreaterThan(0);
-      expect(response.data.sources[0]).toHaveProperty('title');
-      expect(response.data.sources[0]).toHaveProperty('slug');
-      expect(response.data.sources[0]).toHaveProperty('relevanceScore');
-      expect(response.data.sources[0]).toHaveProperty('excerpt');
-      expect(response.data.sources[0]).toHaveProperty('category');
+      expect(response.success).toBe(true);
+      expect(response.data.answer).toContain('Testing is done with Vitest');
+      expect(mockCreate).toHaveBeenCalledTimes(2);
     });
 
-    it('includes keywords used for search', async () => {
-      const entries = [createMockEntry()];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
+    it('agent can read specific files', async () => {
+      // Simulate: list files -> read file -> return answer
+      mockCreate
+        .mockResolvedValueOnce({
+          stop_reason: 'tool_use',
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tool_1',
+              name: 'list_knowledge_files',
+              input: {},
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          stop_reason: 'tool_use',
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tool_2',
+              name: 'read_knowledge_file',
+              input: { slug: 'test-entry' },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          stop_reason: 'end_turn',
+          content: [
+            {
+              type: 'text',
+              text: 'According to the Test Entry document, the answer is in the content.',
+            },
+          ],
+        });
 
-      const result = await askToolHandler(
-        { question: 'How does authentication work with tokens?' },
-        mockStorage
-      );
+      const testEntry = createMockEntry();
+      vi.mocked(mockStorage.list).mockResolvedValue([testEntry]);
+      vi.mocked(mockStorage.get).mockResolvedValue(testEntry);
+
+      const result = await askToolHandler({ question: 'What is in the test entry?' }, mockStorage);
 
       const response = JSON.parse(result.content[0].text);
-      expect(response.data.keywords).toBeDefined();
-      expect(response.data.keywords).toContain('authentication');
-      expect(response.data.keywords).toContain('tokens');
+      expect(response.success).toBe(true);
+      expect(mockStorage.get).toHaveBeenCalledWith('test-entry');
+    });
+
+    it('handles empty knowledge base', async () => {
+      mockCreate
+        .mockResolvedValueOnce({
+          stop_reason: 'tool_use',
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tool_1',
+              name: 'list_knowledge_files',
+              input: {},
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          stop_reason: 'end_turn',
+          content: [
+            {
+              type: 'text',
+              text: "I couldn't find information about this in the knowledge base.",
+            },
+          ],
+        });
+
+      vi.mocked(mockStorage.list).mockResolvedValue([]);
+
+      const result = await askToolHandler({ question: 'What is the API rate limit?' }, mockStorage);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.success).toBe(true);
+      expect(response.data.answer).toContain("couldn't find");
+    });
+
+    it('handles file not found gracefully', async () => {
+      mockCreate
+        .mockResolvedValueOnce({
+          stop_reason: 'tool_use',
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tool_1',
+              name: 'read_knowledge_file',
+              input: { slug: 'nonexistent' },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          stop_reason: 'end_turn',
+          content: [
+            {
+              type: 'text',
+              text: 'The file was not found in the knowledge base.',
+            },
+          ],
+        });
+
+      vi.mocked(mockStorage.get).mockResolvedValue(null);
+
+      const result = await askToolHandler({ question: 'Read a missing file' }, mockStorage);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.success).toBe(true);
+      expect(mockStorage.get).toHaveBeenCalledWith('nonexistent');
+    });
+  });
+
+  describe('response format', () => {
+    it('returns question and answer in response', async () => {
+      mockCreate.mockResolvedValueOnce({
+        stop_reason: 'end_turn',
+        content: [
+          {
+            type: 'text',
+            text: 'The answer to your question is: Use TypeScript.',
+          },
+        ],
+      });
+
+      const result = await askToolHandler({ question: 'What language do we use?' }, mockStorage);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.success).toBe(true);
+      expect(response.data.question).toBe('What language do we use?');
+      expect(response.data.answer).toBe('The answer to your question is: Use TypeScript.');
     });
   });
 
   describe('error handling', () => {
     it('handles storage errors gracefully', async () => {
+      mockCreate.mockResolvedValueOnce({
+        stop_reason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tool_1',
+            name: 'list_knowledge_files',
+            input: {},
+          },
+        ],
+      });
+
       vi.mocked(mockStorage.list).mockRejectedValue(new Error('Storage unavailable'));
 
       const result = await askToolHandler({ question: 'What is the API rate limit?' }, mockStorage);
@@ -444,6 +322,40 @@ describe('askToolHandler', () => {
       expect(response.success).toBe(false);
       expect(response.error).toContain('Failed to answer question');
       expect(response.error).toContain('Storage unavailable');
+    });
+
+    it('handles Anthropic API errors', async () => {
+      mockCreate.mockRejectedValue(new Error('API rate limited'));
+
+      const result = await askToolHandler({ question: 'Test question' }, mockStorage);
+
+      expect(result.isError).toBe(true);
+      const response = JSON.parse(result.content[0].text);
+      expect(response.success).toBe(false);
+      expect(response.error).toContain('Failed to answer question');
+    });
+
+    it('handles max iterations gracefully', async () => {
+      // Always return tool use to hit max iterations
+      mockCreate.mockResolvedValue({
+        stop_reason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tool_loop',
+            name: 'list_knowledge_files',
+            input: {},
+          },
+        ],
+      });
+
+      vi.mocked(mockStorage.list).mockResolvedValue([]);
+
+      const result = await askToolHandler({ question: 'Test max iterations' }, mockStorage);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.success).toBe(true);
+      expect(response.data.answer).toContain('maximum iterations');
     });
   });
 });
