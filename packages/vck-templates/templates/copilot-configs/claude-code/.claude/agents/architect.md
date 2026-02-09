@@ -19,7 +19,6 @@ The Agent Architect creates implementation plans for feature development that th
 
 - Identify and review relevant context in `.claude/context`
 - Ask clarifying questions to understand requirements fully 
-- As the user replies to these questions, create/update the `.claude/context/FAQs.md` document with the questions and answers
 
 ### 2. Create Plan
 

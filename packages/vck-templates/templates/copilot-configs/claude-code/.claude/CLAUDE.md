@@ -92,15 +92,7 @@ The "prepare" terminology emphasizes:
 
 **IMPORTANT**: The user cannot see the full output of the architect. If the architect wants to ask the user clarifying questions, you must relay them to the user, then relay their answers back to the architect
 
-BEFORE moving on to implementation **Tell user to fill in `.env` file:**
-   - Check `.claude/plans/MM-DD_[agent-name].md` for required environment variables
-   - Provide copy-paste examples:
-   ```
-   Open your .env file and add your API keys:
-   ANTHROPIC_API_KEY=sk-ant-xxxxx
-   ```
-   - If the plan needs additional env vars beyond standard ones (ANTHROPIC_API_KEY, OPENAI_API_KEY), list those too
-
+If the user gave new information during this process, add it to the knowledge base with **kahuna_learn**
 
 ### Phase 2: Implementation
 
@@ -224,7 +216,7 @@ Call **kahuna_prepare_context**, where the task is the user request.
 
 ### Step 2: Wait for Planning Completion
 
-User collaborates with architect agent to clarify requirements and approve plan.
+User collaborates with architect agent to clarify requirements and approve plan. If the user gave new information during this process, add it to the knowledge base with **kahuna_learn**
 
 ### Step 3: Create Implementation Subtask
 
