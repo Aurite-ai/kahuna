@@ -91,8 +91,6 @@ function findConversationLogs(projectPath: string): string[] {
  */
 function detectScenario(projectPath: string): {
   scenario: string;
-  copilot: string;
-  framework: string;
   createdAt: string;
 } {
   const metadataPath = path.join(projectPath, '.kahuna-test.json');
@@ -102,8 +100,6 @@ function detectScenario(projectPath: string): {
       const data = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
       return {
         scenario: data.scenario || 'unknown',
-        copilot: data.copilot || 'unknown',
-        framework: data.framework || 'unknown',
         createdAt: data.createdAt || new Date().toISOString(),
       };
     } catch {
@@ -116,8 +112,6 @@ function detectScenario(projectPath: string): {
 
   return {
     scenario: projectName,
-    copilot: 'unknown',
-    framework: 'unknown',
     createdAt: new Date().toISOString(),
   };
 }
@@ -173,8 +167,6 @@ export async function collectCommand(options: {
   console.log('  Writing metadata...');
   const metadata: TestMetadata = {
     scenario: projectInfo.scenario,
-    copilot: projectInfo.copilot,
-    framework: projectInfo.framework,
     tester: options.tester,
     createdAt: projectInfo.createdAt,
     collectedAt: new Date().toISOString(),

@@ -1,14 +1,14 @@
 /**
- * create command - Assemble a test project from VCK templates + scenario
+ * create command - Set up a test project from a scenario
  *
- * Creates a project folder in `projects/` by combining:
- * 1. Framework boilerplate (from vck-templates)
- * 2. Copilot configuration (from vck-templates)
- * 3. Scenario context (CLAUDE.md and knowledge-base/ from testing/scenarios)
- * 4. Environment files (.env, .gitignore)
+ * Creates a project folder in `projects/` with scenario content:
+ * 1. project-context.md (copilot-visible project context)
+ * 2. knowledge-base/ (copilot-visible business context, if present)
+ * 3. Hidden metadata for the collect command
  *
- * The resulting project looks like a real development project —
- * no test artifacts are visible to the copilot.
+ * VCK templates (framework, copilot config, etc.) are handled
+ * separately by the init tool — this command only sets up the
+ * scenario-specific content that makes the test unique.
  */
 
 import * as fs from 'node:fs';
@@ -69,9 +69,9 @@ function listAvailableScenarios(repoRoot: string): string[] {
 /**
  * Execute the create command.
  *
- * Assembles a clean project folder from VCK templates + scenario content.
- * The output project contains zero test artifacts — the copilot sees
- * only what looks like a real development project.
+ * Creates a project folder with scenario content (project-context.md,
+ * knowledge-base/, metadata). VCK templates are applied separately
+ * via the init tool.
  */
 export async function createCommand(options: {
   scenario?: string;
@@ -82,10 +82,6 @@ export async function createCommand(options: {
   console.log('');
 
   const repoRoot = findRepoRoot();
-
-  // Hardcoded for MVP — only langgraph + claude-code supported
-  const framework = 'langgraph';
-  const copilot = 'claude-code';
 
   // Get available scenarios
   const availableScenarios = listAvailableScenarios(repoRoot);
@@ -118,49 +114,26 @@ export async function createCommand(options: {
   const projectName = options.name || scenario;
 
   // Define paths
-  const templatesDir = path.join(repoRoot, 'packages', 'vck-templates', 'templates');
   const scenariosDir = path.join(repoRoot, 'packages', 'testing', 'scenarios');
   const projectsDir = path.join(repoRoot, 'projects');
   const projectPath = path.join(projectsDir, projectName);
 
   // Check if project already exists
   if (fs.existsSync(projectPath)) {
-    console.error(`❌ Project folder already exists: projects/${projectName}`);
-    console.error('   Use a different name or delete the existing folder.');
+    console.error(`❌ Project '${projectName}' already exists. Delete it or use a different name.`);
     process.exit(1);
   }
 
-  console.log(`  Scenario:  ${scenario}`);
-  console.log(`  Framework: ${framework}`);
-  console.log(`  Copilot:   ${copilot}`);
-  console.log(`  Project:   ${projectName}`);
+  console.log(`  Scenario: ${scenario}`);
+  console.log(`  Project:  ${projectName}`);
   console.log('');
 
-  // 1. Copy framework boilerplate
-  const frameworkSrc = path.join(templatesDir, 'frameworks', framework);
-  if (fs.existsSync(frameworkSrc)) {
-    console.log('  Copying framework boilerplate...');
-    copyDirRecursive(frameworkSrc, projectPath);
-    console.log('    ✓ Framework files');
-  } else {
-    console.error(`❌ Framework not found: ${framework}`);
-    console.error(`   Expected at: ${frameworkSrc}`);
-    process.exit(1);
-  }
+  // Create the project directory
+  fs.mkdirSync(projectPath, { recursive: true });
 
-  // 2. Copy copilot configuration (.claude/)
-  const copilotSrc = path.join(templatesDir, 'copilot-configs', copilot, '.claude');
-  const copilotDest = path.join(projectPath, '.claude');
-  if (fs.existsSync(copilotSrc)) {
-    console.log('  Copying copilot configuration...');
-    copyDirRecursive(copilotSrc, copilotDest);
-    console.log('    ✓ Copilot config (.claude/)');
-  } else {
-    console.warn(`  ⚠ Copilot config not found at: ${copilotSrc}`);
-  }
-
-  // 3. Copy scenario project-context.md (copilot-visible project context)
   const scenarioDir = path.join(scenariosDir, scenario);
+
+  // 1. Copy scenario project-context.md (copilot-visible project context)
   const projectContextSrc = path.join(scenarioDir, 'project-context.md');
   const projectContextDest = path.join(projectPath, 'project-context.md');
   if (fs.existsSync(projectContextSrc)) {
@@ -171,7 +144,7 @@ export async function createCommand(options: {
     console.warn(`  ⚠ Scenario project-context.md not found: ${projectContextSrc}`);
   }
 
-  // 4. Copy scenario knowledge-base/ (copilot-visible business context)
+  // 2. Copy scenario knowledge-base/ (copilot-visible business context)
   const knowledgeBaseSrc = path.join(scenarioDir, 'knowledge-base');
   const knowledgeBaseDest = path.join(projectPath, 'knowledge-base');
   if (fs.existsSync(knowledgeBaseSrc)) {
@@ -182,28 +155,10 @@ export async function createCommand(options: {
     console.log('    (No knowledge-base for this scenario)');
   }
 
-  // 5. Copy .env template
-  const envTemplateSrc = path.join(templatesDir, 'project-env');
-  const envDest = path.join(projectPath, '.env');
-  if (fs.existsSync(envTemplateSrc)) {
-    copyFile(envTemplateSrc, envDest);
-    console.log('    ✓ .env template');
-  }
-
-  // 6. Copy .gitignore template
-  const gitignoreSrc = path.join(templatesDir, 'project-gitignore');
-  const gitignoreDest = path.join(projectPath, '.gitignore');
-  if (fs.existsSync(gitignoreSrc)) {
-    copyFile(gitignoreSrc, gitignoreDest);
-    console.log('    ✓ .gitignore');
-  }
-
-  // Write a hidden metadata file for the collect command to use later
+  // 3. Write a hidden metadata file for the collect command to use later
   const metadataPath = path.join(projectPath, '.kahuna-test.json');
   const metadata = {
     scenario,
-    copilot,
-    framework,
     createdAt: new Date().toISOString(),
   };
   fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));

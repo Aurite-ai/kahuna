@@ -12,10 +12,6 @@
 export interface TestMetadata {
   /** Which scenario was used (e.g., "customer-support-agent") */
   scenario: string;
-  /** Copilot used for the test (e.g., "claude-code") */
-  copilot: string;
-  /** Framework template used (e.g., "langgraph") */
-  framework: string;
   /** Name of the person running the test */
   tester: string;
   /** ISO timestamp when the project was created */
