@@ -16,6 +16,7 @@
  * - Upgradeable to embeddings later
  */
 
+import { z } from 'zod';
 import type { KnowledgeEntry, KnowledgeStorageService } from '../storage/index.js';
 import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
 
@@ -65,12 +66,15 @@ This is the PRIMARY context retrieval tool. Call it ONCE at task start, then wor
 };
 
 /**
- * Input type for the tool.
+ * Zod schema for validating prepare context tool input.
  */
-interface PrepareContextInput {
-  task: string;
-  files?: string[];
-}
+const prepareContextInputSchema = z.object({
+  task: z
+    .string({ error: 'Missing or empty task' })
+    .transform((val) => val.trim())
+    .refine((val) => val.length > 0, { message: 'Missing or empty task' }),
+  files: z.array(z.string()).optional(),
+});
 
 /**
  * Ranked file with relevance information
@@ -332,17 +336,20 @@ export async function prepareContextToolHandler(
   args: Record<string, unknown>,
   storage: KnowledgeStorageService
 ): Promise<MCPToolResponse> {
-  const input = args as unknown as PrepareContextInput;
-  const { task, files = [] } = input;
+  // Validate input with Zod
+  const parseResult = prepareContextInputSchema.safeParse(args);
+  if (!parseResult.success) {
+    const issues = parseResult.error.issues.map((i) => i.message).join(', ');
+    return errorResponse(`Invalid input: ${issues}`, {
+      hint: 'Provide a clear task description',
+    });
+  }
+
+  const { task, files = [] } = parseResult.data;
 
   // Internal defaults (not exposed to user)
   const maxFiles = 10;
   const minRelevanceScore = 1;
-
-  // Validate input
-  if (!task) {
-    return errorResponse('Missing required parameter: task');
-  }
 
   try {
     // Step 1: Fetch all active entries from local storage
