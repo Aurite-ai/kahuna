@@ -69,9 +69,9 @@ describe('learnToolHandler', () => {
     ctx = createMockContext();
     mockStorage = ctx.storage;
 
-    // Default categorization response (using AI categorizer categories)
+    // Default categorization response (using unified knowledge categories)
     mockCategorizeFile.mockResolvedValue({
-      category: 'technical-info',
+      category: 'reference',
       confidence: 0.9,
       reasoning: 'Test categorization',
       metadata: {
@@ -181,7 +181,7 @@ describe('learnToolHandler', () => {
           title: 'Test File',
           sourceFile: 'test-file.md',
           sourcePath: 'src/test-file.md',
-          category: 'technical-info',
+          category: 'reference',
           confidence: 0.9,
           reasoning: 'Test categorization',
         })
@@ -332,7 +332,7 @@ describe('learnToolHandler', () => {
 
     it('handles KnowledgeStorageError', async () => {
       mockCategorizeFile.mockResolvedValue({
-        category: 'technical-info',
+        category: 'reference',
         confidence: 0.9,
         reasoning: 'Test',
       });

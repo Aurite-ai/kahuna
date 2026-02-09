@@ -67,9 +67,9 @@ export async function categorizeFile(
 					properties: {
 						category: {
 							type: 'string',
-							enum: ['business-info', 'technical-info', 'code', 'hybrid'],
+							enum: ['policy', 'requirement', 'reference', 'decision', 'pattern', 'context'],
 							description:
-								'The category that best fits this file. Use hybrid only if content is 30-70% split between business and technical.',
+								'The knowledge category that best fits this file. Use context as fallback if no other category clearly fits.',
 						},
 						confidence: {
 							type: 'number',

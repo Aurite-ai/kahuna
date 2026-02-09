@@ -27,6 +27,7 @@ import {
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
 import { FileKnowledgeStorageService } from './storage/index.js';
 import { askTool } from './tools/ask.js';
+import { healthCheckTool } from './tools/health-check.js';
 import { initializeTool } from './tools/initialize.js';
 import { learnTool } from './tools/learn.js';
 import { prepareContextTool } from './tools/prepare-context.js';
@@ -37,35 +38,11 @@ import type { ToolContext } from './tools/types.js';
 // =============================================================================
 
 /**
- * Health check tool - useful for verifying MCP server is working.
- */
-const healthCheckTool = {
-  name: 'health_check',
-  description: `Check if the Kahuna MCP server is running correctly.
-
-This tool verifies the MCP connection is working.
-
-Actions:
-- ping: Confirm MCP server is alive`,
-  inputSchema: {
-    type: 'object' as const,
-    properties: {
-      action: {
-        type: 'string',
-        enum: ['ping'],
-        description: 'Type of health check',
-      },
-    },
-    required: ['action'],
-  },
-};
-
-/**
  * All registered tools.
  * Add new tool imports here as they are created.
  */
 const allTools = [
-  healthCheckTool,
+  healthCheckTool.definition,
   initializeTool.definition,
   learnTool.definition,
   prepareContextTool.definition,
@@ -82,49 +59,8 @@ async function routeToolCall(
   ctx: ToolContext
 ): Promise<CallToolResult> {
   switch (toolName) {
-    case 'health_check': {
-      const action = (args as { action?: string }).action || 'ping';
-
-      if (action === 'ping') {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  success: true,
-                  message: 'Kahuna MCP server is running!',
-                  server: SERVER_NAME,
-                  version: SERVER_VERSION,
-                  timestamp: new Date().toISOString(),
-                  availableTools: allTools.map((t) => t.name),
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                success: false,
-                error: `Unknown action: ${action}`,
-                validActions: ['ping'],
-              },
-              null,
-              2
-            ),
-          },
-        ],
-        isError: true,
-      };
-    }
+    case 'health_check':
+      return healthCheckTool.handler(args, ctx);
 
     case 'kahuna_initialize':
       return initializeTool.handler(args, ctx);

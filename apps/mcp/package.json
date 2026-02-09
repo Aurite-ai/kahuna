@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "MCP server that wraps Kahuna tRPC API as MCP tools",
+  "description": "Kahuna MCP server - context management tools for coding copilots",
   "bin": {
     "kahuna-mcp": "./dist/index.js"
   },

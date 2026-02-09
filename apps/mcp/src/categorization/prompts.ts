@@ -1,5 +1,8 @@
 /**
  * Prompts for file categorization
+ *
+ * Categories align with the knowledge base storage structure.
+ * See: docs/design/knowledge-architecture.md
  */
 
 /**
@@ -10,26 +13,20 @@ export function buildCategorizationPrompt(filename: string, content: string): st
 
 **Categories:**
 
-1. **business-info**: Business context, policies, rules, domain knowledge, goals, strategies, requirements, user research, meeting notes, business plans
-2. **technical-info**: Technical documentation, API specs, integration guides, architecture docs, deployment configs, database schemas, tool documentation
-3. **code**: Source code files in any language, scripts, configuration files with code logic
-4. **hybrid**: Files containing significant content from 2 or more categories (30-70% split)
+1. **policy**: Business context, policies, rules, domain knowledge, goals, strategies, business plans, meeting notes, organizational standards
+2. **requirement**: Requirements, specifications, user stories, acceptance criteria, constraints, functional/non-functional requirements
+3. **reference**: Technical documentation, API specs, integration guides, architecture docs, database schemas, tool documentation, code with documentation
+4. **decision**: Decision records, rationale documents, trade-off analyses, "why we chose X" explanations
+5. **pattern**: Source code, scripts, implementation patterns, reusable code examples, configuration files with code logic
+6. **context**: General background information, overviews, onboarding docs, or files that don't clearly fit another category
 
-**When to use 'hybrid':**
-- File contains distinct sections from different categories
-- No single category dominates (i.e., no category is >70% of the content)
-- Multiple aspects are substantial (each 30%+) and cannot be ignored
-- Examples:
-  * Product requirements (business) + API documentation (technical)
-  * README (technical docs) + code examples (code)
-  * Implementation guide (business process) + source code (code)
-  * Jupyter notebook with explanations (technical) + code blocks (code)
-
-**When NOT to use 'hybrid':**
-- One category clearly dominates (>70%) - use that primary category
-- Minor mentions of other categories (<30%) - use the primary category
-- Well-commented code - still classify as 'code' unless comments are 30%+ and provide substantial documentation
-- Documentation with brief code snippets (<30% code) - classify as 'business-info' or 'technical-info'
+**Guidelines for choosing:**
+- Choose the category that best describes the *primary purpose* of the file
+- If a file has elements of multiple categories, choose the dominant one (>50% of content)
+- Use **context** as a fallback when no other category clearly fits
+- **requirement** vs **policy**: Requirements are things to build; policies are rules to follow
+- **reference** vs **pattern**: Reference explains how things work; pattern shows code to follow
+- **decision** is specifically for "why" documents, not general documentation
 
 **Your Task:**
 

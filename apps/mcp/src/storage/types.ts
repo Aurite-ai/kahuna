@@ -2,11 +2,11 @@
  * Type definitions for local knowledge storage
  *
  * These types define the structure of .mdc files stored in ~/.kahuna/knowledge/
- * See: docs/internal/tasks/mcp-mvp/design/local-storage-design.md
+ * See: docs/design/knowledge-architecture.md
  */
 
 /**
- * Categories aligned with knowledge-architecture.md
+ * Categories aligned with docs/design/knowledge-architecture.md
  */
 export type KnowledgeCategory =
   | 'policy'

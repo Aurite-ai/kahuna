@@ -1,21 +1,18 @@
 /**
  * Type definitions and Zod schemas for file categorization
  *
- * Migrated from packages/file-router — hybrid splitting types removed.
+ * Categories align with the knowledge base storage structure.
+ * See: docs/design/knowledge-architecture.md
  */
 
 import { z } from 'zod';
 
 /**
- * Top-level file categories (Stage 1 classification)
+ * Knowledge categories used for both AI categorization and storage.
+ * Single taxonomy — no mapping layer needed.
  */
-export const FILE_CATEGORIES = ['business-info', 'technical-info', 'code', 'hybrid'] as const;
+export const FILE_CATEGORIES = ['policy', 'requirement', 'reference', 'decision', 'pattern', 'context'] as const;
 export type FileCategory = (typeof FILE_CATEGORIES)[number];
-
-/**
- * Non-hybrid categories (used for split results)
- */
-export type PrimaryFileCategory = Exclude<FileCategory, 'hybrid'>;
 
 /**
  * Enhanced metadata extracted from files

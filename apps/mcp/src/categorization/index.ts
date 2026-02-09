@@ -21,7 +21,6 @@ export {
 	type CategorizationResult,
 	type FileCategory,
 	type FileMetadata,
-	type PrimaryFileCategory,
 } from './types.js';
 
 // Utilities

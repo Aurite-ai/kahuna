@@ -25,7 +25,7 @@ export { KnowledgeStorageError } from './types.js';
 // Utilities
 export {
   generateSlug,
-  mapCategory,
+  validateCategory,
   parseMdcFile,
   generateMdcFile,
   type ParsedMdcFile,

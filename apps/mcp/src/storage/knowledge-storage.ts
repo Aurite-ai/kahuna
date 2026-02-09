@@ -2,7 +2,7 @@
  * Knowledge Storage Service implementation
  *
  * Provides file-based storage for knowledge entries in .mdc format.
- * See: docs/internal/tasks/mcp-mvp/design/local-storage-design.md
+ * See: docs/design/knowledge-architecture.md
  */
 
 import * as fs from 'node:fs/promises';
@@ -16,7 +16,7 @@ import type {
   SaveKnowledgeEntryInput,
 } from './types.js';
 import { KnowledgeStorageError } from './types.js';
-import { generateMdcFile, generateSlug, mapCategory, parseMdcFile } from './utils.js';
+import { generateMdcFile, generateSlug, parseMdcFile, validateCategory } from './utils.js';
 
 /**
  * Get the base directory for knowledge storage.
@@ -116,7 +116,7 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
         path: input.sourcePath ?? null,
       },
       classification: {
-        category: mapCategory(input.category),
+        category: validateCategory(input.category),
         confidence: input.confidence,
         reasoning: input.reasoning,
         tags: input.metadata?.tags ?? [],
