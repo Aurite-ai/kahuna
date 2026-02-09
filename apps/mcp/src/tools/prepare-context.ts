@@ -17,8 +17,9 @@
  */
 
 import { z } from 'zod';
-import type { KnowledgeEntry, KnowledgeStorageService } from '../storage/index.js';
+import type { KnowledgeEntry } from '../storage/index.js';
 import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
+import type { ToolContext } from './types.js';
 
 /**
  * Tool definition for MCP registration.
@@ -334,8 +335,9 @@ function countByCategory(entries: RankedEntry[]): Record<string, number> {
  */
 export async function prepareContextToolHandler(
   args: Record<string, unknown>,
-  storage: KnowledgeStorageService
+  ctx: ToolContext
 ): Promise<MCPToolResponse> {
+  const { storage } = ctx;
   // Validate input with Zod
   const parseResult = prepareContextInputSchema.safeParse(args);
   if (!parseResult.success) {

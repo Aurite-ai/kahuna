@@ -17,8 +17,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages';
 import { z } from 'zod';
 import { executeKnowledgeTool, knowledgeTools } from '../agents/index.js';
+import { MODELS } from '../config.js';
 import type { KnowledgeStorageService } from '../storage/index.js';
 import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
+import type { ToolContext } from './types.js';
 
 /**
  * Agent configuration constants
@@ -114,7 +116,7 @@ Guidelines:
   // Agentic loop - let Claude use tools until it has an answer
   for (let i = 0; i < AGENT_MAX_ITERATIONS; i++) {
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: MODELS.ask,
       max_tokens: AGENT_MAX_TOKENS,
       system: systemPrompt,
       tools: knowledgeTools,
@@ -178,8 +180,9 @@ Guidelines:
  */
 export async function askToolHandler(
   args: Record<string, unknown>,
-  storage: KnowledgeStorageService
+  ctx: ToolContext
 ): Promise<MCPToolResponse> {
+  const { storage } = ctx;
   // Validate input with Zod
   const parseResult = askInputSchema.safeParse(args);
   if (!parseResult.success) {

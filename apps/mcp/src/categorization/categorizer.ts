@@ -3,6 +3,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { MODELS } from '../config.js';
 import { buildCategorizationPrompt } from './prompts.js';
 import {
 	type CategorizationOptions,
@@ -49,7 +50,7 @@ export async function categorizeFile(
 
 	// Call Claude with tool-based structured output
 	const response = await anthropic.messages.create({
-		model: 'claude-3-haiku-20240307',
+		model: MODELS.categorization,
 		max_tokens: 2048,
 		messages: [
 			{

@@ -1,57 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { KnowledgeEntry, KnowledgeStorageService } from '../../storage/index.js';
+import type { KnowledgeStorageService } from '../../storage/index.js';
 import { prepareContextToolDefinition, prepareContextToolHandler } from '../prepare-context.js';
-
-/**
- * Create a mock storage service for testing
- */
-function createMockStorage(overrides?: Partial<KnowledgeStorageService>): KnowledgeStorageService {
-  return {
-    save: vi.fn(),
-    list: vi.fn(),
-    get: vi.fn(),
-    exists: vi.fn(),
-    delete: vi.fn(),
-    healthCheck: vi.fn(),
-    ...overrides,
-  };
-}
-
-/**
- * Create a mock KnowledgeEntry for testing
- */
-function createMockEntry(overrides?: Partial<KnowledgeEntry>): KnowledgeEntry {
-  const now = new Date().toISOString();
-  return {
-    slug: 'test-entry',
-    type: 'knowledge',
-    title: 'Test Entry',
-    summary: 'A test entry for the knowledge base',
-    created_at: now,
-    updated_at: now,
-    source: {
-      file: 'test.md',
-      project: 'test-project',
-      path: null,
-    },
-    classification: {
-      category: 'reference',
-      confidence: 0.9,
-      reasoning: 'Test reasoning',
-      tags: ['test', 'example'],
-      topics: ['testing'],
-      entities: {
-        technologies: ['TypeScript'],
-        frameworks: [],
-        libraries: [],
-        apis: [],
-      },
-    },
-    status: 'active',
-    content: '# Test Content\n\nThis is test content.',
-    ...overrides,
-  };
-}
+import type { ToolContext } from '../types.js';
+import { createMockContext, createMockEntry } from './test-utils.js';
 
 describe('prepareContextToolDefinition', () => {
   it('has the correct name', () => {
@@ -82,16 +33,18 @@ describe('prepareContextToolDefinition', () => {
 });
 
 describe('prepareContextToolHandler', () => {
+  let ctx: ToolContext;
   let mockStorage: KnowledgeStorageService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockStorage = createMockStorage();
+    ctx = createMockContext();
+    mockStorage = ctx.storage;
   });
 
   describe('input validation', () => {
     it('returns error when task is missing', async () => {
-      const result = await prepareContextToolHandler({}, mockStorage);
+      const result = await prepareContextToolHandler({}, ctx);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
@@ -102,7 +55,7 @@ describe('prepareContextToolHandler', () => {
     it('accepts empty files array (optional parameter)', async () => {
       vi.mocked(mockStorage.list).mockResolvedValue([createMockEntry()]);
 
-      const result = await prepareContextToolHandler({ task: 'test task', files: [] }, mockStorage);
+      const result = await prepareContextToolHandler({ task: 'test task', files: [] }, ctx);
 
       expect(result.isError).toBeUndefined();
       const response = JSON.parse(result.content[0].text);
@@ -119,7 +72,7 @@ describe('prepareContextToolHandler', () => {
       ];
       vi.mocked(mockStorage.list).mockResolvedValue(entries);
 
-      const result = await prepareContextToolHandler({ task: 'general task' }, mockStorage);
+      const result = await prepareContextToolHandler({ task: 'general task' }, ctx);
 
       expect(mockStorage.list).toHaveBeenCalledWith({ status: 'active' });
       const response = JSON.parse(result.content[0].text);
@@ -130,7 +83,7 @@ describe('prepareContextToolHandler', () => {
     it('handles empty knowledge base gracefully', async () => {
       vi.mocked(mockStorage.list).mockResolvedValue([]);
 
-      const result = await prepareContextToolHandler({ task: 'test task' }, mockStorage);
+      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
 
       expect(result.isError).toBeUndefined();
       const response = JSON.parse(result.content[0].text);
@@ -176,7 +129,7 @@ describe('prepareContextToolHandler', () => {
           task: 'fix a bug',
           files: ['src/auth/login.ts'],
         },
-        mockStorage
+        ctx
       );
 
       const response = JSON.parse(result.content[0].text);
@@ -218,7 +171,7 @@ describe('prepareContextToolHandler', () => {
 
       const result = await prepareContextToolHandler(
         { task: 'implement authentication using oauth' },
-        mockStorage
+        ctx
       );
 
       const response = JSON.parse(result.content[0].text);
@@ -248,7 +201,7 @@ describe('prepareContextToolHandler', () => {
 
       const result = await prepareContextToolHandler(
         { task: 'implement authentication' },
-        mockStorage
+        ctx
       );
 
       const response = JSON.parse(result.content[0].text);
@@ -279,7 +232,7 @@ describe('prepareContextToolHandler', () => {
 
       const result = await prepareContextToolHandler(
         { task: 'write typescript code' },
-        mockStorage
+        ctx
       );
 
       const response = JSON.parse(result.content[0].text);
@@ -315,7 +268,7 @@ describe('prepareContextToolHandler', () => {
       ];
       vi.mocked(mockStorage.list).mockResolvedValue(entries);
 
-      const result = await prepareContextToolHandler({ task: 'implement rest api' }, mockStorage);
+      const result = await prepareContextToolHandler({ task: 'implement rest api' }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.selectedFiles.length).toBe(2);
@@ -338,7 +291,7 @@ describe('prepareContextToolHandler', () => {
       ];
       vi.mocked(mockStorage.list).mockResolvedValue(entries);
 
-      const result = await prepareContextToolHandler({ task: 'test task' }, mockStorage);
+      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.summary).toBeDefined();
@@ -356,7 +309,7 @@ describe('prepareContextToolHandler', () => {
       ];
       vi.mocked(mockStorage.list).mockResolvedValue(entries);
 
-      const result = await prepareContextToolHandler({ task: 'test task' }, mockStorage);
+      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.formattedContext).toBeDefined();
@@ -382,7 +335,7 @@ describe('prepareContextToolHandler', () => {
       ];
       vi.mocked(mockStorage.list).mockResolvedValue(entries);
 
-      const result = await prepareContextToolHandler({ task: 'test task' }, mockStorage);
+      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       const selectedFile = response.data.selectedFiles[0];
@@ -400,7 +353,7 @@ describe('prepareContextToolHandler', () => {
       );
       vi.mocked(mockStorage.list).mockResolvedValue(entries);
 
-      const result = await prepareContextToolHandler({ task: 'test task' }, mockStorage);
+      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.selectedFiles.length).toBe(10);
@@ -411,7 +364,7 @@ describe('prepareContextToolHandler', () => {
     it('handles storage errors gracefully', async () => {
       vi.mocked(mockStorage.list).mockRejectedValue(new Error('Storage unavailable'));
 
-      const result = await prepareContextToolHandler({ task: 'test task' }, mockStorage);
+      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
@@ -445,7 +398,7 @@ describe('prepareContextToolHandler', () => {
       // but with very low scores. If all entries have score < 1, they won't show.
       const result = await prepareContextToolHandler(
         { task: 'implement authentication with jwt tokens' },
-        mockStorage
+        ctx
       );
 
       const response = JSON.parse(result.content[0].text);

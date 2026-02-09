@@ -10,7 +10,7 @@ import 'dotenv/config';
  *
  * Tools:
  * - health_check: Verify MCP server connectivity
- * - initialize: Set up a new Kahuna knowledge base
+ * - kahuna_initialize: Set up a new Kahuna knowledge base
  * - kahuna_learn: Categorize and store knowledge files
  * - kahuna_prepare_context: Retrieve relevant context for a task
  * - kahuna_ask: Ask questions about the knowledge base
@@ -24,18 +24,17 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { FileKnowledgeStorageService, type KnowledgeStorageService } from './storage/index.js';
+import { SERVER_NAME, SERVER_VERSION } from './config.js';
+import { FileKnowledgeStorageService } from './storage/index.js';
 import { askTool } from './tools/ask.js';
 import { initializeTool } from './tools/initialize.js';
 import { learnTool } from './tools/learn.js';
 import { prepareContextTool } from './tools/prepare-context.js';
+import type { ToolContext } from './tools/types.js';
 
 // =============================================================================
 // SERVER CONFIGURATION
 // =============================================================================
-
-const SERVER_NAME = 'kahuna-mcp-server';
-const SERVER_VERSION = '0.0.1';
 
 /**
  * Health check tool - useful for verifying MCP server is working.
@@ -80,7 +79,7 @@ const allTools = [
 async function routeToolCall(
   toolName: string,
   args: Record<string, unknown>,
-  storage: KnowledgeStorageService
+  ctx: ToolContext
 ): Promise<CallToolResult> {
   switch (toolName) {
     case 'health_check': {
@@ -127,17 +126,17 @@ async function routeToolCall(
       };
     }
 
-    case 'initialize':
-      return initializeTool.handler(args);
+    case 'kahuna_initialize':
+      return initializeTool.handler(args, ctx);
 
     case 'kahuna_learn':
-      return learnTool.handler(args, storage);
+      return learnTool.handler(args, ctx);
 
     case 'kahuna_prepare_context':
-      return prepareContextTool.handler(args, storage);
+      return prepareContextTool.handler(args, ctx);
 
     case 'kahuna_ask':
-      return askTool.handler(args, storage);
+      return askTool.handler(args, ctx);
 
     default:
       return {
@@ -163,6 +162,9 @@ async function routeToolCall(
 async function main() {
   // Create local knowledge storage service
   const storage = new FileKnowledgeStorageService();
+
+  // Build the shared tool context
+  const ctx: ToolContext = { storage };
 
   // Create MCP server
   const server = new Server(
@@ -195,7 +197,7 @@ async function main() {
    */
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-    return routeToolCall(name, args ?? {}, storage);
+    return routeToolCall(name, args ?? {}, ctx);
   });
 
   // ---------------------------------------------------------------------------
