@@ -78,6 +78,7 @@ Your task: Split this file into distinct sections where each section is primaril
 - **business-info**: Business context, policies, requirements, goals, strategies
 - **technical-info**: Technical documentation, API specs, architecture, configs
 - **code**: Source code, scripts, code blocks
+- **integration-spec**: Workflow descriptions, integration requirements, connector specs
 
 **Guidelines:**
 1. Identify natural boundaries (headings, code blocks, topic changes, etc.)

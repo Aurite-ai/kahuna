@@ -7,13 +7,128 @@ import { z } from 'zod';
 /**
  * Top-level file categories (Stage 1 classification)
  */
-export const FILE_CATEGORIES = ['business-info', 'technical-info', 'code', 'hybrid'] as const;
+export const FILE_CATEGORIES = [
+  'business-info',
+  'technical-info',
+  'code',
+  'integration-spec',
+  'hybrid',
+] as const;
 export type FileCategory = (typeof FILE_CATEGORIES)[number];
 
 /**
  * Non-hybrid categories (used for split results)
  */
 export type PrimaryFileCategory = Exclude<FileCategory, 'hybrid'>;
+
+/**
+ * Integration trigger types
+ */
+export const TRIGGER_TYPES = [
+  'webhook',
+  'schedule',
+  'event',
+  'manual',
+  'api-call',
+  'file-upload',
+  'database-trigger',
+] as const;
+
+/**
+ * Data source types
+ */
+export const DATA_SOURCE_TYPES = [
+  'database',
+  'api',
+  'file',
+  'crm',
+  'spreadsheet',
+  'email',
+  'cloud-storage',
+  'other',
+] as const;
+
+/**
+ * Output/action types
+ */
+export const OUTPUT_TYPES = [
+  'email',
+  'notification',
+  'api-call',
+  'file',
+  'database-write',
+  'webhook',
+  'message',
+  'other',
+] as const;
+
+/**
+ * Authentication methods
+ */
+export const AUTH_METHODS = ['oauth2', 'api-key', 'basic-auth', 'jwt', 'none', 'other'] as const;
+
+/**
+ * Integration metadata schema for workflow/connector specifications
+ */
+export const IntegrationMetadataSchema = z.object({
+  // What triggers the workflow
+  triggers: z
+    .array(
+      z.object({
+        type: z.enum(TRIGGER_TYPES),
+        source: z.string().optional(),
+        description: z.string(),
+      })
+    )
+    .optional(),
+
+  // Where data comes from
+  dataSources: z
+    .array(
+      z.object({
+        type: z.enum(DATA_SOURCE_TYPES),
+        name: z.string(),
+        description: z.string(),
+      })
+    )
+    .optional(),
+
+  // Where results/actions go
+  outputs: z
+    .array(
+      z.object({
+        type: z.enum(OUTPUT_TYPES),
+        provider: z.string().optional(),
+        description: z.string(),
+      })
+    )
+    .optional(),
+
+  // What AI tasks are needed
+  aiTasks: z
+    .array(
+      z.object({
+        task: z.string(),
+        description: z.string(),
+      })
+    )
+    .optional(),
+
+  // Authentication requirements
+  authentication: z
+    .array(
+      z.object({
+        system: z.string(),
+        method: z.enum(AUTH_METHODS),
+      })
+    )
+    .optional(),
+
+  // Connected services/tools (for quick reference)
+  connectedServices: z.array(z.string()).optional(),
+});
+
+export type IntegrationMetadata = z.infer<typeof IntegrationMetadataSchema>;
 
 /**
  * Enhanced metadata extracted from files
@@ -58,6 +173,9 @@ export const FileMetadataSchema = z.object({
 
   // For documentation: key sections
   sections: z.array(z.string()).optional(),
+
+  // For integration-spec files: workflow integrations
+  integrations: IntegrationMetadataSchema.optional(),
 });
 
 export type FileMetadata = z.infer<typeof FileMetadataSchema>;
@@ -153,6 +271,16 @@ export interface SplitResult {
 }
 
 /**
+ * Non-hybrid categories for content splits (array version for Zod)
+ */
+export const PRIMARY_CATEGORIES = [
+  'business-info',
+  'technical-info',
+  'code',
+  'integration-spec',
+] as const;
+
+/**
  * Zod schema for content split validation
  */
 export const ContentSplitSchema = z.object({
@@ -160,7 +288,7 @@ export const ContentSplitSchema = z.object({
   originalFilename: z.string(),
   sectionIndex: z.number().int().positive(),
   content: z.string().min(1),
-  category: z.enum(['business-info', 'technical-info', 'code']),
+  category: z.enum(PRIMARY_CATEGORIES),
   confidence: z.number().min(0).max(1),
   reasoning: z.string(),
   sectionTitle: z.string().optional(),

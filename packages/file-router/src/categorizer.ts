@@ -66,9 +66,9 @@ export async function categorizeFile(
           properties: {
             category: {
               type: 'string',
-              enum: ['business-info', 'technical-info', 'code', 'hybrid'],
+              enum: ['business-info', 'technical-info', 'code', 'integration-spec', 'hybrid'],
               description:
-                'The category that best fits this file. Use hybrid only if content is 30-70% split between business and technical.',
+                'The category that best fits this file. Use integration-spec for workflow/connector descriptions. Use hybrid only if content is 30-70% split between multiple categories.',
             },
             confidence: {
               type: 'number',
@@ -166,6 +166,148 @@ export async function categorizeFile(
                   type: 'array',
                   items: { type: 'string' },
                   description: 'For documentation: main section headings',
+                },
+                integrations: {
+                  type: 'object',
+                  description:
+                    'Extract from ANY file where external systems/tools/APIs are mentioned - not just integration-spec files',
+                  properties: {
+                    triggers: {
+                      type: 'array',
+                      description: 'What starts the workflow',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          type: {
+                            type: 'string',
+                            enum: [
+                              'webhook',
+                              'schedule',
+                              'event',
+                              'manual',
+                              'api-call',
+                              'file-upload',
+                              'database-trigger',
+                            ],
+                          },
+                          source: {
+                            type: 'string',
+                            description: 'Source system or input (e.g., "web-form", "cron")',
+                          },
+                          description: {
+                            type: 'string',
+                            description: 'What this trigger does',
+                          },
+                        },
+                        required: ['type', 'description'],
+                      },
+                    },
+                    dataSources: {
+                      type: 'array',
+                      description: 'Where data comes from',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          type: {
+                            type: 'string',
+                            enum: [
+                              'database',
+                              'api',
+                              'file',
+                              'crm',
+                              'spreadsheet',
+                              'email',
+                              'cloud-storage',
+                              'other',
+                            ],
+                          },
+                          name: {
+                            type: 'string',
+                            description: 'Name of the data source (e.g., "customer-db", "HubSpot")',
+                          },
+                          description: {
+                            type: 'string',
+                            description: 'What data is retrieved',
+                          },
+                        },
+                        required: ['type', 'name', 'description'],
+                      },
+                    },
+                    outputs: {
+                      type: 'array',
+                      description: 'Where results/actions go',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          type: {
+                            type: 'string',
+                            enum: [
+                              'email',
+                              'notification',
+                              'api-call',
+                              'file',
+                              'database-write',
+                              'webhook',
+                              'message',
+                              'other',
+                            ],
+                          },
+                          provider: {
+                            type: 'string',
+                            description: 'Service provider (e.g., "Gmail", "Slack")',
+                          },
+                          description: {
+                            type: 'string',
+                            description: 'What action is taken',
+                          },
+                        },
+                        required: ['type', 'description'],
+                      },
+                    },
+                    aiTasks: {
+                      type: 'array',
+                      description: 'What AI/LLM tasks are needed',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          task: {
+                            type: 'string',
+                            description:
+                              'Task identifier (e.g., "generate-email", "analyze-sentiment")',
+                          },
+                          description: {
+                            type: 'string',
+                            description: 'What the AI needs to do',
+                          },
+                        },
+                        required: ['task', 'description'],
+                      },
+                    },
+                    authentication: {
+                      type: 'array',
+                      description: 'Authentication requirements for each system',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          system: {
+                            type: 'string',
+                            description: 'System name (e.g., "Gmail", "PostgreSQL")',
+                          },
+                          method: {
+                            type: 'string',
+                            enum: ['oauth2', 'api-key', 'basic-auth', 'jwt', 'none', 'other'],
+                          },
+                        },
+                        required: ['system', 'method'],
+                      },
+                    },
+                    connectedServices: {
+                      type: 'array',
+                      items: { type: 'string' },
+                      description:
+                        'List of all external services/tools mentioned (e.g., ["Gmail", "HubSpot", "PostgreSQL"])',
+                    },
+                  },
                 },
               },
             },

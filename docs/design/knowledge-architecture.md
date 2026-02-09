@@ -134,12 +134,81 @@ MVP categories (agents determine during learn):
 
 | Category | Description | Examples |
 |----------|-------------|----------|
-| **policy** | Business rules, constraints | API guidelines, security policies |
-| **requirement** | What the system must do | Feature specs, user stories |
-| **reference** | Background information | Documentation, specs |
-| **decision** | Choices with rationale | Architecture decisions |
-| **pattern** | Reusable approaches | Code patterns, workflows |
-| **context** | General background | Company info, domain knowledge |
+| **business-info** | Business context, policies, rules, domain knowledge | API guidelines, security policies, business plans |
+| **technical-info** | Technical documentation and specifications | API specs, architecture docs, database schemas |
+| **code** | Source code files and scripts | Python files, TypeScript files, config files |
+| **integration-spec** | Workflow descriptions, integration requirements | "When order ready, send email via Gmail", connector specs |
+| **hybrid** | Files with mixed content (30-70% split) | README with code examples, specs with implementation |
+
+### Integration Detection (Cross-Category)
+
+**Integration metadata is extracted from ANY file where external systems are mentioned** - not just `integration-spec` files. This is crucial for:
+- Auto-generating tool scaffolding in VCKs
+- Surfacing relevant integrations during `kahuna_prepare_context`
+- Enabling "Connector Discovery" - when users describe their needs in any context, Kahuna identifies what connections are required
+
+**When to use `integration-spec` category:**
+- Use when the PRIMARY purpose of the file is describing integrations/connectors
+- Example: A dedicated "integrations.md" file listing all external systems
+
+**When integrations are extracted from other categories:**
+- A `business-info` file about customer support that mentions "send email via Gmail" → Gmail captured as connected service
+- A `technical-info` API doc that describes HubSpot integration → HubSpot captured as data source
+- A `code` file that imports Stripe SDK → Stripe captured as connected service
+
+**Integration Metadata Structure:**
+
+| Field | Description | Example Values |
+|-------|-------------|----------------|
+| **triggers** | What starts the workflow | webhook, schedule, manual, event, api-call |
+| **dataSources** | Where data comes from | database, api, crm, spreadsheet, email |
+| **outputs** | Where results/actions go | email, notification, api-call, database-write |
+| **aiTasks** | What AI needs to do | generate-email, analyze-sentiment, classify-ticket |
+| **authentication** | How to connect to systems | oauth2, api-key, basic-auth, jwt |
+| **connectedServices** | All external services mentioned | Gmail, HubSpot, PostgreSQL, Slack |
+
+**Example Integration-Spec Entry:**
+
+```markdown
+---
+id: uuid-5678
+type: integration-spec
+title: Customer Pickup Notification Workflow
+classification:
+  category: integration-spec
+  tags:
+    - customer-notification
+    - email-automation
+integrations:
+  triggers:
+    - type: manual
+      source: web-form
+      description: Worker enters customer name
+  dataSources:
+    - type: database
+      name: customer-db
+      description: Customer emails and notes
+  outputs:
+    - type: email
+      provider: gmail
+      description: Personalized pickup notification
+  aiTasks:
+    - task: generate-email
+      description: Write personalized pickup notification using customer notes
+  authentication:
+    - system: gmail
+      method: oauth2
+    - system: customer-db
+      method: api-key
+  connectedServices:
+    - Gmail
+    - PostgreSQL
+---
+
+# Customer Pickup Notification Workflow
+
+When the item is ready, the worker enters the customer name into a web form...
+```
 
 ---
 

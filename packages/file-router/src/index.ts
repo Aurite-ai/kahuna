@@ -6,6 +6,7 @@
  * - business-info: Business context, policies, rules
  * - technical-info: Technical docs, APIs, integrations
  * - code: Source code files
+ * - integration-spec: Workflow descriptions, connector requirements
  * - hybrid: Mixed content (automatically split into separate sections)
  *
  * ## Basic Usage
@@ -47,15 +48,27 @@ export { buildCategorizationPrompt } from './prompts.js';
 
 // Types
 export {
+  // Category constants
   FILE_CATEGORIES,
   FILE_SIZE_LIMITS,
+  PRIMARY_CATEGORIES,
+  // Integration-related constants
+  TRIGGER_TYPES,
+  DATA_SOURCE_TYPES,
+  OUTPUT_TYPES,
+  AUTH_METHODS,
+  // Schemas
   CategorizationResultSchema,
   ContentSplitSchema,
+  IntegrationMetadataSchema,
+  FileMetadataSchema,
+  // Types
   type FileCategory,
   type PrimaryFileCategory,
   type CategorizationResult,
   type CategorizationOptions,
   type FileMetadata,
+  type IntegrationMetadata,
   type ContentSplit,
   type SplitOptions,
   type SplitResult,
