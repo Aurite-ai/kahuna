@@ -212,15 +212,17 @@ Surfaced from Kahuna knowledge base on 2026-02-05.
 | Category | Tools | Data Flow |
 |----------|-------|-----------|
 | **Building KB** | learn, sync | Files → ~/.kahuna |
-| **Environment** | setup, prepare_context | ~/.kahuna → context/ |
-| **Assistance** | ask, review | context/ + ~/.kahuna → response |
+| **Environment** | initialize, prepare_context | ~/.kahuna → context/ |
+| **Assistance** | ask | context/ + ~/.kahuna → response |
 
-### kahuna_setup (Environment)
+### kahuna_initialize (Environment)
 
 **Creates:**
 - `project/context/README.md` (minimal initial version)
 
 **Does not create:** Knowledge base entries (that's `kahuna_learn`)
+
+> **Note:** Verification/review functionality is handled by a copilot skill rather than an MCP tool. See [copilot-configuration.md](./copilot-configuration.md).
 
 ### kahuna_learn (Building KB)
 
@@ -252,15 +254,6 @@ Surfaced from Kahuna knowledge base on 2026-02-05.
 2. `~/.kahuna/knowledge/` - fallback/additional
 
 **Writes:** Nothing (returns text response)
-
-### kahuna_review (Assistance)
-
-**Reads (in order):**
-1. `project/context/` (if exists) - checked first for patterns/policies
-2. `~/.kahuna/knowledge/` - fallback/additional patterns
-3. Files being reviewed
-
-**Writes:** Nothing (returns analysis)
 
 ### kahuna_sync (Building KB)
 
@@ -531,7 +524,7 @@ confidence: 0.95
 
 **Context merging (resolved):** When preparing context for a new task:
 - **Clear and replace** `context/task/` - Task-specific context is replaced each time
-- **Preserve** curated content like `context/langgraph/` - Initial patterns from `kahuna_setup` persist
+- **Preserve** curated content like `context/langgraph/` - Initial patterns from `kahuna_initialize` persist
 - This ensures task context is always fresh while maintaining foundational patterns
 
 ---
@@ -545,3 +538,4 @@ confidence: 0.95
 - v2.3 (2026-02-05): Changed to .mdc format (YAML frontmatter + markdown) instead of folder+JSON
 - v2.4 (2026-02-05): Fixed Tool Interactions to use .mdc; resolved context merging question
 - v3.0 (2026-02-05): Promoted to docs/design/; updated links and status to Final
+- v3.1 (2026-02-09): Renamed kahuna_setup → kahuna_initialize; removed kahuna_review (now skill-based)
