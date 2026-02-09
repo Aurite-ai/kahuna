@@ -19,6 +19,7 @@ import * as path from 'node:path';
 import { FileSizeError, categorizeFile } from '@kahuna/file-router';
 import type { KnowledgeStorageService, SaveKnowledgeEntryInput } from '../storage/index.js';
 import { KnowledgeStorageError } from '../storage/index.js';
+import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
 
 /**
  * Tool definition for MCP registration.
@@ -81,18 +82,6 @@ interface LearnToolInput {
 }
 
 /**
- * MCP tool response format.
- */
-interface MCPToolResponse {
-  [key: string]: unknown;
-  content: Array<{
-    type: 'text';
-    text: string;
-  }>;
-  isError?: boolean;
-}
-
-/**
  * Result for a single file learning process
  */
 interface FileLearnResult {
@@ -103,35 +92,6 @@ interface FileLearnResult {
   error?: string;
   slug?: string;
   created?: boolean;
-}
-
-/**
- * Helper to create a success response.
- */
-function successResponse(data: unknown): MCPToolResponse {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({ success: true, data }, null, 2),
-      },
-    ],
-  };
-}
-
-/**
- * Helper to create an error response.
- */
-function errorResponse(message: string, details?: unknown): MCPToolResponse {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({ success: false, error: message, details }, null, 2),
-      },
-    ],
-    isError: true,
-  };
 }
 
 /**

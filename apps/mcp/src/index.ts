@@ -45,6 +45,7 @@ import {
 
 import { type KahunaClient, createClientFromEnv } from './client.js';
 import { FileKnowledgeStorageService, type KnowledgeStorageService } from './storage/index.js';
+import { askTool } from './tools/ask.js';
 import { initializeTool } from './tools/initialize.js';
 import { learnTool } from './tools/learn.js';
 import { prepareContextTool } from './tools/prepare-context.js';
@@ -92,9 +93,9 @@ const allTools = [
   initializeTool.definition,
   learnTool.definition,
   prepareContextTool.definition,
+  askTool.definition,
   // Future tools:
   // setupTool.definition,
-  // askTool.definition,
   // reviewTool.definition,
   // syncTool.definition,
 ];
@@ -208,11 +209,12 @@ async function routeToolCall(
     case 'kahuna_prepare_context':
       return prepareContextTool.handler(args, storage);
 
+    case 'kahuna_ask':
+      return askTool.handler(args, storage);
+
     // Future tool handlers:
     // case 'kahuna_setup':
     //   return setupTool.handler(args, storage);
-    // case 'kahuna_ask':
-    //   return askTool.handler(args, storage);
     // case 'kahuna_review':
     //   return reviewTool.handler(args, storage);
     // case 'kahuna_sync':
