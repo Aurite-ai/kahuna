@@ -11,13 +11,10 @@
  * - Confidence indicators (high/medium/low)
  * - Follow-up suggestions
  * - Knowledge gap detection
- * - Answer caching with KB-aware invalidation
- * - Graceful fallback when AI unavailable
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { KnowledgeEntry, KnowledgeStorageService } from '../storage/index.js';
-import { AnswerCacheService, generateKbVersion } from '../storage/index.js';
 
 /**
  * Tool definition for MCP registration.
@@ -100,7 +97,6 @@ interface AnswerResult {
     missingInfo?: string;
     suggestion?: string;
   };
-  cached: boolean;
 }
 
 /**
@@ -336,7 +332,7 @@ function formatAnswer(result: AnswerResult, question: string): string {
 
   lines.push('# Answer\n');
   lines.push(`**Question:** ${question}\n`);
-  lines.push(`**Confidence:** ${confidenceEmoji}${result.cached ? ' (cached)' : ''}\n`);
+  lines.push(`**Confidence:** ${confidenceEmoji}\n`);
 
   // Main answer
   lines.push(result.answer);
@@ -394,31 +390,24 @@ function formatAnswer(result: AnswerResult, question: string): string {
 async function synthesizeAnswer(
   question: string,
   relevantEntries: RankedEntry[],
-  keywords: string[]
+  _keywords: string[]
 ): Promise<{
   answer: string;
   suggestedFollowups: string[];
   gapDetection?: { hasGap: boolean; missingInfo?: string; suggestion?: string };
 }> {
-  // Check if API key is available
-  if (!process.env.ANTHROPIC_API_KEY) {
-    // Fallback to excerpt-based answer
-    return createFallbackAnswer(question, relevantEntries, keywords);
-  }
+  const client = new Anthropic();
 
-  try {
-    const client = new Anthropic();
-
-    // Format context from entries
-    const contextParts = relevantEntries.map((entry, i) => {
-      return `## Source ${i + 1}: ${entry.title} (relevance: ${entry.relevanceScore.toFixed(1)})
+  // Format context from entries
+  const contextParts = relevantEntries.map((entry, i) => {
+    return `## Source ${i + 1}: ${entry.title} (relevance: ${entry.relevanceScore.toFixed(1)})
 Category: ${entry.classification.category}
 Tags: ${entry.classification.tags.join(', ') || 'none'}
 
 ${entry.content}`;
-    });
+  });
 
-    const prompt = `You are a knowledge assistant for an enterprise codebase. Answer the question based ONLY on the provided context.
+  const prompt = `You are a knowledge assistant for an enterprise codebase. Answer the question based ONLY on the provided context.
 
 Question: ${question}
 
@@ -442,108 +431,42 @@ Respond with a JSON object:
   "suggestion": "What should be documented (if gap exists)"
 }`;
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1500,
-      messages: [{ role: 'user', content: prompt }],
-    });
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1500,
+    messages: [{ role: 'user', content: prompt }],
+  });
 
-    // Parse the response
-    const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
+  // Parse the response
+  const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
 
-    // Try to parse as JSON
-    try {
-      // Extract JSON from response (it might be wrapped in markdown code blocks)
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          answer: parsed.answer || responseText,
-          suggestedFollowups: parsed.suggestedFollowups || [],
-          gapDetection: parsed.hasKnowledgeGap
-            ? {
-                hasGap: true,
-                missingInfo: parsed.missingInfo,
-                suggestion: parsed.suggestion,
-              }
-            : undefined,
-        };
-      }
-    } catch {
-      // JSON parsing failed, use raw response
+  // Try to parse as JSON
+  try {
+    // Extract JSON from response (it might be wrapped in markdown code blocks)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        answer: parsed.answer || responseText,
+        suggestedFollowups: parsed.suggestedFollowups || [],
+        gapDetection: parsed.hasKnowledgeGap
+          ? {
+              hasGap: true,
+              missingInfo: parsed.missingInfo,
+              suggestion: parsed.suggestion,
+            }
+          : undefined,
+      };
     }
-
-    // Fallback: use raw response
-    return {
-      answer: responseText,
-      suggestedFollowups: [],
-    };
-  } catch (error) {
-    // AI synthesis failed, use fallback
-    console.error('AI synthesis failed:', error);
-    return createFallbackAnswer(question, relevantEntries, keywords);
-  }
-}
-
-/**
- * Create a fallback answer when AI is unavailable
- */
-function createFallbackAnswer(
-  _question: string,
-  entries: RankedEntry[],
-  keywords: string[]
-): {
-  answer: string;
-  suggestedFollowups: string[];
-  gapDetection?: { hasGap: boolean; missingInfo?: string; suggestion?: string };
-} {
-  if (entries.length === 0) {
-    return {
-      answer: 'No relevant information found in the knowledge base for this question.',
-      suggestedFollowups: [],
-      gapDetection: {
-        hasGap: true,
-        missingInfo: `No documentation found related to: ${keywords.join(', ')}`,
-        suggestion: 'Consider using kahuna_learn to add relevant documentation',
-      },
-    };
+  } catch {
+    // JSON parsing failed, use raw response
   }
 
-  const lines: string[] = [];
-  lines.push(
-    `Based on the knowledge base, here are the most relevant findings for your question:\n`
-  );
-
-  for (let i = 0; i < Math.min(3, entries.length); i++) {
-    const entry = entries[i];
-    const excerpt = extractExcerpt(entry.content, keywords, 300);
-    lines.push(`### From: ${entry.title}`);
-    lines.push(`${excerpt}\n`);
-  }
-
-  lines.push(
-    '\n*Note: AI synthesis is unavailable. These are direct excerpts from the knowledge base.*'
-  );
-
+  // Fallback: use raw response
   return {
-    answer: lines.join('\n'),
+    answer: responseText,
     suggestedFollowups: [],
-    gapDetection:
-      entries[0].relevanceScore < 5
-        ? {
-            hasGap: true,
-            missingInfo: 'Low relevance match - answer may not fully address the question',
-            suggestion: 'Try rephrasing the question or add more specific documentation',
-          }
-        : undefined,
   };
-}
-
-/**
- * Get the knowledge base directory from environment or default
- */
-function getKnowledgeBaseDir(): string {
-  return process.env.KAHUNA_KNOWLEDGE_DIR || '.kahuna-knowledge';
 }
 
 /**
@@ -551,12 +474,10 @@ function getKnowledgeBaseDir(): string {
  *
  * Process flow:
  * 1. Validate input
- * 2. Check cache for existing answer
- * 3. Extract keywords from question
- * 4. Search and rank knowledge base entries
- * 5. Synthesize answer using Claude (or fallback)
- * 6. Cache the result
- * 7. Return formatted answer
+ * 2. Extract keywords from question
+ * 3. Search and rank knowledge base entries
+ * 4. Synthesize answer using Claude
+ * 5. Return formatted answer
  *
  * @param args - Tool arguments from MCP client
  * @param storage - Knowledge storage service instance
@@ -577,9 +498,6 @@ export async function askToolHandler(
   }
 
   try {
-    // Initialize cache
-    const cacheService = new AnswerCacheService(getKnowledgeBaseDir());
-
     // Step 1: Get all active entries
     const allEntries = await storage.list({ status: 'active' });
 
@@ -598,39 +516,13 @@ export async function askToolHandler(
               missingInfo: 'Knowledge base is empty',
               suggestion: 'Use kahuna_learn to add files to the knowledge base',
             },
-            cached: false,
           },
           question
         ),
       });
     }
 
-    // Step 2: Generate KB version and check cache
-    const kbVersion = generateKbVersion(allEntries);
-    const cachedAnswer = await cacheService.get(question, kbVersion);
-
-    if (cachedAnswer) {
-      // Return cached answer
-      return successResponse({
-        message: 'Answer retrieved from cache',
-        cached: true,
-        answer: formatAnswer(
-          {
-            answer: cachedAnswer.answer,
-            confidence: cachedAnswer.confidence,
-            sources: cachedAnswer.sources,
-            suggestedFollowups: cachedAnswer.suggestedFollowups,
-            cached: true,
-          },
-          question
-        ),
-        confidence: cachedAnswer.confidence,
-        sources: cachedAnswer.sources,
-        cacheStats: await cacheService.getStats(),
-      });
-    }
-
-    // Step 3: Extract keywords from question
+    // Step 2: Extract keywords from question
     const keywords = extractKeywords(question);
 
     if (keywords.length === 0) {
@@ -639,7 +531,7 @@ export async function askToolHandler(
       });
     }
 
-    // Step 4: Rank entries by relevance
+    // Step 3: Rank entries by relevance
     const rankedEntries = allEntries
       .map((entry) => calculateRelevance(entry, keywords))
       .filter((entry) => entry.relevanceScore > 0)
@@ -648,7 +540,7 @@ export async function askToolHandler(
     // Take top entries for synthesis
     const topEntries = rankedEntries.slice(0, 5);
 
-    // Step 5: Build sources
+    // Step 4: Build sources
     const sources: AnswerSource[] = topEntries.map((entry) => ({
       title: entry.title,
       slug: entry.slug,
@@ -657,10 +549,10 @@ export async function askToolHandler(
       category: entry.classification.category,
     }));
 
-    // Step 6: Determine confidence
+    // Step 5: Determine confidence
     const confidence = determineConfidence(sources);
 
-    // Step 7: Synthesize answer
+    // Step 6: Synthesize answer using LLM
     const synthesis = await synthesizeAnswer(question, topEntries, keywords);
 
     // Build result
@@ -670,33 +562,17 @@ export async function askToolHandler(
       sources,
       suggestedFollowups: synthesis.suggestedFollowups,
       gapDetection: synthesis.gapDetection,
-      cached: false,
     };
 
-    // Step 8: Cache the result
-    await cacheService.set(
-      question,
-      {
-        question,
-        answer: result.answer,
-        confidence: result.confidence,
-        sources: result.sources,
-        suggestedFollowups: result.suggestedFollowups,
-      },
-      kbVersion
-    );
-
-    // Step 9: Return formatted response
+    // Step 7: Return formatted response
     return successResponse({
       message: `Answer synthesized with ${confidence} confidence from ${sources.length} source(s)`,
-      cached: false,
       answer: formatAnswer(result, question),
       confidence: result.confidence,
       sources: result.sources,
       suggestedFollowups: result.suggestedFollowups,
       gapDetection: result.gapDetection,
       keywords,
-      cacheStats: await cacheService.getStats(),
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

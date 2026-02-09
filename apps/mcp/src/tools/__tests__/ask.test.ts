@@ -2,24 +2,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KnowledgeEntry, KnowledgeStorageService } from '../../storage/index.js';
 import { askToolDefinition, askToolHandler } from '../ask.js';
 
-// Mock the Anthropic client
+// Mock the Anthropic client - use a factory function to ensure fresh mock each time
+const createMockAnthropicClient = () => ({
+  messages: {
+    create: vi.fn().mockResolvedValue({
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            answer: 'This is a synthesized answer based on the context.',
+            suggestedFollowups: ['What about error handling?', 'How do we test this?'],
+            hasKnowledgeGap: false,
+          }),
+        },
+      ],
+    }),
+  },
+});
+
 vi.mock('@anthropic-ai/sdk', () => ({
-  default: vi.fn().mockImplementation(() => ({
-    messages: {
-      create: vi.fn().mockResolvedValue({
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              answer: 'This is a synthesized answer based on the context.',
-              suggestedFollowups: ['What about error handling?', 'How do we test this?'],
-              hasKnowledgeGap: false,
-            }),
-          },
-        ],
-      }),
-    },
-  })),
+  default: vi.fn(() => createMockAnthropicClient()),
 }));
 
 /**
@@ -100,12 +102,13 @@ describe('askToolHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStorage = createMockStorage();
-    // Mock environment with API key
+    // Mock environment with API key for Anthropic SDK
     process.env = { ...originalEnv, ANTHROPIC_API_KEY: 'test-key' };
   });
 
   afterEach(() => {
     process.env = originalEnv;
+    vi.resetAllMocks();
   });
 
   describe('input validation', () => {
@@ -428,18 +431,6 @@ describe('askToolHandler', () => {
       expect(response.data.keywords).toContain('authentication');
       expect(response.data.keywords).toContain('tokens');
     });
-
-    it('includes cache stats', async () => {
-      const entries = [createMockEntry()];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await askToolHandler({ question: 'How does testing work?' }, mockStorage);
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.data.cacheStats).toBeDefined();
-      expect(response.data.cacheStats).toHaveProperty('entryCount');
-      expect(response.data.cacheStats).toHaveProperty('hitRate');
-    });
   });
 
   describe('error handling', () => {
@@ -453,37 +444,6 @@ describe('askToolHandler', () => {
       expect(response.success).toBe(false);
       expect(response.error).toContain('Failed to answer question');
       expect(response.error).toContain('Storage unavailable');
-    });
-  });
-
-  describe('fallback behavior', () => {
-    it('uses fallback when API key is not set', async () => {
-      // Remove API key by setting to undefined
-      process.env.ANTHROPIC_API_KEY = undefined as unknown as string;
-
-      const entries = [
-        createMockEntry({
-          slug: 'api-docs',
-          title: 'API Documentation',
-          content: 'The API rate limit is 100 requests per minute.',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['api', 'rate-limit'],
-            topics: ['api'],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await askToolHandler({ question: 'What is the API rate limit?' }, mockStorage);
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
-      // Fallback should include excerpts from the knowledge base
-      expect(response.data.answer).toContain('knowledge base');
     });
   });
 });
