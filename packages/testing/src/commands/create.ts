@@ -62,7 +62,7 @@ function listAvailableScenarios(repoRoot: string): string[] {
 
   return fs
     .readdirSync(scenariosDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith('level-'))
+    .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
 }
 
@@ -114,9 +114,8 @@ export async function createCommand(options: {
     process.exit(1);
   }
 
-  // Generate project name with short random suffix
-  const suffix = Math.random().toString(36).substring(2, 7);
-  const projectName = options.name || `${scenario}-${suffix}`;
+  // Use scenario name directly as project name (or custom name if provided)
+  const projectName = options.name || scenario;
 
   // Define paths
   const templatesDir = path.join(repoRoot, 'packages', 'vck-templates', 'templates');
@@ -160,16 +159,16 @@ export async function createCommand(options: {
     console.warn(`  ⚠ Copilot config not found at: ${copilotSrc}`);
   }
 
-  // 3. Copy scenario CLAUDE.md (copilot-visible project context)
+  // 3. Copy scenario project-context.md (copilot-visible project context)
   const scenarioDir = path.join(scenariosDir, scenario);
-  const claudeMdSrc = path.join(scenarioDir, 'CLAUDE.md');
-  const claudeMdDest = path.join(projectPath, 'CLAUDE.md');
-  if (fs.existsSync(claudeMdSrc)) {
+  const projectContextSrc = path.join(scenarioDir, 'project-context.md');
+  const projectContextDest = path.join(projectPath, 'project-context.md');
+  if (fs.existsSync(projectContextSrc)) {
     console.log('  Copying scenario context...');
-    copyFile(claudeMdSrc, claudeMdDest);
-    console.log('    ✓ CLAUDE.md');
+    copyFile(projectContextSrc, projectContextDest);
+    console.log('    ✓ project-context.md');
   } else {
-    console.warn(`  ⚠ Scenario CLAUDE.md not found: ${claudeMdSrc}`);
+    console.warn(`  ⚠ Scenario project-context.md not found: ${projectContextSrc}`);
   }
 
   // 4. Copy scenario knowledge-base/ (copilot-visible business context)

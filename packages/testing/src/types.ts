@@ -10,7 +10,7 @@
  * after the collect phase.
  */
 export interface TestMetadata {
-  /** Which scenario was used (e.g., "level-1-customer-support") */
+  /** Which scenario was used (e.g., "customer-support-agent") */
   scenario: string;
   /** Copilot used for the test (e.g., "claude-code") */
   copilot: string;
@@ -30,7 +30,7 @@ export interface TestMetadata {
  * Scenario info parsed from a scenario directory.
  */
 export interface ScenarioInfo {
-  /** Directory name (e.g., "level-1-customer-support") */
+  /** Directory name (e.g., "customer-support-agent") */
   name: string;
   /** Whether the scenario has a CLAUDE.md */
   hasClaude: boolean;

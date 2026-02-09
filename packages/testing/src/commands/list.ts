@@ -11,27 +11,15 @@ import * as path from 'node:path';
 import { findRepoRoot, getProjectsDir, getScenariosDir } from '../utils.js';
 
 /**
- * Parse a scenario directory for display info
+ * Format a scenario directory name for display.
+ * Converts kebab-case to Title Case.
+ * e.g., "customer-support-agent" → "Customer Support Agent"
  */
 function getScenarioDescription(scenarioName: string): string {
-  // Extract level and descriptive name from directory name
-  // e.g., "level-1-customer-support" → "Basic — Customer support agent"
-  const match = scenarioName.match(/^level-(\d+)-(.+)$/);
-  if (!match) {
-    return scenarioName;
-  }
-
-  const level = Number.parseInt(match[1], 10);
-  const name = match[2].replace(/-/g, ' ');
-
-  const levelLabels: Record<number, string> = {
-    1: 'Basic',
-    2: 'Intermediate',
-    3: 'Advanced',
-  };
-
-  const levelLabel = levelLabels[level] || `Level ${level}`;
-  return `${levelLabel} — ${name.charAt(0).toUpperCase() + name.slice(1)}`;
+  return scenarioName
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 /**
@@ -84,7 +72,7 @@ export async function listCommand(): Promise<void> {
   if (fs.existsSync(scenariosDir)) {
     const scenarios = fs
       .readdirSync(scenariosDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory() && entry.name.startsWith('level-'))
+      .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .sort();
 

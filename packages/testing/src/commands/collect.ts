@@ -111,12 +111,11 @@ function detectScenario(projectPath: string): {
     }
   }
 
-  // If no metadata, try to infer from project name
+  // If no metadata, use project folder name as scenario name
   const projectName = path.basename(projectPath);
-  const scenarioMatch = projectName.match(/^(level-\d+-[a-z-]+)/);
 
   return {
-    scenario: scenarioMatch ? scenarioMatch[1] : 'unknown',
+    scenario: projectName,
     copilot: 'unknown',
     framework: 'unknown',
     createdAt: new Date().toISOString(),
