@@ -21,21 +21,9 @@ Trigger this skill when the user asks to:
 
 ## Process
 
-### Step 1: Get Rules from Knowledge Base
+> **Note:** This skill assumes organizational and IT rules are already available in the conversation context from the `kahuna_prepare_context` call at conversation start (per CLAUDE.md rules).
 
-Call `kahuna_prepare_context` to retrieve organizational rules:
-
-```
-kahuna_prepare_context({
-  "task": "Verify agent code against organizational policies, security rules, and framework best practices"
-})
-```
-
-This returns rules from the knowledge base including:
-- **Organizational rules** - Company-specific coding standards and data handling policies
-- **IT/Security rules** - Security requirements, compliance standards, secrets management
-
-### Step 2: Load Framework Skill
+### Step 1: Load Framework Skill
 
 Check `.claude/skills/` for the relevant framework skill based on what the agent uses:
 
@@ -45,7 +33,7 @@ Check `.claude/skills/` for the relevant framework skill based on what the agent
 
 The framework skill defines best practices, required patterns, and anti-patterns specific to that framework. Load and reference it during verification.
 
-### Step 3: Discover Agent Files
+### Step 2: Discover Agent Files
 
 Locate agent implementation files in the project. Check these common locations:
 
@@ -65,12 +53,12 @@ Locate agent implementation files in the project. Check these common locations:
 
 Use `list_files` or similar to discover the actual structure, then read relevant files.
 
-### Step 4: Verify Code Against Rules
+### Step 3: Verify Code Against Rules
 
-For each rule from Steps 1 and 2, analyze the agent code:
+Analyze the agent code against all available rules:
 
-1. **Organizational rules** - Check code against company policies from knowledge base
-2. **IT/Security rules** - Check code against security requirements from knowledge base
+1. **Organizational rules** - Check code against company policies from conversation context
+2. **IT/Security rules** - Check code against security requirements from conversation context
 3. **Framework best practices** - Check code against patterns from the framework skill
 
 For each rule, determine:
@@ -78,7 +66,7 @@ For each rule, determine:
 - ⚠️ **Warning** - Potential concern worth reviewing
 - ❌ **Issue** - Clear violation that needs fixing
 
-### Step 5: Generate Report
+### Step 4: Generate Report
 
 Output a structured verification report:
 
