@@ -14,12 +14,17 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type {
-  ContentBlock,
-  Tool,
-  ToolResultBlockParam,
-} from '@anthropic-ai/sdk/resources/messages';
+import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages';
+import { z } from 'zod';
+import { executeKnowledgeTool, knowledgeTools } from '../agents/index.js';
 import type { KnowledgeStorageService } from '../storage/index.js';
+import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
+
+/**
+ * Agent configuration constants
+ */
+const AGENT_MAX_ITERATIONS = 10;
+const AGENT_MAX_TOKENS = 2000;
 
 /**
  * Tool definition for MCP registration.
@@ -60,115 +65,14 @@ Searches the knowledge base and synthesizes an answer with source citations.
 };
 
 /**
- * Input type for the tool.
+ * Zod schema for validating ask tool input.
  */
-interface AskToolInput {
-  question: string;
-}
-
-/**
- * MCP tool response format.
- */
-interface MCPToolResponse {
-  [key: string]: unknown;
-  content: Array<{
-    type: 'text';
-    text: string;
-  }>;
-  isError?: boolean;
-}
-
-/**
- * Helper to create a success response.
- */
-function successResponse(data: unknown): MCPToolResponse {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({ success: true, data }, null, 2),
-      },
-    ],
-  };
-}
-
-/**
- * Helper to create an error response.
- */
-function errorResponse(message: string, details?: unknown): MCPToolResponse {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({ success: false, error: message, details }, null, 2),
-      },
-    ],
-    isError: true,
-  };
-}
-
-/**
- * Internal tools for the agent to explore the knowledge base
- */
-const agentTools: Tool[] = [
-  {
-    name: 'list_knowledge_files',
-    description:
-      'List all files in the knowledge base. Returns file names (slugs) and titles to help you decide which files to read.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {},
-      required: [],
-    },
-  },
-  {
-    name: 'read_knowledge_file',
-    description:
-      'Read the full content of a specific knowledge base file. Use this after listing files to read ones that seem relevant to the question.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        slug: {
-          type: 'string',
-          description: 'The file slug (filename without extension) to read',
-        },
-      },
-      required: ['slug'],
-    },
-  },
-];
-
-/**
- * Execute an agent tool call
- */
-async function executeAgentTool(
-  toolName: string,
-  toolInput: Record<string, unknown>,
-  storage: KnowledgeStorageService
-): Promise<string> {
-  switch (toolName) {
-    case 'list_knowledge_files': {
-      const entries = await storage.list({ status: 'active' });
-      if (entries.length === 0) {
-        return 'No files in knowledge base.';
-      }
-      const fileList = entries.map((e) => `- ${e.slug}: "${e.title}"`).join('\n');
-      return `Knowledge base files:\n${fileList}`;
-    }
-
-    case 'read_knowledge_file': {
-      const slug = toolInput.slug as string;
-      const entry = await storage.get(slug);
-      if (!entry) {
-        return `File not found: ${slug}`;
-      }
-      return `# ${entry.title}\n\n${entry.content}`;
-    }
-
-    default:
-      return `Unknown tool: ${toolName}`;
-  }
-}
+const askInputSchema = z.object({
+  question: z
+    .string({ error: 'Missing or empty question' })
+    .transform((val) => val.trim())
+    .refine((val) => val.length > 0, { message: 'Missing or empty question' }),
+});
 
 /**
  * Synthesize answer using an agentic Claude loop
@@ -208,13 +112,12 @@ Guidelines:
   ];
 
   // Agentic loop - let Claude use tools until it has an answer
-  const maxIterations = 10;
-  for (let i = 0; i < maxIterations; i++) {
+  for (let i = 0; i < AGENT_MAX_ITERATIONS; i++) {
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      max_tokens: AGENT_MAX_TOKENS,
       system: systemPrompt,
-      tools: agentTools,
+      tools: knowledgeTools,
       messages,
     });
 
@@ -244,7 +147,7 @@ Guidelines:
     const toolResults: ToolResultBlockParam[] = [];
     for (const block of toolUseBlocks) {
       if (block.type === 'tool_use') {
-        const result = await executeAgentTool(
+        const result = await executeKnowledgeTool(
           block.name,
           block.input as Record<string, unknown>,
           storage
@@ -277,15 +180,16 @@ export async function askToolHandler(
   args: Record<string, unknown>,
   storage: KnowledgeStorageService
 ): Promise<MCPToolResponse> {
-  const input = args as unknown as AskToolInput;
-  const { question } = input;
-
-  // Validate input
-  if (!question || typeof question !== 'string' || question.trim().length === 0) {
-    return errorResponse('Missing or empty question', {
+  // Validate input with Zod
+  const parseResult = askInputSchema.safeParse(args);
+  if (!parseResult.success) {
+    const issues = parseResult.error.issues.map((i) => i.message).join(', ');
+    return errorResponse(`Invalid input: ${issues}`, {
       hint: 'Provide a clear question about the project',
     });
   }
+
+  const { question } = parseResult.data;
 
   try {
     // Let the agent answer the question
