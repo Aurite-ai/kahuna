@@ -17,9 +17,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
-    "@kahuna/file-router": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "@trpc/client": "^11.9.0",
     "dotenv": "^16.4.0",
     "yaml": "^2.4.0",
     "zod": "^4.3.6"

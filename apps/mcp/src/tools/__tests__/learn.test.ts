@@ -5,7 +5,7 @@ import { KnowledgeStorageError } from '../../storage/index.js';
 import { learnToolDefinition, learnToolHandler } from '../learn.js';
 
 // Mock the file-router module
-vi.mock('@kahuna/file-router', () => ({
+vi.mock('../../categorization/index.js', () => ({
   categorizeFile: vi.fn(),
   FileSizeError: class FileSizeError extends Error {
     constructor(
@@ -28,7 +28,7 @@ vi.mock('node:fs/promises', () => ({
   access: vi.fn(),
 }));
 
-import { FileSizeError, categorizeFile } from '@kahuna/file-router';
+import { FileSizeError, categorizeFile } from '../../categorization/index.js';
 
 /**
  * Create a mock storage service for testing

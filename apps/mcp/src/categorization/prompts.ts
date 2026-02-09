@@ -6,7 +6,7 @@
  * Build the enhanced categorization prompt for a file with metadata extraction
  */
 export function buildCategorizationPrompt(filename: string, content: string): string {
-  return `You are an expert file analyzer. Categorize this file AND extract rich metadata to help understand its purpose and content.
+	return `You are an expert file analyzer. Categorize this file AND extract rich metadata to help understand its purpose and content.
 
 **Categories:**
 

@@ -16,8 +16,8 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { FileSizeError, categorizeFile } from '@kahuna/file-router';
 import { z } from 'zod';
+import { FileSizeError, categorizeFile } from '../categorization/index.js';
 import type { KnowledgeStorageService, SaveKnowledgeEntryInput } from '../storage/index.js';
 import { KnowledgeStorageError } from '../storage/index.js';
 import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
