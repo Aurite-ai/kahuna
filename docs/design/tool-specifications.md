@@ -10,11 +10,10 @@
 
 | Tool | Purpose |
 |------|---------|
-| `kahuna_setup` | Initialize new project |
+| `kahuna_initialize` | Initialize new project |
 | `kahuna_learn` | Send files for Kahuna to learn from |
 | `kahuna_prepare_context` | Prepare context/ for a task |
 | `kahuna_ask` | Quick Q&A |
-| `kahuna_review` | Check files against patterns/policies |
 | `kahuna_sync` | Sync all changes (deferred) |
 
 ---
@@ -39,24 +38,24 @@ Each tool spec includes:
 
 ---
 
-## 1. kahuna_setup
+## 1. kahuna_initialize
 
 ### Tool Description
 
 ```
-Set up a new LangGraph agent project with Kahuna integration.
+Initialize a new LangGraph agent project with Kahuna integration.
 
 USE THIS TOOL WHEN:
 - User wants to start a new agent project
-- User says "create", "setup", "start", "new project", or similar
+- User says "create", "initialize", "setup", "start", "new project", or similar
 - An empty directory needs to be set up for LangGraph development
 
 <examples>
 ### Basic setup
-kahuna_setup(project_name="customer-support-agent")
+kahuna_initialize(project_name="customer-support-agent")
 
 ### With description
-kahuna_setup(
+kahuna_initialize(
   project_name="support-agent",
   description="AI agent that answers customer questions from our docs"
 )
@@ -114,7 +113,7 @@ Created LangGraph agent project structure with Kahuna integration.
 
 ### Output Structure
 
-`kahuna_setup` creates the following project structure:
+`kahuna_initialize` creates the following project structure:
 
 ```
 project-name/
@@ -509,114 +508,13 @@ The project uses keyword-based search for these reasons:
 
 ---
 
-## 6. kahuna_review
-
-### Tool Description
-
-```
-Review files against patterns and policies from context and knowledge base.
-
-USE THIS TOOL WHEN:
-- Before committing code
-- After completing implementation
-- User asks to "review", "check", or "validate" their work
-- Want to verify alignment with project standards
-
-Checks against context/ first (if exists), then ~/.kahuna knowledge base for additional patterns/policies.
-
-<examples>
-### Review implementation
-kahuna_review(files=["src/agent/tools.py"])
-
-### Review multiple files
-kahuna_review(files=["src/agent/tools.py", "src/agent/graph.py"])
-
-### Focus on specific aspects
-kahuna_review(
-  files=["src/agent/tools.py"],
-  focus=["error-handling", "api-standards"]
-)
-</examples>
-
-<hints>
-- Uses both project context/ AND knowledge base
-- Run before committing to catch issues early
-- Provides specific suggestions for any deviations
-</hints>
-```
-
-### Input Schema
-
-```typescript
-{
-  files: string[],           // Required: Files to analyze
-  focus?: string[]           // Optional: Specific patterns/policies to check
-}
-```
-
-### Response Format
-
-```markdown
-# Analysis Results
-
-Analyzed **2 files** against project standards.
-
-## Summary
-
-| Status | Count |
-|--------|-------|
-| ✅ Aligned | 3 |
-| ⚠️ Minor issue | 1 |
-
----
-
-## src/agent/tools.py
-
-### ✅ Aligned: Search Approach
-Uses keyword search as documented in context/search-decision.md.
-
-### ⚠️ Minor: Error Handling
-Missing try/except pattern from context/error-patterns.md.
-
-**Suggestion:**
-```python
-try:
-    results = search(query)
-except SearchError as e:
-    return f"Search failed: {e}"
-```
-
----
-
-<hints>
-- One minor issue to fix in tools.py
-- After fixing, ready to commit
-- If the deviation is intentional, update the pattern in context/
-</hints>
-```
-
-### MVP Scope
-
-**Build first:**
-- Accept files to analyze
-- Compare against patterns/policies in context/
-- Return basic compliance report
-
-**Future enhancements:**
-- LLM-powered code analysis
-- Specific fix suggestions with code
-- Auto-fix option for simple issues
-- Learn from accepted deviations
-
----
-
 ## Tool Categories
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
 | **Building Knowledge Base** | `kahuna_learn`, `kahuna_sync` | Populate ~/.kahuna |
-| **Environment Setup** | `kahuna_setup`, `kahuna_prepare_context` | Prepare project |
-| **Assistance** | `kahuna_ask`, `kahuna_review` | Help copilot (uses context + KB) |
+| **Environment Setup** | `kahuna_initialize`, `kahuna_prepare_context` | Prepare project |
+| **Assistance** | `kahuna_ask` | Help copilot (uses context + KB) |
 
 ## Implementation Priority
 
@@ -624,14 +522,13 @@ Based on vibe coder workflow and MVP constraints:
 
 | Priority | Tool | Why |
 |----------|------|-----|
-| 1 | **kahuna_setup** | Required to start any project |
+| 1 | **kahuna_initialize** | Required to start any project |
 | 2 | **kahuna_learn** | Builds knowledge base (already in progress) |
 | 3 | **kahuna_prepare_context** | Core value prop - surfacing context |
 | 4 | **kahuna_ask** | Assistance using context + KB |
-| 5 | **kahuna_review** | Quality check using context + KB |
-| 6 | **kahuna_sync** | Nice-to-have automation (deferred) |
+| 5 | **kahuna_sync** | Nice-to-have automation (deferred) |
 
-**MVP Target:** Tools 1-5 working, tool 6 deferred.
+**MVP Target:** Tools 1-4 working, tool 5 deferred.
 
 ---
 
@@ -677,3 +574,4 @@ Tool descriptions contain full steering context. The agent always knows when to 
 - v4.1 (2026-02-05): Expanded kahuna_setup to show full output structure including copilot configuration
 - v4.2 (2026-02-05): Fixed kahuna_learn response to correctly show storage location (~/.kahuna)
 - v5.0 (2026-02-05): Promoted to docs/design/; updated links and status to Final
+- v6.0 (2026-02-09): Renamed kahuna_setup → kahuna_initialize; removed kahuna_review (now skill-based verification); 4 active tools + 1 deferred

@@ -20,9 +20,10 @@
     "db:push": "pnpm --filter @kahuna/api db:push",
     "db:studio": "pnpm --filter @kahuna/api db:studio",
     "db:reset": "pnpm --filter @kahuna/api db:reset",
-    "test:init": "node packages/testing/dist/cli.js init",
+    "kahuna-test": "node packages/testing/dist/cli.js",
     "test:create": "node packages/testing/dist/cli.js create",
-    "test:submit": "node packages/testing/dist/cli.js submit"
+    "test:list": "node packages/testing/dist/cli.js list",
+    "test:collect": "node packages/testing/dist/cli.js collect"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

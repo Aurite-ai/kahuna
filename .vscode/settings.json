@@ -17,6 +17,15 @@
   "files.associations": {
     "*.tsx": "typescriptreact",
     "*.ts": "typescript",
-     "*.mdc": "markdown"
+    "*.mdc": "markdown"
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/.turbo": true,
+    "**/node_modules": true
   }
 }

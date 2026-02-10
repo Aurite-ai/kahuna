@@ -9,14 +9,12 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@kahuna/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

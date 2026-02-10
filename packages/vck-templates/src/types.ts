@@ -4,6 +4,46 @@
  * Types specific to template management and VCK generation.
  */
 
+// ── VCK structure types (moved from @kahuna/shared) ──
+
+/**
+ * VCK metadata - tracking information for the generated kit.
+ */
+export interface VCKMetadata {
+  /** Project this VCK was generated for */
+  projectId: string;
+  /** ISO timestamp when VCK was generated */
+  generatedAt: string;
+  /** VCK format version (for compatibility) */
+  version: string;
+}
+
+/**
+ * VCK context - business information from user's context files.
+ */
+export interface VCKContext {
+  /** Summary of the user's business/project */
+  businessSummary: string;
+  /** Additional context files as key-value pairs (filename -> content) */
+  files: Record<string, string>;
+}
+
+/**
+ * VCK structure - the complete kit returned to users.
+ */
+export interface VCK {
+  /** Tracking and version information */
+  metadata: VCKMetadata;
+  /** User's business context */
+  context: VCKContext;
+  /** Copilot rules and guidelines */
+  rules: string[];
+  /** Boilerplate files (filename -> content) */
+  boilerplate: Record<string, string>;
+}
+
+// ── Template types ──
+
 /**
  * Template metadata for a framework template.
  */

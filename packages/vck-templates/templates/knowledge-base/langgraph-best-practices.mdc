@@ -1,0 +1,277 @@
+---
+type: knowledge
+title: LangGraph Best Practices
+summary: >
+  Comprehensive reference for building LangGraph agent workflows including core
+  concepts, graph construction patterns, state management, advanced patterns
+  like Send API and Command, and production-ready code examples.
+created_at: "2026-02-10T00:00:00Z"
+updated_at: "2026-02-10T00:00:00Z"
+
+source:
+  file: langgraph-best-practices.mdc
+  project: null
+  path: null
+
+classification:
+  category: reference
+  confidence: 1.0
+  reasoning: >
+    Seed content providing technical reference documentation for the LangGraph
+    framework. Covers API patterns, state management, and code examples.
+  topics:
+    - LangGraph
+    - Agent Workflows
+    - State Management
+    - Python AI Agents
+    - Structured Output
+
+status: active
+---
+
+# LangGraph Best Practices
+
+## Core Concepts
+
+LangGraph models agent workflows as graphs with three key components:
+
+1. **State**: A shared data structure representing the current snapshot of your application
+   - Use TypedDict or Pydantic BaseModel for schema definition
+   - Define reducers to specify how updates are applied to each state key
+   - Default reducer overwrites values; use Annotated types for custom reducers (e.g., operator.add for lists)
+   - For message-based workflows, use MessagesState or the add_messages reducer
+
+2. **Nodes**: Functions that encode logic and perform computation
+   - Accept state as input, perform work, return state updates
+   - Can be synchronous or asynchronous Python functions
+   - Can accept optional config (RunnableConfig) and runtime (Runtime) parameters
+   - Nodes do the work - they contain LLM calls or regular code
+   - Add nodes with builder.add_node("node_name", node_function)
+
+3. **Edges**: Functions that determine which node executes next
+   - Edges tell what to do next based on current state
+   - Normal edges: Direct transitions with add_edge("node_a", "node_b")
+   - Conditional edges: Dynamic routing with add_conditional_edges("node_a", routing_function)
+   - Use START constant for entry points, END for terminal nodes
+   - Multiple outgoing edges execute destination nodes in parallel
+
+## Graph Construction Pattern
+
+1. Define State schema (TypedDict or Pydantic model)
+2. Create StateGraph: builder = StateGraph(State)
+3. Add nodes: builder.add_node("name", function)
+4. Add edges: builder.add_edge(START, "first_node") and builder.add_edge("node_a", "node_b")
+5. Add conditional edges if needed: builder.add_conditional_edges("node", routing_func)
+6. Compile: graph = builder.compile()
+
+## State Management
+
+- **Multiple Schemas**: Use InputState, OutputState, OverallState, and PrivateState for different node communication patterns
+- **Reducers**: Annotate state keys with reducer functions to control update behavior
+  - Default: Overwrite existing value
+  - operator.add: Append to lists
+  - add_messages: Smart message list management with ID tracking
+- **MessagesState**: Prebuilt state for chat applications with messages key using add_messages reducer
+
+## Advanced Patterns
+
+- **Send API**: For map-reduce patterns, return Send objects from conditional edges to dynamically create parallel branches
+- **Command**: Combine state updates and routing in a single node by returning Command(update={...}, goto="next_node")
+  - Use Command when you need both state updates AND routing decisions
+  - Requires type annotation: Command[Literal["node_name"]]
+  - Command adds dynamic edges but doesn't override static edges
+- **Subgraphs**: Use Command.PARENT to navigate from subgraph nodes to parent graph nodes
+
+## Execution Model
+
+- Graph uses message passing with discrete "super-steps"
+- Nodes in parallel are part of same super-step
+- Sequential nodes belong to separate super-steps
+- Execution terminates when all nodes are inactive and no messages in transit
+
+## Important Requirements
+
+- **MUST compile graph** before use: graph = builder.compile()
+- Use START constant for entry points, END for terminal nodes
+- Import required: from langgraph.graph import StateGraph, START, END
+- For messages: from langgraph.graph.message import add_messages
+- For commands: from langgraph.types import Command, Send
+
+## LLM Usage
+
+When calling llms, such as through ChatAnthropic, always specify structured output and call the models with .with_structured_output. Also specify method="json_schema".
+
+Here is an example code snippet:
+```
+from langchain_anthropic import ChatAnthropic
+from pydantic import BaseModel, Field
+
+model = ChatAnthropic(model="claude-sonnet-4-5-20250929")
+
+class Movie(BaseModel):
+    """A movie with details."""
+    title: str = Field(..., description="The title of the movie")
+    year: int = Field(..., description="The year the movie was released")
+    director: str = Field(..., description="The director of the movie")
+    rating: float = Field(..., description="The movie's rating out of 10")
+
+model_with_structure = model.with_structured_output(Movie, method="json_schema")
+response = model_with_structure.invoke("Provide details about the movie Inception")
+```
+In this code snippet, response will contain an object like Movie(title='Inception', year=2010, director='Christopher Nolan', rating=8.8)
+
+Generate production-ready, well-structured LangGraph workflows following these patterns.
+
+Here is an example workflow for reference:
+
+# Step 1: Define tools and model
+
+from langchain.tools import tool
+from langchain.chat_models import init_chat_model
+
+
+model = init_chat_model(
+    "claude-sonnet-4-5-20250929",
+    temperature=0
+)
+
+
+# Define tools
+@tool
+def multiply(a: int, b: int) -> int:
+    """Multiply a and b.
+
+    Args:
+        a: First int
+        b: Second int
+    """
+    return a * b
+
+
+@tool
+def add(a: int, b: int) -> int:
+    """Adds a and b.
+
+    Args:
+        a: First int
+        b: Second int
+    """
+    return a + b
+
+
+@tool
+def divide(a: int, b: int) -> float:
+    """Divide a and b.
+
+    Args:
+        a: First int
+        b: Second int
+    """
+    return a / b
+
+
+# Augment the LLM with tools
+tools = [add, multiply, divide]
+tools_by_name = {tool.name: tool for tool in tools}
+model_with_tools = model.bind_tools(tools)
+
+# Step 2: Define state
+
+from langchain.messages import AnyMessage
+from typing_extensions import TypedDict, Annotated
+import operator
+
+
+class MessagesState(TypedDict):
+    messages: Annotated[list[AnyMessage], operator.add]
+    llm_calls: int
+
+# Step 3: Define model node
+from langchain.messages import SystemMessage
+
+
+def llm_call(state: dict):
+    """LLM decides whether to call a tool or not"""
+
+    return {
+        "messages": [
+            model_with_tools.invoke(
+                [
+                    SystemMessage(
+                        content="You are a helpful assistant tasked with performing arithmetic on a set of inputs."
+                    )
+                ]
+                + state["messages"]
+            )
+        ],
+        "llm_calls": state.get('llm_calls', 0) + 1
+    }
+
+
+# Step 4: Define tool node
+
+from langchain.messages import ToolMessage
+
+
+def tool_node(state: dict):
+    """Performs the tool call"""
+
+    result = []
+    for tool_call in state["messages"][-1].tool_calls:
+        tool = tools_by_name[tool_call["name"]]
+        observation = tool.invoke(tool_call["args"])
+        result.append(ToolMessage(content=observation, tool_call_id=tool_call["id"]))
+    return {"messages": result}
+
+# Step 5: Define logic to determine whether to end
+
+from typing import Literal
+from langgraph.graph import StateGraph, START, END
+
+
+# Conditional edge function to route to the tool node or end based upon whether the LLM made a tool call
+def should_continue(state: MessagesState) -> Literal["tool_node", END]:
+    """Decide if we should continue the loop or stop based upon whether the LLM made a tool call"""
+
+    messages = state["messages"]
+    last_message = messages[-1]
+
+    # If the LLM makes a tool call, then perform an action
+    if last_message.tool_calls:
+        return "tool_node"
+
+    # Otherwise, we stop (reply to the user)
+    return END
+
+# Step 6: Build agent
+
+# Build workflow
+agent_builder = StateGraph(MessagesState)
+
+# Add nodes
+agent_builder.add_node("llm_call", llm_call)
+agent_builder.add_node("tool_node", tool_node)
+
+# Add edges to connect nodes
+agent_builder.add_edge(START, "llm_call")
+agent_builder.add_conditional_edges(
+    "llm_call",
+    should_continue,
+    ["tool_node", END]
+)
+agent_builder.add_edge("tool_node", "llm_call")
+
+# Compile the agent
+agent = agent_builder.compile()
+
+
+from IPython.display import Image, display
+# Show the agent
+display(Image(agent.get_graph(xray=True).draw_mermaid_png()))
+
+# Invoke
+from langchain.messages import HumanMessage
+messages = [HumanMessage(content="Add 3 and 4.")]
+messages = agent.invoke({"messages": messages})
+for m in messages["messages"]:
+    m.pretty_print()

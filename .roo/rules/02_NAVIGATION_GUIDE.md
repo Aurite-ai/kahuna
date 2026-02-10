@@ -10,6 +10,7 @@ This guide helps developers and AI copilots locate files and understand the proj
 | --------------------------- | -------------------- |
 | Project setup               | `README.md`          |
 | Architecture/design docs    | `docs/architecture/` |
+| Design documents            | `docs/design/`       |
 | How-to guides               | `docs/guides/`       |
 | Reference materials         | `docs/reference/`    |
 | Working docs (current task) | `docs/internal/`     |
@@ -48,21 +49,28 @@ Documentation moves from working space to permanent:
 
 ```
 docs/
-├── architecture/           # Approved designs, system docs
+├── architecture/           # Approved infrastructure designs
+├── design/                 # Product & feature design docs
 ├── guides/                 # How-to instructions
 └── reference/              # Long-term reference materials
 ```
 
 ### Architecture Documents
 
-| Document                            | Contents                                          |
-| ----------------------------------- | ------------------------------------------------- |
-| `01-repository-infrastructure.md`   | Monorepo setup, tooling, TypeScript config        |
-| `02-feedback-loop-architecture.md`  | Data flow, entities, VCK structure, API endpoints |
-| `03-foundational-infrastructure.md` | Auth, middleware, tRPC setup, session management  |
-| `04-system-boundaries.md`           | Infrastructure/loop separation, design principles |
-| `05-frontend-architecture.md`        | React structure, state management, routing       |
-| `product-vision.md`                 | High-level product goals and features             |
+| Document                          | Contents                                               |
+| --------------------------------- | ------------------------------------------------------ |
+| `01-repository-infrastructure.md` | Monorepo setup, tooling, TypeScript config              |
+| `02-context-management-system.md` | Knowledge module architecture, tool pipeline, agents    |
+
+### Design Documents
+
+| Document                       | Contents                                    |
+| ------------------------------ | ------------------------------------------- |
+| `README.md`                    | Product overview, core concepts, index      |
+| `tool-specifications.md`       | MCP tool specs, schemas, response formats   |
+| `knowledge-architecture.md`    | Knowledge base structure, file formats      |
+| `user-journey.md`              | End-to-end copilot usage flow               |
+| `copilot-configuration.md`     | VCK and copilot config design               |
 
 ### Working (`docs/internal/`)
 
@@ -108,24 +116,37 @@ Orchestrator subtask prompts specify exact paths. See `.roo/rules-orchestrator/O
 
 ```
 apps/
-├── api/                    # Express backend (tRPC + Prisma)
-└── mcp/                    # MCP server (stdio) for coding copilots
+└── mcp/                    # MCP server (stdio) — context management tools for copilots
+    └── src/
+        ├── knowledge/      # Knowledge base domain logic
+        │   ├── agents/     # Agent prompts, tools, shared runner
+        │   ├── storage/    # KB storage service, types, utilities
+        │   └── surfacing/  # Context writer (project context/ dir)
+        ├── tools/          # MCP tool handlers (learn, ask, prepare-context, health-check, initialize)
+        ├── config.ts       # Centralized configuration (models, server constants)
+        └── index.ts        # Server entry point
 
 packages/
-├── shared/                 # Shared types, schemas, utilities
-├── vck-templates/          # VCK content (copilot configs, frameworks)
-└── testing/                # Test scenarios and CLI tools
+├── testing/                # QA testing infrastructure
+│   ├── scenarios/          # Test scenarios (customer-support-agent, etc.)
+│   └── src/                # CLI: create, list, collect commands
+└── vck-templates/          # VCK content (copilot configs, framework scaffolds, KB seeds)
+    ├── src/                # Template generator logic
+    └── templates/          # Static template files
+        ├── copilot-configs/  # Copilot configuration templates
+        ├── frameworks/       # Framework boilerplate templates
+        └── knowledge-base/   # KB seed files (.mdc) copied during initialize
 ```
 
 ---
 
 ## Configuration Files
 
-| File                  | Purpose                              |
-| --------------------- | ------------------------------------ |
-| `package.json`        | Root scripts, shared devDependencies |
-| `pnpm-workspace.yaml` | Workspace package locations          |
-| `turbo.json`          | Task runner configuration            |
-| `tsconfig.base.json`  | Shared TypeScript settings           |
-| `biome.json`          | Linting and formatting               |
-| `.env.example`        | Environment variable template        |
+| File                   | Purpose                              |
+| ---------------------- | ------------------------------------ |
+| `package.json`         | Root scripts, shared devDependencies |
+| `pnpm-workspace.yaml`  | Workspace package locations          |
+| `turbo.json`           | Task runner configuration            |
+| `tsconfig.base.json`   | Shared TypeScript settings           |
+| `biome.json`           | Linting and formatting               |
+| `apps/mcp/.env.example`| MCP server environment template      |

@@ -105,6 +105,39 @@ The todo list tracks task progress but shouldn't waste tokens on routine updates
 
 ---
 
+## Common Commands
+
+Essential commands for working in this repo:
+
+| Command | What it does |
+| --- | --- |
+| `pnpm build` | Build all packages (via Turborepo) |
+| `pnpm test` | Run all tests across workspace |
+| `pnpm lint` | Lint entire codebase (Biome) |
+| `pnpm lint:fix` | Lint + auto-fix |
+| `pnpm format` | Format all files (Biome) |
+| `pnpm typecheck` | Type-check all packages |
+| `pnpm clean` | Remove all build artifacts and caches |
+
+### MCP Server (`apps/mcp/`)
+
+| Command | What it does |
+| --- | --- |
+| `pnpm --filter @kahuna/mcp build` | Build MCP server |
+| `pnpm --filter @kahuna/mcp dev` | Run MCP server in watch mode (`tsx watch`) |
+| `pnpm --filter @kahuna/mcp start` | Run built MCP server (`node dist/index.js`) |
+| `pnpm --filter @kahuna/mcp test` | Run MCP tests (Vitest) |
+| `pnpm --filter @kahuna/mcp test:watch` | Run MCP tests in watch mode |
+| `pnpm --filter @kahuna/mcp typecheck` | Type-check MCP server only |
+
+### Tips
+
+- The MCP server uses **stdio** transport — it reads/writes JSON-RPC over stdin/stdout. Use `dev` for local development; connect via an MCP client (e.g., Roo Code, Claude Desktop).
+- Environment config: copy `apps/mcp/.env.example` → `apps/mcp/.env`
+- The `--filter` flag targets a specific workspace package by name.
+
+---
+
 ## Remember
 
 The goal is effective collaboration and quality code, not bureaucratic process. These rules exist to help achieve that goal, not hinder it.

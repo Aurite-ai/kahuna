@@ -9,22 +9,23 @@ These scenarios test a copilot's ability to:
 2. **Execute technical implementation** based on gathered requirements
 3. **Make appropriate design decisions** at varying complexity levels
 
-## Scenario Levels
+## Scenarios
 
-| Level | Scenario | Key Testing Focus |
-|-------|----------|-------------------|
-| 1 | [Customer Support Agent](./level-1-customer-support/) | Tool usage, file security, basic agent patterns |
-| 2 | [Stock Market Reporter](./level-2-stock-reporter/) | 3rd party API auth, tool selection, output formatting |
-| 3 | [SEO Analysis Reporter](./level-3-seo-analyzer/) | Complex integrations, design decisions, LLM-assisted analysis |
+| Scenario | Key Testing Focus |
+|----------|-------------------|
+| [Customer Support Agent](./customer-support-agent/) | Tool usage, file security, basic agent patterns |
+| [Stock Market Reporter](./stock-market-reporter/) | 3rd party API auth, tool selection, output formatting |
+| [SEO Analysis Reporter](./seo-analysis-reporter/) | Complex integrations, design decisions, LLM-assisted analysis |
 
 ## Document Structure
 
-Each scenario level contains:
+Each scenario contains:
 
-- **`CLAUDE.md`** - Project context file for the copilot (copied to test instance root)
+- **`project-context.md`** - Project context file for the copilot (copied to test project root)
 - **`requirements.md`** - Full internal requirements document (what we evaluate against)
 - **`user-prompts.md`** - Natural language prompts a non-technical user would say (what we give the copilot)
 - **`evaluation-criteria.md`** - Rubric for judging copilot performance
+- **`knowledge-base/`** - (optional) Business context files visible to the copilot
 
 ## Testing Methodology
 
@@ -54,21 +55,21 @@ A good copilot should:
                                └─────────────────────────────────────┘
 ```
 
-## Level Progression
+## Scenario Progression
 
-### Level 1: Foundation
+### Customer Support Agent (Foundation)
 - Single tool type (file reading)
 - Clear security boundary (designated folder)
 - Straightforward conversation flow
 - Tests: basic agent patterns, security awareness
 
-### Level 2: Integration
+### Stock Market Reporter (Integration)
 - External API integration (Yahoo Finance)
 - API key configuration guidance
 - Mixed tool/non-tool output (markdown doesn't need tools)
 - Tests: auth handling, knowing when NOT to use tools
 
-### Level 3: Architecture
+### SEO Analysis Reporter (Architecture)
 - Multiple complex APIs (Google, DataForSEO, Perplexity)
 - Design decisions required (how to structure analysis)
 - LLM-in-the-loop for analysis
@@ -76,24 +77,23 @@ A good copilot should:
 
 ## Usage
 
-### Creating a Test Instance
+### Creating a Test Project
 
-Use the script to create an isolated test environment:
+Use the CLI to create an isolated test environment:
 
 ```bash
-cd agent-dev
-./scripts/create-test-instance.sh level-1-customer-support
+pnpm kahuna-test create customer-support-agent
 ```
 
 This combines:
 - Framework scaffold (from `templates/frameworks/langgraph/`)
 - Copilot config (from `templates/copilot-configs/claude-code/.claude/`)
-- Scenario context (CLAUDE.md from the scenario folder)
+- Scenario context (project-context.md and knowledge-base/ from the scenario folder)
 
 ### Manual Testing Flow
 
-1. Create test instance with the script
-2. Follow setup instructions printed by script
+1. Create test project with the CLI
+2. Follow setup instructions printed by the CLI
 3. Start copilot session (e.g., `claude`)
 4. Give copilot the initial prompt from `user-prompts.md`
 5. Respond naturally to copilot questions using guidance notes

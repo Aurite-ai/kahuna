@@ -32,7 +32,7 @@ Sarah works in customer success. She wants to build an AI agent that answers cus
 │                                                                              │
 │           ↓                                                                  │
 │                                                                              │
-│   kahuna_setup(                                                              │
+│   kahuna_initialize(                                                         │
 │     project_name="support-agent",                                            │
 │     description="AI agent that answers customer questions from company docs" │
 │   )                                                                          │
@@ -73,7 +73,7 @@ Sarah works in customer success. She wants to build an AI agent that answers cus
 
 ### Why This Works
 
-- `kahuna_setup` creates a working environment immediately
+- `kahuna_initialize` creates a working environment immediately
 - Curated LangGraph patterns provide real guidance (not placeholders)
 - CLAUDE.md instructs the copilot how to use the project
 - Sarah sees progress, not blank screens
@@ -311,21 +311,15 @@ Sarah is ready to commit her changes and wants to verify they follow company sta
 │                                                                              │
 │   Sarah: "Let's review this before I commit"                                 │
 │                                                                              │
-│   Claude Code calls review to check against patterns/policies                │
+│   Claude Code invokes the verification skill (configured by Kahuna)          │
 │                                                                              │
 │           ↓                                                                  │
 │                                                                              │
-│   kahuna_review(                                                             │
-│     files=["src/agent/tools.py"]                                             │
-│   )                                                                          │
-│                                                                              │
-│           ↓                                                                  │
-│                                                                              │
-│   Kahuna compares file against:                                              │
+│   The skill checks files against:                                            │
 │   1. context/ patterns and policies (already surfaced)                       │
 │   2. ~/.kahuna/ knowledge base patterns                                      │
 │                                                                              │
-│   Response:                                                                  │
+│   Result:                                                                    │
 │   ┌─────────────────────────────────────────────────────────────┐            │
 │   │ # Review: src/agent/tools.py                                │            │
 │   │                                                             │            │
@@ -339,11 +333,6 @@ Sarah is ready to commit her changes and wants to verify they follow company sta
 │   │ **Error format differs from standard** (line 45)            │            │
 │   │ Your code returns: `{"error": "failed"}`                    │            │
 │   │ Standard requires: `{"error": "...", "message": "...", ...}`│            │
-│   │                                                             │            │
-│   │ <hints>                                                     │            │
-│   │ - Fix the error format for consistency                      │            │
-│   │ - Otherwise ready for commit                                │            │
-│   │ </hints>                                                    │            │
 │   └─────────────────────────────────────────────────────────────┘            │
 │                                                                              │
 │   Claude Code offers to fix the issue                                        │
@@ -361,7 +350,7 @@ Sarah is ready to commit her changes and wants to verify they follow company sta
 
 ### Why This Works
 
-- `kahuna_review` checks against accumulated knowledge
+- Verification skill checks against accumulated knowledge
 - Finds specific deviations from established patterns
 - Provides actionable feedback, not vague warnings
 - Sarah's code quality improves without her memorizing standards
@@ -470,6 +459,7 @@ Sarah never:
 - Tagged or categorized documents
 - Searched for relevant context
 - Wrote documentation
+- Memorized coding standards
 
 Yet her project has:
 - Consistent patterns
@@ -485,13 +475,13 @@ Yet her project has:
 
 ### When Each Tool Is Called
 
-| User Intent | Tool | Frequency |
-|-------------|------|-----------|
-| "Start a new project" | `kahuna_setup` | Once per project |
+| User Intent | Tool/Skill | Frequency |
+|-------------|------------|-----------|
+| "Start a new project" | `kahuna_initialize` | Once per project |
 | "Here's our X document" | `kahuna_learn` | When sharing files |
 | "I want to build X" | `kahuna_prepare_context` | Start of each task |
 | "Do we have guidelines for X?" | `kahuna_ask` | Mid-task questions |
-| "Review this before commit" | `kahuna_review` | Before commits |
+| "Review this before commit" | Verification skill | Before commits |
 | "Save what we learned" | `kahuna_sync` | End of session |
 
 ### Copilot Decision Flow
@@ -504,7 +494,7 @@ Yet her project has:
          "New project"    "Build X"        "Here's a file"
                 │                │                │
                 ▼                ▼                ▼
-          kahuna_setup    kahuna_prepare    kahuna_learn
+        kahuna_initialize kahuna_prepare    kahuna_learn
                                _context
                                  │
                                  ▼
@@ -515,7 +505,8 @@ Yet her project has:
          "Question?"      "Review this"    "End of session"
                 │                │                │
                 ▼                ▼                ▼
-           kahuna_ask     kahuna_review     kahuna_sync
+           kahuna_ask     Verification      kahuna_sync
+                             skill
 ```
 
 ---
@@ -525,3 +516,4 @@ Yet her project has:
 - v1.0 (2026-02-05): Initial user journey specification
 - v1.1 (2026-02-05): Updated project structure to include copilot configuration files
 - v2.0 (2026-02-05): Promoted to docs/design/; updated links and status to Final
+- v2.1 (2026-02-09): Renamed kahuna_setup → kahuna_initialize; replaced kahuna_review with verification skill

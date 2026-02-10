@@ -1,41 +1,51 @@
 /**
- * Initialize Tool - Copy copilot configuration to user's working directory
+ * Initialize Tool - Copy copilot configuration and seed knowledge base
  *
  * This tool copies the Claude Code copilot configuration from the VCK templates
- * to the directory where the user is running Claude Code. This sets up the
- * project with the proper rules, skills, and settings for agent development.
+ * to the directory where the user is running Claude Code, and seeds the knowledge
+ * base with starter content from the VCK templates.
  */
 
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
  * Tool definition for MCP registration.
  */
 export const initializeToolDefinition = {
-  name: 'initialize',
-  description: `Initialize a new project with Kahuna copilot configuration.
+  name: 'kahuna_initialize',
+  description: `Initialize a new project with Kahuna copilot configuration and seed the knowledge base.
 
 This tool copies the Claude Code copilot configuration from Kahuna's VCK templates
-to the specified directory. It sets up:
+to the specified directory and seeds the knowledge base with starter content. It sets up:
 - .claude/settings.json - Permissions and default mode
 - .claude/rules/ - Project rules and guidelines
 - .claude/skills/ - Skills
 - .claude/agents/ - Subagents
 - .claude/context/, .claude/plans/ - Empty directories for context and plan files
 - .claude/CLAUDE.md - Main copilot instructions
+- Knowledge base seed files (e.g., framework best practices)
 
 The configuration includes the orchestrator workflow that guides Claude through
 proper architect → code → test cycles for agent development.
 
-Parameters:
-- targetPath: (required) Directory to initialize.
-- overwrite: (optional) Whether to overwrite existing files. Defaults to false.
+<examples>
+### Initialize a project
+kahuna_initialize(targetPath="/path/to/project")
 
-Examples:
-- Initialize: { "targetPath": "/path/to/project" }
-- Overwrite existing: { "targetPath": "/path/to/project", "overwrite": true }`,
+### Overwrite existing config
+kahuna_initialize(targetPath="/path/to/project", overwrite=true)
+</examples>
+
+<hints>
+- targetPath must be an existing directory
+- Set overwrite=true to replace existing files
+- Restart Claude Code after initialization to pick up new config
+- Knowledge base seed files are only copied if they don't already exist (unless overwrite=true)
+</hints>`,
 
   inputSchema: {
     type: 'object' as const,
@@ -62,56 +72,26 @@ interface InitializeToolInput {
 }
 
 /**
- * MCP tool response format.
+ * Check if a path exists (async replacement for fs.existsSync).
  */
-interface MCPToolResponse {
-  [key: string]: unknown;
-  content: Array<{
-    type: 'text';
-    text: string;
-  }>;
-  isError?: boolean;
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Helper to create a success response.
- */
-function successResponse(data: unknown): MCPToolResponse {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({ success: true, data }, null, 2),
-      },
-    ],
-  };
-}
-
-/**
- * Helper to create an error response.
- */
-function errorResponse(message: string, details?: unknown): MCPToolResponse {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({ success: false, error: message, details }, null, 2),
-      },
-    ],
-    isError: true,
-  };
-}
-
-/**
- * Get the absolute path to the VCK templates directory.
+ * Get the absolute path to the VCK copilot config templates directory.
  */
 function getTemplatesPath(): string {
-  // Get the directory of this file
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
 
   // Navigate from apps/mcp/src/tools/ to packages/vck-templates/templates/copilot-configs/claude-code/
-  const templatesPath = path.resolve(
+  return path.resolve(
     __dirname,
     '..',
     '..',
@@ -123,42 +103,69 @@ function getTemplatesPath(): string {
     'copilot-configs',
     'claude-code'
   );
+}
 
-  return templatesPath;
+/**
+ * Get the absolute path to the KB seed templates directory.
+ */
+function getSeedTemplatesPath(): string {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+
+  // Navigate from apps/mcp/src/tools/ to packages/vck-templates/templates/knowledge-base/
+  return path.resolve(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    '..',
+    'packages',
+    'vck-templates',
+    'templates',
+    'knowledge-base'
+  );
+}
+
+/**
+ * Get the knowledge base directory path.
+ * Uses KAHUNA_KNOWLEDGE_DIR env var if set, otherwise defaults to ~/.kahuna/knowledge/
+ */
+function getKnowledgeBaseDir(): string {
+  return process.env.KAHUNA_KNOWLEDGE_DIR || path.join(os.homedir(), '.kahuna', 'knowledge');
 }
 
 /**
  * Recursively copy a directory.
  */
-function copyDirectoryRecursive(
+async function copyDirectoryRecursive(
   source: string,
   target: string,
   overwrite: boolean,
   copiedFiles: string[],
   skippedFiles: string[]
-): void {
+): Promise<void> {
   // Create target directory if it doesn't exist
-  if (!fs.existsSync(target)) {
-    fs.mkdirSync(target, { recursive: true });
+  if (!(await pathExists(target))) {
+    await fs.mkdir(target, { recursive: true });
   }
 
   // Read all items in source directory
-  const items = fs.readdirSync(source);
+  const items = await fs.readdir(source);
 
   for (const item of items) {
     const sourcePath = path.join(source, item);
     const targetPath = path.join(target, item);
-    const stat = fs.statSync(sourcePath);
+    const stat = await fs.stat(sourcePath);
 
     if (stat.isDirectory()) {
       // Recursively copy subdirectories
-      copyDirectoryRecursive(sourcePath, targetPath, overwrite, copiedFiles, skippedFiles);
+      await copyDirectoryRecursive(sourcePath, targetPath, overwrite, copiedFiles, skippedFiles);
     } else {
       // Copy file
-      if (fs.existsSync(targetPath) && !overwrite) {
+      if ((await pathExists(targetPath)) && !overwrite) {
         skippedFiles.push(targetPath);
       } else {
-        fs.copyFileSync(sourcePath, targetPath);
+        await fs.copyFile(sourcePath, targetPath);
         copiedFiles.push(targetPath);
       }
     }
@@ -166,10 +173,57 @@ function copyDirectoryRecursive(
 }
 
 /**
- * Handle the initialize tool call.
+ * Seed the knowledge base with .mdc files from the seed templates directory.
+ *
+ * Scans the seed templates directory for .mdc files and copies them to the
+ * KB directory. Skips files that already exist unless overwrite is true.
+ *
+ * @returns Object with arrays of seeded and skipped file names
+ */
+async function seedKnowledgeBase(
+  overwrite: boolean
+): Promise<{ seeded: string[]; skipped: string[]; kbDir: string }> {
+  const seeded: string[] = [];
+  const skipped: string[] = [];
+
+  const kbDir = getKnowledgeBaseDir();
+  const seedDir = getSeedTemplatesPath();
+
+  // If seed templates directory doesn't exist, return empty results
+  if (!(await pathExists(seedDir))) {
+    return { seeded, skipped, kbDir };
+  }
+
+  // Create KB directory if it doesn't exist
+  if (!(await pathExists(kbDir))) {
+    await fs.mkdir(kbDir, { recursive: true });
+  }
+
+  // Read seed directory for .mdc files (flat scan, no recursion)
+  const items = await fs.readdir(seedDir);
+  const mdcFiles = items.filter((item) => item.endsWith('.mdc'));
+
+  for (const file of mdcFiles) {
+    const sourcePath = path.join(seedDir, file);
+    const targetPath = path.join(kbDir, file);
+
+    if ((await pathExists(targetPath)) && !overwrite) {
+      skipped.push(file);
+    } else {
+      await fs.copyFile(sourcePath, targetPath);
+      seeded.push(file);
+    }
+  }
+
+  return { seeded, skipped, kbDir };
+}
+
+/**
+ * Handle the kahuna_initialize tool call.
  */
 export async function initializeToolHandler(
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  _ctx: ToolContext
 ): Promise<MCPToolResponse> {
   const input = args as unknown as InitializeToolInput;
   const targetPath = input.targetPath;
@@ -180,27 +234,28 @@ export async function initializeToolHandler(
     const absoluteTargetPath = path.resolve(targetPath);
 
     // Verify target directory exists
-    if (!fs.existsSync(absoluteTargetPath)) {
-      return errorResponse(`Target directory does not exist: ${absoluteTargetPath}`, {
-        hint: 'Create the directory first or provide a valid path',
-      });
+    if (!(await pathExists(absoluteTargetPath))) {
+      return markdownResponse(
+        `Target directory does not exist: ${absoluteTargetPath}\n\n<hints>\n- Create the directory first or provide a valid path\n</hints>`,
+        true
+      );
     }
 
     // Verify target is a directory
-    const targetStat = fs.statSync(absoluteTargetPath);
+    const targetStat = await fs.stat(absoluteTargetPath);
     if (!targetStat.isDirectory()) {
-      return errorResponse(`Target path is not a directory: ${absoluteTargetPath}`);
+      return markdownResponse(`Target path is not a directory: ${absoluteTargetPath}`, true);
     }
 
     // Get source template path
     const sourcePath = getTemplatesPath();
 
     // Verify source exists
-    if (!fs.existsSync(sourcePath)) {
-      return errorResponse('VCK templates not found', {
-        expectedPath: sourcePath,
-        hint: 'Make sure you are running this from the Kahuna monorepo',
-      });
+    if (!(await pathExists(sourcePath))) {
+      return markdownResponse(
+        `VCK templates not found at: ${sourcePath}\n\n<hints>\n- Make sure you are running this from the Kahuna monorepo\n</hints>`,
+        true
+      );
     }
 
     // Track copied and skipped files
@@ -211,8 +266,8 @@ export async function initializeToolHandler(
     const claudeSourcePath = path.join(sourcePath, '.claude');
     const claudeTargetPath = path.join(absoluteTargetPath, '.claude');
 
-    if (fs.existsSync(claudeSourcePath)) {
-      copyDirectoryRecursive(
+    if (await pathExists(claudeSourcePath)) {
+      await copyDirectoryRecursive(
         claudeSourcePath,
         claudeTargetPath,
         overwrite,
@@ -225,51 +280,65 @@ export async function initializeToolHandler(
     const claudeMdSource = path.join(sourcePath, 'CLAUDE.md');
     const claudeMdTarget = path.join(absoluteTargetPath, 'CLAUDE.md');
 
-    if (fs.existsSync(claudeMdSource)) {
-      if (fs.existsSync(claudeMdTarget) && !overwrite) {
+    if (await pathExists(claudeMdSource)) {
+      if ((await pathExists(claudeMdTarget)) && !overwrite) {
         skippedFiles.push(claudeMdTarget);
       } else {
-        fs.copyFileSync(claudeMdSource, claudeMdTarget);
+        await fs.copyFile(claudeMdSource, claudeMdTarget);
         copiedFiles.push(claudeMdTarget);
       }
     }
 
-    // Build response message
-    const message = [
-      `Initialized Kahuna copilot configuration in: ${absoluteTargetPath}`,
-      '',
-      `Files copied: ${copiedFiles.length}`,
-    ];
+    // Seed knowledge base
+    const seedResult = await seedKnowledgeBase(overwrite);
+
+    // Build markdown response
+    const copiedRelative = copiedFiles.map((f) => path.relative(absoluteTargetPath, f));
+    const skippedRelative = skippedFiles.map((f) => path.relative(absoluteTargetPath, f));
+
+    let markdown = `# Initialized
+
+Kahuna copilot configuration copied to: \`${absoluteTargetPath}\`
+
+## Copilot Configuration
+
+**Files copied:** ${copiedFiles.length}`;
 
     if (skippedFiles.length > 0) {
-      message.push(
-        `Files skipped (already exist): ${skippedFiles.length}`,
-        '',
-        `To overwrite existing files, use: { "targetPath": "${targetPath}", "overwrite": true }`
-      );
+      markdown += `\n**Files skipped (already exist):** ${skippedFiles.length}`;
+      markdown += `\n\nSkipped files:\n${skippedRelative.map((f) => `- ${f}`).join('\n')}`;
     }
 
-    message.push(
-      'Next steps: Advise the user to stop the current Claude Code instance with Ctrl+C and restart it in order to refresh the conversation to use the new files'
-    );
+    if (copiedFiles.length > 0) {
+      markdown += `\n\nCopied files:\n${copiedRelative.map((f) => `- ${f}`).join('\n')}`;
+    }
 
-    return successResponse({
-      message: message.join('\n'),
-      targetPath: absoluteTargetPath,
-      copiedFiles: copiedFiles.map((f) => path.relative(absoluteTargetPath, f)),
-      skippedFiles: skippedFiles.map((f) => path.relative(absoluteTargetPath, f)),
-      stats: {
-        copied: copiedFiles.length,
-        skipped: skippedFiles.length,
-        total: copiedFiles.length + skippedFiles.length,
-      },
-    });
+    // Knowledge Base section
+    markdown += `\n\n## Knowledge Base
+
+**KB directory:** \`${seedResult.kbDir}\`
+**Files seeded:** ${seedResult.seeded.length}`;
+
+    if (seedResult.skipped.length > 0) {
+      markdown += `\n**Files skipped (already exist):** ${seedResult.skipped.length}`;
+      markdown += `\n\nSkipped seed files:\n${seedResult.skipped.map((f) => `- ${f}`).join('\n')}`;
+    }
+
+    if (seedResult.seeded.length > 0) {
+      markdown += `\n\nSeeded files:\n${seedResult.seeded.map((f) => `- ${f}`).join('\n')}`;
+    }
+
+    markdown += `\n\n<hints>
+- Stop the current Claude Code instance with Ctrl+C and restart to pick up new config
+${skippedFiles.length > 0 || seedResult.skipped.length > 0 ? `- To overwrite existing files: kahuna_initialize(targetPath="${targetPath}", overwrite=true)\n` : ''}</hints>`;
+
+    return markdownResponse(markdown);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return errorResponse(`Failed to initialize: ${errorMessage}`, {
-      targetPath,
-      overwrite,
-    });
+    return markdownResponse(
+      `Failed to initialize: ${errorMessage}\n\n<hints>\n- Check that the target path is accessible\n</hints>`,
+      true
+    );
   }
 }
 
