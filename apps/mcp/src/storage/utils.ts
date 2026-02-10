@@ -1,8 +1,8 @@
 /**
  * Utility functions for local knowledge storage
  *
- * Handles slug generation, category mapping, and .mdc file parsing/generation.
- * See: docs/internal/tasks/mcp-mvp/design/local-storage-design.md
+ * Handles slug generation and .mdc file parsing/generation.
+ * See: docs/design/knowledge-architecture.md
  */
 
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
@@ -32,41 +32,30 @@ export function generateSlug(title: string): string {
 }
 
 /**
- * Map AI categorizer output to design doc categories
- *
- * Current AI categories → Target categories:
- * - business-info → policy
- * - technical-info → reference
- * - code → pattern
- * - Unknown → context (fallback)
- *
- * @param aiCategory - Category from AI categorizer
- * @returns Mapped KnowledgeCategory
+ * Valid knowledge categories (must match KnowledgeCategory type)
  */
-export function mapCategory(aiCategory: string): KnowledgeCategory {
-  switch (aiCategory.toLowerCase()) {
-    case 'business-info':
-      return 'policy';
-    case 'technical-info':
-      return 'reference';
-    case 'code':
-      return 'pattern';
-    // Pass through valid categories
-    case 'policy':
-      return 'policy';
-    case 'requirement':
-      return 'requirement';
-    case 'reference':
-      return 'reference';
-    case 'decision':
-      return 'decision';
-    case 'pattern':
-      return 'pattern';
-    case 'context':
-      return 'context';
-    default:
-      return 'context'; // Fallback for unknown categories
+const VALID_CATEGORIES = new Set<string>([
+  'policy',
+  'requirement',
+  'reference',
+  'decision',
+  'pattern',
+  'context',
+]);
+
+/**
+ * Validate a category string and return a valid KnowledgeCategory.
+ * Returns the category if valid, or 'context' as fallback for unknown values.
+ *
+ * @param category - Category string from AI categorizer or other source
+ * @returns Valid KnowledgeCategory
+ */
+export function validateCategory(category: string): KnowledgeCategory {
+  const normalized = category.toLowerCase();
+  if (VALID_CATEGORIES.has(normalized)) {
+    return normalized as KnowledgeCategory;
   }
+  return 'context'; // Fallback for unknown categories
 }
 
 /**

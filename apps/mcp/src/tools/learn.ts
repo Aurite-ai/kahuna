@@ -16,11 +16,12 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { FileSizeError, categorizeFile } from '@kahuna/file-router';
 import { z } from 'zod';
-import type { KnowledgeStorageService, SaveKnowledgeEntryInput } from '../storage/index.js';
+import { FileSizeError, categorizeFile } from '../categorization/index.js';
+import type { SaveKnowledgeEntryInput } from '../storage/index.js';
 import { KnowledgeStorageError } from '../storage/index.js';
 import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
+import type { ToolContext } from './types.js';
 
 /**
  * Tool definition for MCP registration.
@@ -239,8 +240,9 @@ async function readFileContent(filePath: string): Promise<string> {
  */
 export async function learnToolHandler(
   args: Record<string, unknown>,
-  storage: KnowledgeStorageService
+  ctx: ToolContext
 ): Promise<MCPToolResponse> {
+  const { storage } = ctx;
   // Validate input with Zod
   const parseResult = learnInputSchema.safeParse(args);
   if (!parseResult.success) {

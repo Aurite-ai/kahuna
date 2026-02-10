@@ -25,7 +25,7 @@ export { KnowledgeStorageError } from './types.js';
 // Utilities
 export {
   generateSlug,
-  mapCategory,
+  validateCategory,
   parseMdcFile,
   generateMdcFile,
   type ParsedMdcFile,
@@ -34,10 +34,3 @@ export {
 // Storage Service
 export { FileKnowledgeStorageService } from './knowledge-storage.js';
 
-// Answer Cache
-export {
-  AnswerCacheService,
-  generateKbVersion,
-  type CachedAnswer,
-  type AnswerCacheOptions,
-} from './answer-cache.js';

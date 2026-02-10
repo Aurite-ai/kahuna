@@ -6,15 +6,17 @@
  * project with the proper rules, skills, and settings for agent development.
  */
 
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
+import type { ToolContext } from './types.js';
 
 /**
  * Tool definition for MCP registration.
  */
 export const initializeToolDefinition = {
-  name: 'initialize',
+  name: 'kahuna_initialize',
   description: `Initialize a new project with Kahuna copilot configuration.
 
 This tool copies the Claude Code copilot configuration from Kahuna's VCK templates
@@ -62,44 +64,15 @@ interface InitializeToolInput {
 }
 
 /**
- * MCP tool response format.
+ * Check if a path exists (async replacement for fs.existsSync).
  */
-interface MCPToolResponse {
-  [key: string]: unknown;
-  content: Array<{
-    type: 'text';
-    text: string;
-  }>;
-  isError?: boolean;
-}
-
-/**
- * Helper to create a success response.
- */
-function successResponse(data: unknown): MCPToolResponse {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({ success: true, data }, null, 2),
-      },
-    ],
-  };
-}
-
-/**
- * Helper to create an error response.
- */
-function errorResponse(message: string, details?: unknown): MCPToolResponse {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({ success: false, error: message, details }, null, 2),
-      },
-    ],
-    isError: true,
-  };
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -130,35 +103,35 @@ function getTemplatesPath(): string {
 /**
  * Recursively copy a directory.
  */
-function copyDirectoryRecursive(
+async function copyDirectoryRecursive(
   source: string,
   target: string,
   overwrite: boolean,
   copiedFiles: string[],
   skippedFiles: string[]
-): void {
+): Promise<void> {
   // Create target directory if it doesn't exist
-  if (!fs.existsSync(target)) {
-    fs.mkdirSync(target, { recursive: true });
+  if (!(await pathExists(target))) {
+    await fs.mkdir(target, { recursive: true });
   }
 
   // Read all items in source directory
-  const items = fs.readdirSync(source);
+  const items = await fs.readdir(source);
 
   for (const item of items) {
     const sourcePath = path.join(source, item);
     const targetPath = path.join(target, item);
-    const stat = fs.statSync(sourcePath);
+    const stat = await fs.stat(sourcePath);
 
     if (stat.isDirectory()) {
       // Recursively copy subdirectories
-      copyDirectoryRecursive(sourcePath, targetPath, overwrite, copiedFiles, skippedFiles);
+      await copyDirectoryRecursive(sourcePath, targetPath, overwrite, copiedFiles, skippedFiles);
     } else {
       // Copy file
-      if (fs.existsSync(targetPath) && !overwrite) {
+      if ((await pathExists(targetPath)) && !overwrite) {
         skippedFiles.push(targetPath);
       } else {
-        fs.copyFileSync(sourcePath, targetPath);
+        await fs.copyFile(sourcePath, targetPath);
         copiedFiles.push(targetPath);
       }
     }
@@ -166,10 +139,11 @@ function copyDirectoryRecursive(
 }
 
 /**
- * Handle the initialize tool call.
+ * Handle the kahuna_initialize tool call.
  */
 export async function initializeToolHandler(
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  _ctx: ToolContext
 ): Promise<MCPToolResponse> {
   const input = args as unknown as InitializeToolInput;
   const targetPath = input.targetPath;
@@ -180,14 +154,14 @@ export async function initializeToolHandler(
     const absoluteTargetPath = path.resolve(targetPath);
 
     // Verify target directory exists
-    if (!fs.existsSync(absoluteTargetPath)) {
+    if (!(await pathExists(absoluteTargetPath))) {
       return errorResponse(`Target directory does not exist: ${absoluteTargetPath}`, {
         hint: 'Create the directory first or provide a valid path',
       });
     }
 
     // Verify target is a directory
-    const targetStat = fs.statSync(absoluteTargetPath);
+    const targetStat = await fs.stat(absoluteTargetPath);
     if (!targetStat.isDirectory()) {
       return errorResponse(`Target path is not a directory: ${absoluteTargetPath}`);
     }
@@ -196,7 +170,7 @@ export async function initializeToolHandler(
     const sourcePath = getTemplatesPath();
 
     // Verify source exists
-    if (!fs.existsSync(sourcePath)) {
+    if (!(await pathExists(sourcePath))) {
       return errorResponse('VCK templates not found', {
         expectedPath: sourcePath,
         hint: 'Make sure you are running this from the Kahuna monorepo',
@@ -211,8 +185,8 @@ export async function initializeToolHandler(
     const claudeSourcePath = path.join(sourcePath, '.claude');
     const claudeTargetPath = path.join(absoluteTargetPath, '.claude');
 
-    if (fs.existsSync(claudeSourcePath)) {
-      copyDirectoryRecursive(
+    if (await pathExists(claudeSourcePath)) {
+      await copyDirectoryRecursive(
         claudeSourcePath,
         claudeTargetPath,
         overwrite,
@@ -225,11 +199,11 @@ export async function initializeToolHandler(
     const claudeMdSource = path.join(sourcePath, 'CLAUDE.md');
     const claudeMdTarget = path.join(absoluteTargetPath, 'CLAUDE.md');
 
-    if (fs.existsSync(claudeMdSource)) {
-      if (fs.existsSync(claudeMdTarget) && !overwrite) {
+    if (await pathExists(claudeMdSource)) {
+      if ((await pathExists(claudeMdTarget)) && !overwrite) {
         skippedFiles.push(claudeMdTarget);
       } else {
-        fs.copyFileSync(claudeMdSource, claudeMdTarget);
+        await fs.copyFile(claudeMdSource, claudeMdTarget);
         copiedFiles.push(claudeMdTarget);
       }
     }

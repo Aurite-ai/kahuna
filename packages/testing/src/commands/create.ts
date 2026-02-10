@@ -1,41 +1,19 @@
 /**
- * test:create command - Create a VCK instance from templates and scenarios
+ * create command - Set up a test project from a scenario
  *
- * Creates a project folder in `projects/` by combining:
- * 1. Framework boilerplate (from vck-templates)
- * 2. Copilot configuration (from vck-templates)
- * 3. Scenario context (CLAUDE.md and knowledge-base/ from testing/scenarios)
+ * Creates a project folder in `projects/` with scenario content:
+ * 1. project-context.md (copilot-visible project context)
+ * 2. knowledge-base/ (copilot-visible business context, if present)
+ * 3. Hidden metadata for the collect command
+ *
+ * VCK templates (framework, copilot config, etc.) are handled
+ * separately by the init tool — this command only sets up the
+ * scenario-specific content that makes the test unique.
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createTestClient } from '../client.js';
-import { SEED_DATA } from '../types.js';
-import { loadConfig } from './init.js';
-
-/**
- * Find the repository root by looking for package.json with workspaces
- */
-function findRepoRoot(): string {
-  let current = process.cwd();
-
-  while (current !== '/') {
-    const packageJsonPath = path.join(current, 'package.json');
-    if (fs.existsSync(packageJsonPath)) {
-      try {
-        const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-        if (pkg.workspaces || pkg.name === 'kahuna') {
-          return current;
-        }
-      } catch {
-        // Continue searching
-      }
-    }
-    current = path.dirname(current);
-  }
-
-  return process.cwd();
-}
+import { findRepoRoot } from '../utils.js';
 
 /**
  * Copy a directory recursively
@@ -62,7 +40,7 @@ function copyDirRecursive(src: string, dest: string): void {
 }
 
 /**
- * Copy a single file
+ * Copy a single file, creating parent directories as needed
  */
 function copyFile(src: string, dest: string): void {
   if (!fs.existsSync(src)) {
@@ -74,7 +52,7 @@ function copyFile(src: string, dest: string): void {
 }
 
 /**
- * List available scenarios
+ * List available scenarios from the scenarios/ directory
  */
 function listAvailableScenarios(repoRoot: string): string[] {
   const scenariosDir = path.join(repoRoot, 'packages', 'testing', 'scenarios');
@@ -84,35 +62,33 @@ function listAvailableScenarios(repoRoot: string): string[] {
 
   return fs
     .readdirSync(scenariosDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith('level-'))
+    .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
 }
 
 /**
- * Execute the create command
+ * Execute the create command.
+ *
+ * Creates a project folder with scenario content (project-context.md,
+ * knowledge-base/, metadata). VCK templates are applied separately
+ * via the init tool.
  */
 export async function createCommand(options: {
   scenario?: string;
   name?: string;
 }): Promise<void> {
   console.log('');
-  console.log('📦 Creating VCK instance...');
+  console.log('📦 Creating test project...');
   console.log('');
 
   const repoRoot = findRepoRoot();
-  const config = loadConfig();
-
-  // Determine framework and copilot
-  const framework = config?.defaults.framework || 'langgraph';
-  const copilot = config?.defaults.copilot || 'claude-code';
 
   // Get available scenarios
   const availableScenarios = listAvailableScenarios(repoRoot);
 
   // Determine scenario
-  let scenario = options.scenario || config?.defaults.scenario;
+  let scenario = options.scenario;
   if (!scenario) {
-    // Default to first available scenario
     if (availableScenarios.length > 0) {
       scenario = availableScenarios[0];
     } else {
@@ -134,139 +110,69 @@ export async function createCommand(options: {
     process.exit(1);
   }
 
-  // Generate project name
-  const projectName = options.name || `${scenario}-${Date.now().toString(36)}`;
+  // Use scenario name directly as project name (or custom name if provided)
+  const projectName = options.name || scenario;
 
   // Define paths
-  const templatesDir = path.join(repoRoot, 'packages', 'vck-templates', 'templates');
   const scenariosDir = path.join(repoRoot, 'packages', 'testing', 'scenarios');
   const projectsDir = path.join(repoRoot, 'projects');
   const projectPath = path.join(projectsDir, projectName);
 
   // Check if project already exists
   if (fs.existsSync(projectPath)) {
-    console.error(`❌ Project folder already exists: projects/${projectName}`);
-    console.error('   Use a different name or delete the existing folder.');
+    console.error(`❌ Project '${projectName}' already exists. Delete it or use a different name.`);
     process.exit(1);
   }
 
-  console.log(`Scenario: ${scenario}`);
-  console.log(`Framework: ${framework}`);
-  console.log(`Copilot: ${copilot}`);
-  console.log(`Project name: ${projectName}`);
+  console.log(`  Scenario: ${scenario}`);
+  console.log(`  Project:  ${projectName}`);
   console.log('');
 
-  // 1. Copy framework files
-  const frameworkSrc = path.join(templatesDir, 'frameworks', framework);
-  if (fs.existsSync(frameworkSrc)) {
-    console.log('Copying framework boilerplate...');
-    copyDirRecursive(frameworkSrc, projectPath);
-    console.log('  ✓ Framework files copied');
-  } else {
-    console.error(`❌ Framework not found: ${framework}`);
-    console.error(`   Expected at: ${frameworkSrc}`);
-    process.exit(1);
-  }
+  // Create the project directory
+  fs.mkdirSync(projectPath, { recursive: true });
 
-  // 2. Copy copilot configuration (.claude/)
-  const copilotSrc = path.join(templatesDir, 'copilot-configs', copilot, '.claude');
-  const copilotDest = path.join(projectPath, '.claude');
-  if (fs.existsSync(copilotSrc)) {
-    console.log('Copying copilot configuration...');
-    copyDirRecursive(copilotSrc, copilotDest);
-    console.log('  ✓ Copilot config copied');
-  } else {
-    console.warn(`⚠ Copilot config not found: ${copilot}`);
-    console.warn(`  Expected at: ${copilotSrc}`);
-  }
-
-  // 3. Copy scenario CLAUDE.md
   const scenarioDir = path.join(scenariosDir, scenario);
-  const claudeMdSrc = path.join(scenarioDir, 'CLAUDE.md');
-  const claudeMdDest = path.join(projectPath, 'CLAUDE.md');
-  if (fs.existsSync(claudeMdSrc)) {
-    console.log('Copying scenario context (CLAUDE.md)...');
-    copyFile(claudeMdSrc, claudeMdDest);
-    console.log('  ✓ CLAUDE.md copied');
+
+  // 1. Copy scenario project-context.md (copilot-visible project context)
+  const projectContextSrc = path.join(scenarioDir, 'project-context.md');
+  const projectContextDest = path.join(projectPath, 'project-context.md');
+  if (fs.existsSync(projectContextSrc)) {
+    console.log('  Copying scenario context...');
+    copyFile(projectContextSrc, projectContextDest);
+    console.log('    ✓ project-context.md');
   } else {
-    console.warn(`⚠ Scenario CLAUDE.md not found: ${claudeMdSrc}`);
+    console.warn(`  ⚠ Scenario project-context.md not found: ${projectContextSrc}`);
   }
 
-  // 4. Copy scenario knowledge-base/
+  // 2. Copy scenario knowledge-base/ (copilot-visible business context)
   const knowledgeBaseSrc = path.join(scenarioDir, 'knowledge-base');
   const knowledgeBaseDest = path.join(projectPath, 'knowledge-base');
   if (fs.existsSync(knowledgeBaseSrc)) {
-    console.log('Copying knowledge base...');
+    console.log('  Copying knowledge base...');
     copyDirRecursive(knowledgeBaseSrc, knowledgeBaseDest);
-    console.log('  ✓ Knowledge base copied');
+    console.log('    ✓ knowledge-base/');
   } else {
-    console.log('  (No knowledge-base folder for this scenario)');
+    console.log('    (No knowledge-base for this scenario)');
   }
 
-  // 5. Copy .env template
-  const envTemplateSrc = path.join(templatesDir, 'project-env');
-  const envDest = path.join(projectPath, '.env');
-  if (fs.existsSync(envTemplateSrc)) {
-    console.log('Copying .env template...');
-    copyFile(envTemplateSrc, envDest);
-    console.log('  ✓ .env template copied');
-  }
-
-  // 6. Copy .gitignore template
-  const gitignoreSrc = path.join(templatesDir, 'project-gitignore');
-  const gitignoreDest = path.join(projectPath, '.gitignore');
-  if (fs.existsSync(gitignoreSrc)) {
-    console.log('Copying .gitignore...');
-    copyFile(gitignoreSrc, gitignoreDest);
-    console.log('  ✓ .gitignore copied');
-  }
-
-  // 5. Optionally register with API (if running)
-  const apiUrl = config?.api.url || 'http://localhost:3000';
-  let projectId: string | undefined;
-
-  try {
-    const client = createTestClient({
-      baseUrl: apiUrl,
-      testUserId: SEED_DATA.TEST_USER_1_ID,
-    });
-
-    // Check API health
-    await client.healthCheck();
-
-    // Create project in database
-    console.log('');
-    console.log('Registering with API...');
-    const project = await client.createProject(projectName);
-    projectId = project.id;
-    console.log(`  ✓ Project registered (ID: ${projectId})`);
-  } catch {
-    console.log('');
-    console.log('  (API not available - project created locally only)');
-  }
+  // 3. Write a hidden metadata file for the collect command to use later
+  const metadataPath = path.join(projectPath, '.kahuna-test.json');
+  const metadata = {
+    scenario,
+    createdAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
 
   // Report success
   console.log('');
-  console.log('✅ VCK instance created successfully!');
+  console.log('✅ Test project created!');
   console.log('');
-  console.log(`📁 Location: projects/${projectName}/`);
-  console.log('');
-  console.log('Project structure:');
-  console.log('  .claude/           - Copilot configuration');
-  console.log('  src/agent/         - Agent source code');
-  console.log('  knowledge-base/    - Business context files');
-  console.log('  CLAUDE.md          - Project instructions');
-  console.log('  main.py            - Entry point');
-  console.log('  pyproject.toml     - Dependencies');
+  console.log(`📁 projects/${projectName}/`);
   console.log('');
   console.log('Next steps:');
-  console.log(`  1. cd projects/${projectName}`);
-  console.log('  2. Open in your coding copilot (Claude Code, Cursor, etc.)');
-  console.log('  3. Follow instructions in README.md');
-  if (projectId) {
-    console.log('');
-    console.log('When done, submit results:');
-    console.log(`  pnpm test:submit --project ${projectId}`);
-  }
+  console.log(`  1. Read the scenario prompts: packages/testing/scenarios/${scenario}/user-prompts.md`);
+  console.log(`  2. cd projects/${projectName}`);
+  console.log('  3. Open Claude Code (or your copilot) and follow the user prompts');
+  console.log(`  4. When done: pnpm kahuna-test collect ${projectName}`);
   console.log('');
 }

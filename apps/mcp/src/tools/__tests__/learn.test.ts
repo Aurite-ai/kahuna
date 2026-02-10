@@ -1,11 +1,13 @@
 import * as fs from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { KnowledgeEntry, KnowledgeStorageService } from '../../storage/index.js';
+import type { KnowledgeStorageService } from '../../storage/index.js';
 import { KnowledgeStorageError } from '../../storage/index.js';
 import { learnToolDefinition, learnToolHandler } from '../learn.js';
+import type { ToolContext } from '../types.js';
+import { createMockContext, createMockEntry } from './test-utils.js';
 
-// Mock the file-router module
-vi.mock('@kahuna/file-router', () => ({
+// Mock the categorization module
+vi.mock('../../categorization/index.js', () => ({
   categorizeFile: vi.fn(),
   FileSizeError: class FileSizeError extends Error {
     constructor(
@@ -28,58 +30,7 @@ vi.mock('node:fs/promises', () => ({
   access: vi.fn(),
 }));
 
-import { FileSizeError, categorizeFile } from '@kahuna/file-router';
-
-/**
- * Create a mock storage service for testing
- */
-function createMockStorage(overrides?: Partial<KnowledgeStorageService>): KnowledgeStorageService {
-  return {
-    save: vi.fn(),
-    list: vi.fn(),
-    get: vi.fn(),
-    exists: vi.fn(),
-    delete: vi.fn(),
-    healthCheck: vi.fn(),
-    ...overrides,
-  };
-}
-
-/**
- * Create a mock KnowledgeEntry for testing
- */
-function createMockEntry(overrides?: Partial<KnowledgeEntry>): KnowledgeEntry {
-  const now = new Date().toISOString();
-  return {
-    slug: 'test-entry',
-    type: 'knowledge',
-    title: 'Test Entry',
-    summary: 'A test entry',
-    created_at: now,
-    updated_at: now,
-    source: {
-      file: 'test.md',
-      project: 'test-project',
-      path: null,
-    },
-    classification: {
-      category: 'reference',
-      confidence: 0.9,
-      reasoning: 'Test reasoning',
-      tags: ['test'],
-      topics: ['testing'],
-      entities: {
-        technologies: [],
-        frameworks: [],
-        libraries: [],
-        apis: [],
-      },
-    },
-    status: 'active',
-    content: '# Test Content',
-    ...overrides,
-  };
-}
+import { FileSizeError, categorizeFile } from '../../categorization/index.js';
 
 describe('learnToolDefinition', () => {
   it('has the correct name', () => {
@@ -105,6 +56,7 @@ describe('learnToolDefinition', () => {
 });
 
 describe('learnToolHandler', () => {
+  let ctx: ToolContext;
   let mockStorage: KnowledgeStorageService;
   const mockCategorizeFile = vi.mocked(categorizeFile);
   const mockFsStat = vi.mocked(fs.stat);
@@ -114,11 +66,12 @@ describe('learnToolHandler', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockStorage = createMockStorage();
+    ctx = createMockContext();
+    mockStorage = ctx.storage;
 
-    // Default categorization response (using AI categorizer categories)
+    // Default categorization response (using unified knowledge categories)
     mockCategorizeFile.mockResolvedValue({
-      category: 'technical-info',
+      category: 'reference',
       confidence: 0.9,
       reasoning: 'Test categorization',
       metadata: {
@@ -145,7 +98,7 @@ describe('learnToolHandler', () => {
 
   describe('input validation', () => {
     it('returns error when paths is missing', async () => {
-      const result = await learnToolHandler({}, mockStorage);
+      const result = await learnToolHandler({}, ctx);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
@@ -154,7 +107,7 @@ describe('learnToolHandler', () => {
     });
 
     it('returns error when paths array is empty', async () => {
-      const result = await learnToolHandler({ paths: [] }, mockStorage);
+      const result = await learnToolHandler({ paths: [] }, ctx);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
@@ -165,7 +118,7 @@ describe('learnToolHandler', () => {
     it('returns error when no accessible files found', async () => {
       mockFsAccess.mockRejectedValue(new Error('ENOENT'));
 
-      const result = await learnToolHandler({ paths: ['/nonexistent/file.md'] }, mockStorage);
+      const result = await learnToolHandler({ paths: ['/nonexistent/file.md'] }, ctx);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
@@ -178,7 +131,7 @@ describe('learnToolHandler', () => {
     it('reads file content from provided path', async () => {
       vi.mocked(mockStorage.save).mockResolvedValue(createMockEntry());
 
-      await learnToolHandler({ paths: ['docs/api-guidelines.md'] }, mockStorage);
+      await learnToolHandler({ paths: ['docs/api-guidelines.md'] }, ctx);
 
       expect(mockFsAccess).toHaveBeenCalledWith('docs/api-guidelines.md');
       expect(mockFsReadFile).toHaveBeenCalledWith('docs/api-guidelines.md', 'utf-8');
@@ -187,7 +140,7 @@ describe('learnToolHandler', () => {
     it('handles file read errors gracefully', async () => {
       mockFsReadFile.mockRejectedValue(new Error('Permission denied'));
 
-      const result = await learnToolHandler({ paths: ['docs/protected.md'] }, mockStorage);
+      const result = await learnToolHandler({ paths: ['docs/protected.md'] }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.results[0].success).toBe(false);
@@ -207,7 +160,7 @@ describe('learnToolHandler', () => {
 
       vi.mocked(mockStorage.save).mockResolvedValue(savedEntry);
 
-      const result = await learnToolHandler({ paths: ['docs/api-guidelines.md'] }, mockStorage);
+      const result = await learnToolHandler({ paths: ['docs/api-guidelines.md'] }, ctx);
 
       expect(result.isError).toBeUndefined();
       const response = JSON.parse(result.content[0].text);
@@ -221,14 +174,14 @@ describe('learnToolHandler', () => {
     it('calls storage.save with correct input including sourcePath', async () => {
       vi.mocked(mockStorage.save).mockResolvedValue(createMockEntry());
 
-      await learnToolHandler({ paths: ['src/test-file.md'] }, mockStorage);
+      await learnToolHandler({ paths: ['src/test-file.md'] }, ctx);
 
       expect(mockStorage.save).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Test File',
           sourceFile: 'test-file.md',
           sourcePath: 'src/test-file.md',
-          category: 'technical-info',
+          category: 'reference',
           confidence: 0.9,
           reasoning: 'Test categorization',
         })
@@ -243,7 +196,7 @@ describe('learnToolHandler', () => {
           paths: ['docs/api.md'],
           description: 'Our API design standards',
         },
-        mockStorage
+        ctx
       );
 
       expect(mockStorage.save).toHaveBeenCalledWith(
@@ -264,7 +217,7 @@ describe('learnToolHandler', () => {
       ];
 
       for (const { path: filePath, expectedTitle } of testCases) {
-        await learnToolHandler({ paths: [filePath] }, mockStorage);
+        await learnToolHandler({ paths: [filePath] }, ctx);
 
         expect(mockStorage.save).toHaveBeenLastCalledWith(
           expect.objectContaining({ title: expectedTitle })
@@ -286,7 +239,7 @@ describe('learnToolHandler', () => {
 
       vi.mocked(mockStorage.save).mockResolvedValue(savedEntry);
 
-      const result = await learnToolHandler({ paths: ['docs/api-guidelines.md'] }, mockStorage);
+      const result = await learnToolHandler({ paths: ['docs/api-guidelines.md'] }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.success).toBe(true);
@@ -318,7 +271,7 @@ describe('learnToolHandler', () => {
         {
           paths: ['file-one.md', 'file-two.md', 'file-three.md'],
         },
-        mockStorage
+        ctx
       );
 
       const response = JSON.parse(result.content[0].text);
@@ -341,7 +294,7 @@ describe('learnToolHandler', () => {
         {
           paths: ['good-file.md', 'bad-file.md'],
         },
-        mockStorage
+        ctx
       );
 
       const response = JSON.parse(result.content[0].text);
@@ -358,7 +311,7 @@ describe('learnToolHandler', () => {
     it('handles FileSizeError from categorization', async () => {
       mockCategorizeFile.mockRejectedValueOnce(new FileSizeError(500000, 400000));
 
-      const result = await learnToolHandler({ paths: ['large-file.md'] }, mockStorage);
+      const result = await learnToolHandler({ paths: ['large-file.md'] }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.results[0].success).toBe(false);
@@ -369,7 +322,7 @@ describe('learnToolHandler', () => {
     it('handles missing Anthropic API key', async () => {
       mockCategorizeFile.mockRejectedValueOnce(new Error('ANTHROPIC_API_KEY is not set'));
 
-      const result = await learnToolHandler({ paths: ['test.md'] }, mockStorage);
+      const result = await learnToolHandler({ paths: ['test.md'] }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.results[0].success).toBe(false);
@@ -379,7 +332,7 @@ describe('learnToolHandler', () => {
 
     it('handles KnowledgeStorageError', async () => {
       mockCategorizeFile.mockResolvedValue({
-        category: 'technical-info',
+        category: 'reference',
         confidence: 0.9,
         reasoning: 'Test',
       });
@@ -387,7 +340,7 @@ describe('learnToolHandler', () => {
         new KnowledgeStorageError('Directory not accessible', 'DIR_ERROR')
       );
 
-      const result = await learnToolHandler({ paths: ['test.md'] }, mockStorage);
+      const result = await learnToolHandler({ paths: ['test.md'] }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.results[0].success).toBe(false);
@@ -398,7 +351,7 @@ describe('learnToolHandler', () => {
     it('handles unexpected errors', async () => {
       mockCategorizeFile.mockRejectedValueOnce(new Error('Unexpected network error'));
 
-      const result = await learnToolHandler({ paths: ['test.md'] }, mockStorage);
+      const result = await learnToolHandler({ paths: ['test.md'] }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.results[0].success).toBe(false);
@@ -413,7 +366,7 @@ describe('learnToolHandler', () => {
         createMockEntry({ created_at: now, updated_at: now })
       );
 
-      const result = await learnToolHandler({ paths: ['test.md'] }, mockStorage);
+      const result = await learnToolHandler({ paths: ['test.md'] }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.message).toContain('Processed 1 file(s)');
@@ -452,7 +405,7 @@ describe('learnToolHandler', () => {
           })
         );
 
-      const result = await learnToolHandler({ paths: ['ref.md', 'policy.md'] }, mockStorage);
+      const result = await learnToolHandler({ paths: ['ref.md', 'policy.md'] }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.data.message).toContain('reference');

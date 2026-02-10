@@ -17,15 +17,16 @@
  */
 
 import { z } from 'zod';
-import type { KnowledgeEntry, KnowledgeStorageService } from '../storage/index.js';
+import type { KnowledgeEntry } from '../storage/index.js';
 import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
+import type { ToolContext } from './types.js';
 
 /**
  * Tool definition for MCP registration.
  */
 export const prepareContextToolDefinition = {
   name: 'kahuna_prepare_context',
-  description: `Prepare the context/ folder with relevant knowledge for a task.
+  description: `Retrieve relevant knowledge from the Kahuna knowledge base for a task.
 
 USE THIS TOOL WHEN:
 - Starting any new task or feature
@@ -33,7 +34,7 @@ USE THIS TOOL WHEN:
 - Before beginning implementation work
 - User asks "what do we know about X"
 
-This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from context/ files.
+This is the PRIMARY context retrieval tool. Call it ONCE at task start. Relevant content is returned directly in the response.
 
 **Examples:**
 - Starting a task: task="Add rate limiting to the search tool"
@@ -41,9 +42,8 @@ This is the PRIMARY context retrieval tool. Call it ONCE at task start, then wor
 - Exploring a topic: task="Understand our API design patterns"
 
 **Hints:**
-- Call ONCE at task start, then work from context/ files
+- Call ONCE at task start, then work from the returned content
 - Natural language task description works best
-- After calling, read context/README.md for navigation
 - If you need more context mid-task, use kahuna_ask instead`,
 
   inputSchema: {
@@ -280,23 +280,22 @@ function formatContextForCopilot(entries: RankedEntry[], task: string): string {
   }
 
   lines.push('## Relevant Context Surfaced\n');
-  lines.push('| Topic | File | Why Relevant |');
-  lines.push('|-------|------|--------------|');
+  lines.push('| Topic | Category | Why Relevant |');
+  lines.push('|-------|----------|--------------|');
 
   for (const entry of entries) {
-    const file = `context/${entry.slug}.md`;
-    lines.push(`| ${entry.title} | ${file} | ${entry.relevanceReasoning} |`);
+    lines.push(`| ${entry.title} | ${entry.classification.category} | ${entry.relevanceReasoning} |`);
   }
 
   lines.push('\n## Start Here\n');
 
   for (let i = 0; i < Math.min(3, entries.length); i++) {
     const entry = entries[i];
-    lines.push(`${i + 1}. **Read ${entry.slug}.md** - ${entry.summary || entry.title}`);
+    lines.push(`${i + 1}. **${entry.title}** - ${entry.summary || entry.title}`);
   }
 
   lines.push('\n<hints>');
-  lines.push('- Context folder is ready - read files directly');
+  lines.push('- Relevant content is included in the selectedFiles above');
   lines.push('- If you need more context mid-task, use kahuna_ask');
   lines.push('- After completing work, use kahuna_learn to capture learnings');
   lines.push('</hints>');
@@ -334,8 +333,9 @@ function countByCategory(entries: RankedEntry[]): Record<string, number> {
  */
 export async function prepareContextToolHandler(
   args: Record<string, unknown>,
-  storage: KnowledgeStorageService
+  ctx: ToolContext
 ): Promise<MCPToolResponse> {
+  const { storage } = ctx;
   // Validate input with Zod
   const parseResult = prepareContextInputSchema.safeParse(args);
   if (!parseResult.success) {

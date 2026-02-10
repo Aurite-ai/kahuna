@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { KnowledgeEntryFrontmatter } from '../types.js';
-import { generateMdcFile, generateSlug, mapCategory, parseMdcFile } from '../utils.js';
+import { generateMdcFile, generateSlug, parseMdcFile, validateCategory } from '../utils.js';
 
 describe('generateSlug', () => {
   it('converts basic title to lowercase hyphenated slug', () => {
@@ -44,32 +44,28 @@ describe('generateSlug', () => {
   });
 });
 
-describe('mapCategory', () => {
-  it('maps AI categories to knowledge categories', () => {
-    expect(mapCategory('business-info')).toBe('policy');
-    expect(mapCategory('technical-info')).toBe('reference');
-    expect(mapCategory('code')).toBe('pattern');
+describe('validateCategory', () => {
+  it('accepts all valid knowledge categories', () => {
+    expect(validateCategory('policy')).toBe('policy');
+    expect(validateCategory('requirement')).toBe('requirement');
+    expect(validateCategory('reference')).toBe('reference');
+    expect(validateCategory('decision')).toBe('decision');
+    expect(validateCategory('pattern')).toBe('pattern');
+    expect(validateCategory('context')).toBe('context');
   });
 
   it('handles case insensitivity', () => {
-    expect(mapCategory('BUSINESS-INFO')).toBe('policy');
-    expect(mapCategory('Technical-Info')).toBe('reference');
-    expect(mapCategory('CODE')).toBe('pattern');
-  });
-
-  it('passes through valid design doc categories', () => {
-    expect(mapCategory('policy')).toBe('policy');
-    expect(mapCategory('requirement')).toBe('requirement');
-    expect(mapCategory('reference')).toBe('reference');
-    expect(mapCategory('decision')).toBe('decision');
-    expect(mapCategory('pattern')).toBe('pattern');
-    expect(mapCategory('context')).toBe('context');
+    expect(validateCategory('POLICY')).toBe('policy');
+    expect(validateCategory('Reference')).toBe('reference');
+    expect(validateCategory('PATTERN')).toBe('pattern');
   });
 
   it('returns context for unknown categories', () => {
-    expect(mapCategory('unknown')).toBe('context');
-    expect(mapCategory('')).toBe('context');
-    expect(mapCategory('random-category')).toBe('context');
+    expect(validateCategory('unknown')).toBe('context');
+    expect(validateCategory('')).toBe('context');
+    expect(validateCategory('random-category')).toBe('context');
+    expect(validateCategory('business-info')).toBe('context');
+    expect(validateCategory('technical-info')).toBe('context');
   });
 });
 
