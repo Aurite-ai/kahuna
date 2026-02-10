@@ -134,27 +134,29 @@ MVP categories (agents determine during learn):
 
 | Category | Description | Examples |
 |----------|-------------|----------|
-| **business-info** | Business context, policies, rules, domain knowledge | API guidelines, security policies, business plans |
-| **technical-info** | Technical documentation and specifications | API specs, architecture docs, database schemas |
-| **code** | Source code files and scripts | Python files, TypeScript files, config files |
-| **integration-spec** | Workflow descriptions, integration requirements | "When order ready, send email via Gmail", connector specs |
-| **hybrid** | Files with mixed content (30-70% split) | README with code examples, specs with implementation |
+| **policy** | Business rules, constraints, organizational standards, domain knowledge | API guidelines, security policies, business plans |
+| **requirement** | Requirements, specifications, user stories, acceptance criteria | PRDs, user stories, feature specs |
+| **reference** | Technical documentation, API specs, architecture docs, schemas | API docs, database schemas, architecture diagrams |
+| **decision** | Decision records, rationale, trade-off analyses | ADRs, design decisions, technology choices |
+| **pattern** | Source code, implementation patterns, reusable examples, config files | Python files, TypeScript files, config templates |
+| **context** | General background, overviews, onboarding docs, or unclear fit | README files, onboarding docs, project overviews |
+| **integration** | Data sources, external services, APIs, tools, connectors, authentication methods, workflows | Gmail setup, HubSpot API, database connections, Slack webhooks |
 
 ### Integration Detection (Cross-Category)
 
-**Integration metadata is extracted from ANY file where external systems are mentioned** - not just `integration-spec` files. This is crucial for:
+**Integration metadata is extracted from ANY file where external systems are mentioned** - not just `integration` category files. This is crucial for:
 - Auto-generating tool scaffolding in VCKs
 - Surfacing relevant integrations during `kahuna_prepare_context`
 - Enabling "Connector Discovery" - when users describe their needs in any context, Kahuna identifies what connections are required
 
-**When to use `integration-spec` category:**
-- Use when the PRIMARY purpose of the file is describing integrations/connectors
-- Example: A dedicated "integrations.md" file listing all external systems
+**When to use `integration` category:**
+- Use when the PRIMARY purpose of the file is describing integrations, connectors, data sources, or external services
+- Example: A dedicated "integrations.md" file listing all external systems, API connection docs, database setup guides
 
 **When integrations are extracted from other categories:**
-- A `business-info` file about customer support that mentions "send email via Gmail" → Gmail captured as connected service
-- A `technical-info` API doc that describes HubSpot integration → HubSpot captured as data source
-- A `code` file that imports Stripe SDK → Stripe captured as connected service
+- A `policy` file about customer support that mentions "send email via Gmail" → Gmail captured as connected service
+- A `reference` API doc that describes HubSpot integration → HubSpot captured as data source
+- A `pattern` file that imports Stripe SDK → Stripe captured as connected service
 
 **Integration Metadata Structure:**
 
@@ -167,47 +169,61 @@ MVP categories (agents determine during learn):
 | **authentication** | How to connect to systems | oauth2, api-key, basic-auth, jwt |
 | **connectedServices** | All external services mentioned | Gmail, HubSpot, PostgreSQL, Slack |
 
-**Example Integration-Spec Entry:**
+**Example Integration Entry:**
 
 ```markdown
 ---
-id: uuid-5678
-type: integration-spec
+type: knowledge
 title: Customer Pickup Notification Workflow
+summary: Gmail-based notification system triggered by web form when customer orders are ready
+created_at: 2026-02-09T14:30:00Z
+updated_at: 2026-02-09T14:30:00Z
+source:
+  file: /path/to/original/notification-workflow.md
+  project: customer-support-agent
+  path: docs/workflows
 classification:
-  category: integration-spec
-  tags:
-    - customer-notification
+  category: integration
+  confidence: 0.95
+  reasoning: File describes external service connections and workflow automation
+  topics:
+    - gmail
+    - notification
     - email-automation
-integrations:
-  triggers:
-    - type: manual
-      source: web-form
-      description: Worker enters customer name
-  dataSources:
-    - type: database
-      name: customer-db
-      description: Customer emails and notes
-  outputs:
-    - type: email
-      provider: gmail
-      description: Personalized pickup notification
-  aiTasks:
-    - task: generate-email
-      description: Write personalized pickup notification using customer notes
-  authentication:
-    - system: gmail
-      method: oauth2
-    - system: customer-db
-      method: api-key
-  connectedServices:
-    - Gmail
-    - PostgreSQL
+    - webhook
+    - postgresql
+status: active
 ---
 
 # Customer Pickup Notification Workflow
 
-When the item is ready, the worker enters the customer name into a web form...
+## Connected Services
+- **Gmail** - OAuth2 authentication for sending emails
+- **PostgreSQL** - API key authentication for customer database
+
+## Triggers
+- Manual trigger via web form when worker enters customer name
+
+## Data Sources
+- Customer database: emails and order notes
+
+## Outputs
+- Personalized pickup notification email via Gmail
+
+## AI Tasks
+- Generate personalized email content using customer notes and order history
+
+## Authentication
+| Service | Method |
+|---------|--------|
+| Gmail | OAuth2 |
+| Customer DB | API Key |
+
+## Usage for Agents
+This integration enables agents to:
+- Look up customer contact information
+- Generate personalized notification emails
+- Send automated communications when orders are ready
 ```
 
 ---
@@ -608,3 +624,4 @@ confidence: 0.95
 - v2.4 (2026-02-05): Fixed Tool Interactions to use .mdc; resolved context merging question
 - v3.0 (2026-02-05): Promoted to docs/design/; updated links and status to Final
 - v3.1 (2026-02-09): Renamed kahuna_setup → kahuna_initialize; removed kahuna_review (now skill-based)
+- v3.2 (2026-02-09): Added `integration` category for data sources, tools, and external services; aligned categories with implementation
