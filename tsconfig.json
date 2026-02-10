@@ -1,4 +1,8 @@
 {
   "files": [],
-  "references": [{ "path": "packages/shared" }, { "path": "apps/api" }, { "path": "apps/web" }]
+  "references": [
+    { "path": "apps/mcp" },
+    { "path": "packages/testing" },
+    { "path": "packages/vck-templates" }
+  ]
 }

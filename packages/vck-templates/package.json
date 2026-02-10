@@ -15,9 +15,6 @@
     "build": "tsc -b",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@kahuna/shared": "workspace:*"
-  },
   "devDependencies": {
     "@types/node": "^22.0.0"
   }

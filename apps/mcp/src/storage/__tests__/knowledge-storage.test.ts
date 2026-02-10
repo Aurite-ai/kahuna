@@ -119,21 +119,21 @@ describe('FileKnowledgeStorageService', () => {
       expect(files.filter((f) => f.includes('same-title'))).toHaveLength(1);
     });
 
-    it('maps AI categories correctly', async () => {
-      const businessInput = createTestInput({ title: 'Business Doc', category: 'business-info' });
-      const technicalInput = createTestInput({
-        title: 'Technical Doc',
-        category: 'technical-info',
-      });
-      const codeInput = createTestInput({ title: 'Code Doc', category: 'code' });
+    it('validates categories correctly', async () => {
+      const policyInput = createTestInput({ title: 'Policy Doc', category: 'policy' });
+      const referenceInput = createTestInput({ title: 'Reference Doc', category: 'reference' });
+      const patternInput = createTestInput({ title: 'Pattern Doc', category: 'pattern' });
+      const unknownInput = createTestInput({ title: 'Unknown Doc', category: 'unknown-category' });
 
-      const businessEntry = await storage.save(businessInput);
-      const technicalEntry = await storage.save(technicalInput);
-      const codeEntry = await storage.save(codeInput);
+      const policyEntry = await storage.save(policyInput);
+      const referenceEntry = await storage.save(referenceInput);
+      const patternEntry = await storage.save(patternInput);
+      const unknownEntry = await storage.save(unknownInput);
 
-      expect(businessEntry.classification.category).toBe('policy');
-      expect(technicalEntry.classification.category).toBe('reference');
-      expect(codeEntry.classification.category).toBe('pattern');
+      expect(policyEntry.classification.category).toBe('policy');
+      expect(referenceEntry.classification.category).toBe('reference');
+      expect(patternEntry.classification.category).toBe('pattern');
+      expect(unknownEntry.classification.category).toBe('context'); // Fallback
     });
 
     it('handles missing optional metadata', async () => {

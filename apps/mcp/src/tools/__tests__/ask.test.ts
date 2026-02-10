@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { KnowledgeEntry, KnowledgeStorageService } from '../../storage/index.js';
+import type { KnowledgeStorageService } from '../../storage/index.js';
 import { askToolDefinition, askToolHandler } from '../ask.js';
+import type { ToolContext } from '../types.js';
+import { createMockContext, createMockEntry } from './test-utils.js';
 
 // Mock Anthropic client - simulates agentic tool use flow
 const mockCreate = vi.fn();
@@ -12,57 +14,6 @@ vi.mock('@anthropic-ai/sdk', () => ({
     },
   })),
 }));
-
-/**
- * Create a mock storage service for testing
- */
-function createMockStorage(overrides?: Partial<KnowledgeStorageService>): KnowledgeStorageService {
-  return {
-    save: vi.fn(),
-    list: vi.fn(),
-    get: vi.fn(),
-    exists: vi.fn(),
-    delete: vi.fn(),
-    healthCheck: vi.fn(),
-    ...overrides,
-  };
-}
-
-/**
- * Create a mock KnowledgeEntry for testing
- */
-function createMockEntry(overrides?: Partial<KnowledgeEntry>): KnowledgeEntry {
-  const now = new Date().toISOString();
-  return {
-    slug: 'test-entry',
-    type: 'knowledge',
-    title: 'Test Entry',
-    summary: 'A test entry for the knowledge base',
-    created_at: now,
-    updated_at: now,
-    source: {
-      file: 'test.md',
-      project: 'test-project',
-      path: null,
-    },
-    classification: {
-      category: 'reference',
-      confidence: 0.9,
-      reasoning: 'Test reasoning',
-      tags: ['test', 'example'],
-      topics: ['testing'],
-      entities: {
-        technologies: ['TypeScript'],
-        frameworks: [],
-        libraries: [],
-        apis: [],
-      },
-    },
-    status: 'active',
-    content: '# Test Content\n\nThis is test content about testing.',
-    ...overrides,
-  };
-}
 
 describe('askToolDefinition', () => {
   it('has the correct name', () => {
@@ -85,12 +36,14 @@ describe('askToolDefinition', () => {
 });
 
 describe('askToolHandler', () => {
+  let ctx: ToolContext;
   let mockStorage: KnowledgeStorageService;
   const originalEnv = process.env;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockStorage = createMockStorage();
+    ctx = createMockContext();
+    mockStorage = ctx.storage;
     // Mock environment with API key for Anthropic SDK
     process.env = { ...originalEnv, ANTHROPIC_API_KEY: 'test-key' };
   });
@@ -102,7 +55,7 @@ describe('askToolHandler', () => {
 
   describe('input validation', () => {
     it('returns error when question is missing', async () => {
-      const result = await askToolHandler({}, mockStorage);
+      const result = await askToolHandler({}, ctx);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
@@ -111,7 +64,7 @@ describe('askToolHandler', () => {
     });
 
     it('returns error when question is empty string', async () => {
-      const result = await askToolHandler({ question: '' }, mockStorage);
+      const result = await askToolHandler({ question: '' }, ctx);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
@@ -120,7 +73,7 @@ describe('askToolHandler', () => {
     });
 
     it('returns error when question is only whitespace', async () => {
-      const result = await askToolHandler({ question: '   ' }, mockStorage);
+      const result = await askToolHandler({ question: '   ' }, ctx);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
@@ -158,7 +111,7 @@ describe('askToolHandler', () => {
 
       const result = await askToolHandler(
         { question: 'What testing framework do we use?' },
-        mockStorage
+        ctx
       );
 
       const response = JSON.parse(result.content[0].text);
@@ -206,7 +159,7 @@ describe('askToolHandler', () => {
       vi.mocked(mockStorage.list).mockResolvedValue([testEntry]);
       vi.mocked(mockStorage.get).mockResolvedValue(testEntry);
 
-      const result = await askToolHandler({ question: 'What is in the test entry?' }, mockStorage);
+      const result = await askToolHandler({ question: 'What is in the test entry?' }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.success).toBe(true);
@@ -238,7 +191,7 @@ describe('askToolHandler', () => {
 
       vi.mocked(mockStorage.list).mockResolvedValue([]);
 
-      const result = await askToolHandler({ question: 'What is the API rate limit?' }, mockStorage);
+      const result = await askToolHandler({ question: 'What is the API rate limit?' }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.success).toBe(true);
@@ -270,7 +223,7 @@ describe('askToolHandler', () => {
 
       vi.mocked(mockStorage.get).mockResolvedValue(null);
 
-      const result = await askToolHandler({ question: 'Read a missing file' }, mockStorage);
+      const result = await askToolHandler({ question: 'Read a missing file' }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.success).toBe(true);
@@ -290,7 +243,7 @@ describe('askToolHandler', () => {
         ],
       });
 
-      const result = await askToolHandler({ question: 'What language do we use?' }, mockStorage);
+      const result = await askToolHandler({ question: 'What language do we use?' }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.success).toBe(true);
@@ -315,7 +268,7 @@ describe('askToolHandler', () => {
 
       vi.mocked(mockStorage.list).mockRejectedValue(new Error('Storage unavailable'));
 
-      const result = await askToolHandler({ question: 'What is the API rate limit?' }, mockStorage);
+      const result = await askToolHandler({ question: 'What is the API rate limit?' }, ctx);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
@@ -327,7 +280,7 @@ describe('askToolHandler', () => {
     it('handles Anthropic API errors', async () => {
       mockCreate.mockRejectedValue(new Error('API rate limited'));
 
-      const result = await askToolHandler({ question: 'Test question' }, mockStorage);
+      const result = await askToolHandler({ question: 'Test question' }, ctx);
 
       expect(result.isError).toBe(true);
       const response = JSON.parse(result.content[0].text);
@@ -351,7 +304,7 @@ describe('askToolHandler', () => {
 
       vi.mocked(mockStorage.list).mockResolvedValue([]);
 
-      const result = await askToolHandler({ question: 'Test max iterations' }, mockStorage);
+      const result = await askToolHandler({ question: 'Test max iterations' }, ctx);
 
       const response = JSON.parse(result.content[0].text);
       expect(response.success).toBe(true);

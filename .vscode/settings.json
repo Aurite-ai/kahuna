@@ -12,11 +12,20 @@
     "vite.config.ts": "vite.config.*.ts, vite.config.*.mts, eslint*, prettier*, tsconfig*",
     "Dockerfile": "docker-compose*.yml, Dockerfile.*, docker-entrypoint.sh, railway.toml, .dockerignore",
     ".gitignore": ".eslintignore, .prettierignore, .dockerignore, .rooignore",
-    "pnpm-workspace.yaml": "turbo.json, .npmrc, .prettierrc, knip.json"
+    "pnpm-workspace.yaml": "turbo.json, .npmrc, .prettierrc, knip.json",
   },
   "files.associations": {
     "*.tsx": "typescriptreact",
     "*.ts": "typescript",
      "*.mdc": "markdown"
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/.turbo": true,
+    "**/node_modules": true,
   }
 }

@@ -16,10 +16,12 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { FileSizeError, categorizeFile } from '@kahuna/file-router';
-import type { KnowledgeStorageService, SaveKnowledgeEntryInput } from '../storage/index.js';
+import { z } from 'zod';
+import { FileSizeError, categorizeFile } from '../categorization/index.js';
+import type { SaveKnowledgeEntryInput } from '../storage/index.js';
 import { KnowledgeStorageError } from '../storage/index.js';
 import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
+import type { ToolContext } from './types.js';
 
 /**
  * Tool definition for MCP registration.
@@ -74,12 +76,14 @@ Kahuna's agents will:
 };
 
 /**
- * Input type for the tool.
+ * Zod schema for validating learn tool input.
  */
-interface LearnToolInput {
-  paths: string[];
-  description?: string;
-}
+const learnInputSchema = z.object({
+  paths: z
+    .array(z.string(), { error: 'Missing or empty paths array' })
+    .min(1, { message: 'paths array cannot be empty' }),
+  description: z.string().optional(),
+});
 
 /**
  * Result for a single file learning process
@@ -236,17 +240,19 @@ async function readFileContent(filePath: string): Promise<string> {
  */
 export async function learnToolHandler(
   args: Record<string, unknown>,
-  storage: KnowledgeStorageService
+  ctx: ToolContext
 ): Promise<MCPToolResponse> {
-  const input = args as unknown as LearnToolInput;
-  const { paths, description } = input;
-
-  // Validate input
-  if (!paths || !Array.isArray(paths) || paths.length === 0) {
-    return errorResponse('Missing or empty paths array', {
+  const { storage } = ctx;
+  // Validate input with Zod
+  const parseResult = learnInputSchema.safeParse(args);
+  if (!parseResult.success) {
+    const issues = parseResult.error.issues.map((i) => i.message).join(', ');
+    return errorResponse(`Invalid input: ${issues}`, {
       hint: 'Provide at least one file or folder path',
     });
   }
+
+  const { paths, description } = parseResult.data;
 
   // Resolve paths to files
   const { files, errors: pathErrors } = await resolvePaths(paths);

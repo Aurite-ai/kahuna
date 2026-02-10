@@ -8,7 +8,7 @@
 
 ## Overview
 
-When `kahuna_setup` initializes a project, it creates configuration files that teach the copilot how to work with Kahuna and follow structured agent development practices.
+When `kahuna_initialize` initializes a project, it creates configuration files that teach the copilot how to work with Kahuna and follow structured agent development practices.
 
 **MVP Scope:** Static files copied from templates. Future versions may customize based on project context.
 
@@ -83,7 +83,7 @@ Copilot rules that enforce structured development.
 - Read `context/README.md` at task start
 - Use `kahuna_prepare_context` before implementation
 - Use `kahuna_ask` for mid-task questions
-- Use `kahuna_review` before commits
+- Invoke verification skill before commits
 
 ### .claude/skills/
 
@@ -148,3 +148,4 @@ The copilot configuration and knowledge base work together but are distinct:
 
 - v1.0 (2026-02-05): Initial specification (placeholder for team input)
 - v2.0 (2026-02-05): Promoted to docs/design/; updated links and status
+- v2.1 (2026-02-09): Renamed kahuna_setup → kahuna_initialize; replaced kahuna_review with verification skill
