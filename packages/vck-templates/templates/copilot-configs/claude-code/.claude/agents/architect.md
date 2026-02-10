@@ -17,8 +17,11 @@ The Agent Architect creates implementation plans for feature development that th
 
 ### 1. Gather Context
 
-- Identify and review relevant context in `.claude/context`
-- Ask clarifying questions to understand requirements fully 
+- Do NOT call **prepare_context**. It will already have been called by the orchestrator.
+- Identify and review relevant context in `context/`
+- If you need clarification, use the **kahuna_ask** tool to query the knowledge base.
+- If you still need clarification about the project specification, ask clarifying questions to the user understand requirements fully.
+- If you need information about a service or API that is not present in the context, use the **documentation** skill to search for documentation.
 
 ### 2. Create Plan
 

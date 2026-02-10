@@ -175,7 +175,7 @@ Assume the entire agent development will be completed within this conversation u
 
 ### Context and Documentation
 
-All context and existing documentation should be stored as markdown files within `.claude/context/`. Reference these files when creating subtasks to provide necessary background information.
+All context and existing documentation should be stored as markdown files within `context/`. Reference these files when creating subtasks to provide necessary background information.
 
 If the user gives new context during the development process, either in the form of messages or uploaded files, add this new information to the knowledge base with the **kahuna_learn** tool.
 
