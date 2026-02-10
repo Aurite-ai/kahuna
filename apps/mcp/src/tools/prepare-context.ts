@@ -81,7 +81,7 @@ kahuna_prepare_context(task="Understand our API design patterns")
       includeBoilerplate: {
         type: 'boolean',
         description:
-          'Whether to copy framework boilerplate to src/. Defaults to false. Set true only for greenfield projects that need scaffolding.',
+          'Whether to copy framework boilerplate to src/. Defaults to true. Set false if you already have project structure.',
       },
     },
     required: ['task'],
@@ -97,7 +97,7 @@ const prepareContextInputSchema = z.object({
     .transform((val) => val.trim())
     .refine((val) => val.length > 0, { message: 'Missing or empty task' }),
   files: z.array(z.string()).optional(),
-  includeBoilerplate: z.boolean().optional().default(false),
+  includeBoilerplate: z.boolean().optional().default(true),
 });
 
 /**
@@ -358,8 +358,8 @@ export async function prepareContextToolHandler(
 
         // Check if this entry should be referenced locally instead of copied
         const shouldReference = await shouldReferenceLocally(entry);
-        if (shouldReference && entry.source?.file) {
-          const localPath = getRelativeLocalPath(entry.source.file);
+        if (shouldReference) {
+          const localPath = getRelativeLocalPath(entry);
           referencedFiles.push({
             slug: sel.slug,
             reason: sel.reason,

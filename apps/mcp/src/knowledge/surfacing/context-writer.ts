@@ -160,26 +160,22 @@ export async function writeContextReadme(
 
 /**
  * Check if a KB entry should be referenced locally instead of copied.
- * Returns true if the entry originated from a file in the current project
- * and that file still exists.
+ * Returns true if the source file exists in the current working directory
+ * (at the recorded relative path).
  *
  * @param entry - The knowledge entry to check
  * @returns Promise<boolean> - True if entry should be referenced locally
  */
 export async function shouldReferenceLocally(entry: KnowledgeEntry): Promise<boolean> {
-  // Check if entry has source info and came from the current project
-  if (!entry.source?.project || !entry.source?.file) {
+  // Check if entry has source path info
+  if (!entry.source?.path) {
     return false;
   }
 
-  // Check if source project matches current working directory
-  if (entry.source.project !== process.cwd()) {
-    return false;
-  }
-
-  // Check if the source file still exists
+  // Check if the source file exists at the relative path from cwd
   try {
-    await fs.access(entry.source.file);
+    const fullPath = path.join(process.cwd(), entry.source.path);
+    await fs.access(fullPath);
     return true;
   } catch {
     return false;
@@ -188,19 +184,26 @@ export async function shouldReferenceLocally(entry: KnowledgeEntry): Promise<boo
 
 /**
  * Get the relative path from context/ to the source file.
- * Assumes contextDir is a direct child of process.cwd().
+ * Prefers source.path (relative path) over source.file (filename only).
  *
- * @param sourceFile - Absolute or project-relative path to the source file
+ * @param entry - The knowledge entry with source info
  * @returns Relative path suitable for markdown links from context/README.md
  */
-export function getRelativeLocalPath(sourceFile: string): string {
+export function getRelativeLocalPath(entry: KnowledgeEntry): string {
+  if (!entry.source) {
+    return '';
+  }
+
+  // Prefer source.path (the full relative path) over source.file (just filename)
+  const sourcePath = entry.source.path || entry.source.file || '';
+
   // If the path is already relative, just use it
-  if (!path.isAbsolute(sourceFile)) {
-    return sourceFile;
+  if (!path.isAbsolute(sourcePath)) {
+    return sourcePath;
   }
 
   // Get path relative to cwd
-  const relativeToCwd = path.relative(process.cwd(), sourceFile);
+  const relativeToCwd = path.relative(process.cwd(), sourcePath);
   return relativeToCwd;
 }
 

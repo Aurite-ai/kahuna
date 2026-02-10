@@ -270,17 +270,21 @@ Follow these rules for API design.`;
   });
 
   describe('shouldReferenceLocally', () => {
+    let tempDir: string;
     let tempFile: string;
+    let relativePath: string;
 
     beforeEach(async () => {
-      // Create a temp file that "exists" in the current project
-      tempFile = path.join(os.tmpdir(), `kahuna-test-file-${Date.now()}.md`);
+      // Create a temp file relative to cwd for testing
+      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kahuna-test-'));
+      relativePath = path.relative(process.cwd(), path.join(tempDir, 'test.md'));
+      tempFile = path.join(tempDir, 'test.md');
       await fs.writeFile(tempFile, '# Test content');
     });
 
     afterEach(async () => {
       try {
-        await fs.unlink(tempFile);
+        await fs.rm(tempDir, { recursive: true });
       } catch {
         // Ignore cleanup errors
       }
@@ -311,9 +315,9 @@ Follow these rules for API design.`;
       };
     }
 
-    it('returns false when source.project is null', async () => {
+    it('returns false when source.path is null', async () => {
       const entry = createMockEntry({
-        source: { file: tempFile, project: null, path: null },
+        source: { file: 'test.md', project: process.cwd(), path: null },
       });
 
       const result = await shouldReferenceLocally(entry);
@@ -321,9 +325,10 @@ Follow these rules for API design.`;
       expect(result).toBe(false);
     });
 
-    it('returns false when source.file is empty', async () => {
+
+    it('returns false when source.path file does not exist', async () => {
       const entry = createMockEntry({
-        source: { file: '', project: process.cwd(), path: null },
+        source: { file: 'nonexistent.md', project: process.cwd(), path: 'nonexistent/file.md' },
       });
 
       const result = await shouldReferenceLocally(entry);
@@ -331,29 +336,9 @@ Follow these rules for API design.`;
       expect(result).toBe(false);
     });
 
-    it('returns false when source.project does not match cwd', async () => {
+    it('returns true when source.path exists relative to cwd', async () => {
       const entry = createMockEntry({
-        source: { file: tempFile, project: '/different/project', path: null },
-      });
-
-      const result = await shouldReferenceLocally(entry);
-
-      expect(result).toBe(false);
-    });
-
-    it('returns false when source file does not exist', async () => {
-      const entry = createMockEntry({
-        source: { file: '/nonexistent/file.md', project: process.cwd(), path: null },
-      });
-
-      const result = await shouldReferenceLocally(entry);
-
-      expect(result).toBe(false);
-    });
-
-    it('returns true when project matches cwd and file exists', async () => {
-      const entry = createMockEntry({
-        source: { file: tempFile, project: process.cwd(), path: null },
+        source: { file: 'test.md', project: '/some/other/project', path: relativePath },
       });
 
       const result = await shouldReferenceLocally(entry);
@@ -363,29 +348,71 @@ Follow these rules for API design.`;
   });
 
   describe('getRelativeLocalPath', () => {
-    it('returns relative path unchanged', () => {
-      const relativePath = 'docs/api-design.md';
+    it('returns source.path when available', () => {
+      const entry = {
+        slug: 'test',
+        title: 'Test',
+        summary: 'Test',
+        content: 'content',
+        source: {
+          file: 'api-design.md',
+          path: 'docs/api-design.md',
+          project: process.cwd(),
+        },
+      } as KnowledgeEntry;
 
-      const result = getRelativeLocalPath(relativePath);
+      const result = getRelativeLocalPath(entry);
 
       expect(result).toBe('docs/api-design.md');
     });
 
+    it('falls back to source.file when source.path is not available', () => {
+      const entry = {
+        slug: 'test',
+        title: 'Test',
+        summary: 'Test',
+        content: 'content',
+        source: {
+          file: 'api-design.md',
+          project: process.cwd(),
+        },
+      } as KnowledgeEntry;
+
+      const result = getRelativeLocalPath(entry);
+
+      expect(result).toBe('api-design.md');
+    });
+
     it('converts absolute path to relative path from cwd', () => {
       const absolutePath = path.join(process.cwd(), 'docs', 'api-design.md');
+      const entry = {
+        slug: 'test',
+        title: 'Test',
+        summary: 'Test',
+        content: 'content',
+        source: {
+          file: 'api-design.md',
+          path: absolutePath,
+          project: process.cwd(),
+        },
+      } as KnowledgeEntry;
 
-      const result = getRelativeLocalPath(absolutePath);
+      const result = getRelativeLocalPath(entry);
 
       expect(result).toBe(path.join('docs', 'api-design.md'));
     });
 
-    it('handles path outside cwd correctly', () => {
-      const outsidePath = '/some/other/path/file.md';
+    it('returns empty string when no source', () => {
+      const entry = {
+        slug: 'test',
+        title: 'Test',
+        summary: 'Test',
+        content: 'content',
+      } as KnowledgeEntry;
 
-      const result = getRelativeLocalPath(outsidePath);
+      const result = getRelativeLocalPath(entry);
 
-      // Should return a relative path (with ../ components)
-      expect(path.isAbsolute(result)).toBe(false);
+      expect(result).toBe('');
     });
   });
 });
