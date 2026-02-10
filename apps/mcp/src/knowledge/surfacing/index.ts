@@ -9,7 +9,10 @@ export {
   writeContextFile,
   writeContextReadme,
   listContextFiles,
+  shouldReferenceLocally,
+  getRelativeLocalPath,
   type ContextSelection,
+  type ReferencedFile,
 } from './context-writer.js';
 
 export {
@@ -18,3 +21,5 @@ export {
   FrameworkError,
   type FrameworkCopyResult,
 } from './framework-copier.js';
+
+export { generateFileTree, type FileTreeOptions } from './file-tree.js';

@@ -16,12 +16,16 @@ import {
   type FrameworkCopyResult,
   type KnowledgeEntry,
   RETRIEVAL_PROMPT,
+  type ReferencedFile,
   buildRetrievalUserMessage,
   clearContextDir,
   copyFrameworkBoilerplate,
+  generateFileTree,
   generateMdcFile,
+  getRelativeLocalPath,
   retrievalTools,
   runAgent,
+  shouldReferenceLocally,
   writeContextFile,
   writeContextReadme,
 } from '../knowledge/index.js';
@@ -74,6 +78,11 @@ kahuna_prepare_context(task="Understand our API design patterns")
           type: 'string',
         },
       },
+      includeBoilerplate: {
+        type: 'boolean',
+        description:
+          'Whether to copy framework boilerplate to src/. Defaults to false. Set true only for greenfield projects that need scaffolding.',
+      },
     },
     required: ['task'],
   },
@@ -88,6 +97,7 @@ const prepareContextInputSchema = z.object({
     .transform((val) => val.trim())
     .refine((val) => val.length > 0, { message: 'Missing or empty task' }),
   files: z.array(z.string()).optional(),
+  includeBoilerplate: z.boolean().optional().default(false),
 });
 
 /**
@@ -142,6 +152,7 @@ function buildContextReadyMarkdown(
   task: string,
   selections: FileSelection[],
   entries: Map<string, KnowledgeEntry>,
+  referencedFiles?: ReferencedFile[],
   frameworkResult?: FrameworkCopyResult
 ): string {
   const parts: string[] = [];
@@ -168,18 +179,35 @@ function buildContextReadyMarkdown(
     parts.push('All framework files already exist in your project. No files copied.\n');
   }
 
-  parts.push('## Relevant Context Surfaced\n');
-  parts.push('| Topic | File | Why Relevant |');
-  parts.push('|-------|------|--------------|');
+  // Relevant context surfaced (copied to context/)
+  if (selections.length > 0) {
+    parts.push('## Relevant Context Surfaced\n');
+    parts.push('| Topic | File | Why Relevant |');
+    parts.push('|-------|------|--------------|');
 
-  for (const sel of selections) {
-    const entry = entries.get(sel.slug);
-    const title = entry?.title || sel.slug;
-    parts.push(`| ${title} | context/${sel.slug}.md | ${sel.reason} |`);
+    for (const sel of selections) {
+      const entry = entries.get(sel.slug);
+      const title = entry?.title || sel.slug;
+      parts.push(`| ${title} | context/${sel.slug}.md | ${sel.reason} |`);
+    }
+    parts.push('');
+  }
+
+  // Local project files (referenced, not copied)
+  if (referencedFiles && referencedFiles.length > 0) {
+    parts.push('## Local Project Files\n');
+    parts.push('These KB entries originated from files in your project. Read them directly:\n');
+    parts.push('| Topic | Location | Why Relevant |');
+    parts.push('|-------|----------|--------------|');
+
+    for (const ref of referencedFiles) {
+      parts.push(`| ${ref.slug} | ${ref.localPath} | ${ref.reason} |`);
+    }
+    parts.push('');
   }
 
   // Start Here section
-  parts.push('\n## Start Here\n');
+  parts.push('## Start Here\n');
   let stepNum = 1;
 
   // If framework was scaffolded, mention it first
@@ -191,6 +219,7 @@ function buildContextReadyMarkdown(
   parts.push(`${stepNum}. **Read context/README.md** — Full navigation`);
   stepNum++;
 
+  // Include top selections from copied files
   const topSelections = selections.slice(0, 2);
   for (const sel of topSelections) {
     const entry = entries.get(sel.slug);
@@ -199,8 +228,21 @@ function buildContextReadyMarkdown(
     stepNum++;
   }
 
+  // Include referenced files in start here too (if room)
+  if (referencedFiles && referencedFiles.length > 0 && stepNum <= 4) {
+    const remaining = Math.min(4 - stepNum + 1, referencedFiles.length);
+    for (let i = 0; i < remaining; i++) {
+      const ref = referencedFiles[i];
+      parts.push(`${stepNum}. **Check ${ref.localPath}** — ${ref.slug}`);
+      stepNum++;
+    }
+  }
+
   parts.push('\n<hints>');
   parts.push('- Context folder is ready — read files directly');
+  if (referencedFiles && referencedFiles.length > 0) {
+    parts.push('- Some KB entries reference local project files — no need to copy');
+  }
   if (frameworkResult?.copiedFiles.length) {
     parts.push('- Framework boilerplate is in src/ — start from there');
   }
@@ -266,7 +308,7 @@ export async function prepareContextToolHandler(
     );
   }
 
-  const { task, files } = parseResult.data;
+  const { task, files, includeBoilerplate } = parseResult.data;
 
   try {
     // Check if KB is empty
@@ -276,8 +318,11 @@ export async function prepareContextToolHandler(
       return markdownResponse(buildEmptyKBMarkdown());
     }
 
+    // Generate project file tree for the retrieval agent
+    const fileTree = await generateFileTree({ maxDepth: 4, maxEntries: 200 });
+
     // Run retrieval agent
-    const userMessage = buildRetrievalUserMessage(task, files);
+    const userMessage = buildRetrievalUserMessage(task, files, fileTree);
     const agentResult = await runAgent(
       {
         model: MODELS.retrieval,
@@ -301,26 +346,64 @@ export async function prepareContextToolHandler(
     const contextDir = path.join(process.cwd(), 'context');
     await clearContextDir(contextDir);
 
-    // Build entry lookup for selected files
+    // Build entry lookup and partition into copy vs reference
     const entryMap = new Map<string, KnowledgeEntry>();
+    const entriesToCopy: FileSelection[] = [];
+    const referencedFiles: ReferencedFile[] = [];
+
     for (const sel of selections) {
       const entry = await storage.get(sel.slug);
       if (entry) {
         entryMap.set(sel.slug, entry);
-        // Generate .mdc content and write stripped version to context/
-        const mdcContent = generateMdcFile(entry, entry.content);
-        await writeContextFile(contextDir, sel.slug, mdcContent);
+
+        // Check if this entry should be referenced locally instead of copied
+        const shouldReference = await shouldReferenceLocally(entry);
+        if (shouldReference && entry.source?.file) {
+          const localPath = getRelativeLocalPath(entry.source.file);
+          referencedFiles.push({
+            slug: sel.slug,
+            reason: sel.reason,
+            localPath,
+          });
+        } else {
+          entriesToCopy.push(sel);
+          // Generate .mdc content and write stripped version to context/
+          const mdcContent = generateMdcFile(entry, entry.content);
+          await writeContextFile(contextDir, sel.slug, mdcContent);
+        }
       }
     }
 
-    // Write README.md
-    await writeContextReadme(contextDir, task, selections);
-
-    // Copy framework boilerplate if selected
+    // Copy framework boilerplate if selected and includeBoilerplate is true
     let frameworkResult: FrameworkCopyResult | undefined;
     if (frameworkSelection) {
       try {
-        frameworkResult = await copyFrameworkBoilerplate(frameworkSelection.framework);
+        // Only copy boilerplate files if includeBoilerplate is true
+        if (includeBoilerplate) {
+          frameworkResult = await copyFrameworkBoilerplate(frameworkSelection.framework);
+        }
+
+        // Auto-surface the framework's KB doc regardless of includeBoilerplate setting
+        // (we want the docs even if we skip the boilerplate files)
+        const kbDocSlug = frameworkResult?.kbDocSlug ?? `framework-${frameworkSelection.framework}`;
+        const alreadySelected = selections.some((sel) => sel.slug === kbDocSlug);
+        const alreadyReferenced = referencedFiles.some((ref) => ref.slug === kbDocSlug);
+
+        if (!alreadySelected && !alreadyReferenced) {
+          const kbEntry = await storage.get(kbDocSlug);
+          if (kbEntry) {
+            const displayName = frameworkResult?.displayName ?? frameworkSelection.framework;
+            // Add to entriesToCopy for README and response (framework docs should always be copied)
+            entriesToCopy.push({
+              slug: kbDocSlug,
+              reason: `Framework best practices for ${displayName}`,
+            });
+            entryMap.set(kbDocSlug, kbEntry);
+            // Write to context/
+            const mdcContent = generateMdcFile(kbEntry, kbEntry.content);
+            await writeContextFile(contextDir, kbDocSlug, mdcContent);
+          }
+        }
       } catch (error) {
         // Log but don't fail the whole operation
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -328,7 +411,24 @@ export async function prepareContextToolHandler(
       }
     }
 
-    return markdownResponse(buildContextReadyMarkdown(task, selections, entryMap, frameworkResult));
+    // Write README.md with copied entries, referenced files, and framework result
+    await writeContextReadme(
+      contextDir,
+      task,
+      entriesToCopy,
+      referencedFiles.length > 0 ? referencedFiles : undefined,
+      frameworkResult
+    );
+
+    return markdownResponse(
+      buildContextReadyMarkdown(
+        task,
+        entriesToCopy,
+        entryMap,
+        referencedFiles.length > 0 ? referencedFiles : undefined,
+        frameworkResult
+      )
+    );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return markdownResponse(

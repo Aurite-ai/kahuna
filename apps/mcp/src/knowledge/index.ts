@@ -63,10 +63,16 @@ export {
   writeContextFile,
   writeContextReadme,
   listContextFiles,
+  shouldReferenceLocally,
+  getRelativeLocalPath,
   type ContextSelection,
+  type ReferencedFile,
   // Framework
   copyFrameworkBoilerplate,
   resolveFrameworkTemplateDir,
   FrameworkError,
   type FrameworkCopyResult,
+  // File tree
+  generateFileTree,
+  type FileTreeOptions,
 } from './surfacing/index.js';

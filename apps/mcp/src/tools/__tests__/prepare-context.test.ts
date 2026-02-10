@@ -15,6 +15,8 @@ vi.mock('../../knowledge/surfacing/context-writer.js', () => ({
   writeContextFile: vi.fn(),
   writeContextReadme: vi.fn(),
   listContextFiles: vi.fn(),
+  shouldReferenceLocally: vi.fn().mockResolvedValue(false), // Default: copy files to context/
+  getRelativeLocalPath: vi.fn((path) => path),
 }));
 
 // Mock generateMdcFile from storage utils
@@ -144,7 +146,9 @@ describe('prepareContextToolHandler', () => {
         expect.arrayContaining([
           expect.objectContaining({ slug: 'api-guidelines' }),
           expect.objectContaining({ slug: 'error-patterns' }),
-        ])
+        ]),
+        undefined, // referencedFiles (none since shouldReferenceLocally returns false)
+        undefined // frameworkResult (no framework selected)
       );
 
       // Verify markdown response

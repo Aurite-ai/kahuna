@@ -1,17 +1,21 @@
 /**
  * Tests for context writer
  *
- * Tests clearContextDir, writeContextFile, writeContextReadme, listContextFiles.
+ * Tests clearContextDir, writeContextFile, writeContextReadme, listContextFiles,
+ * shouldReferenceLocally, and getRelativeLocalPath.
  * Uses real temp directories for filesystem tests.
  */
 
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { KnowledgeEntry } from '../../storage/types.js';
 import {
   clearContextDir,
+  getRelativeLocalPath,
   listContextFiles,
+  shouldReferenceLocally,
   writeContextFile,
   writeContextReadme,
 } from '../context-writer.js';
@@ -164,6 +168,62 @@ Follow these rules for API design.`;
       expect(readme).toContain('Prepared by Kahuna');
       expect(readme).toContain('kahuna_ask');
     });
+
+    it('includes Local Project Files section when referencedFiles provided', async () => {
+      const selections = [{ slug: 'copied-file', reason: 'Copied to context' }];
+      const referencedFiles = [
+        { slug: 'local-doc', reason: 'From local project', localPath: 'docs/api-design.md' },
+      ];
+
+      await writeContextReadme(contextDir, 'Test with local files', selections, referencedFiles);
+
+      const readme = await fs.readFile(path.join(contextDir, 'README.md'), 'utf-8');
+
+      expect(readme).toContain('## Local Project Files');
+      expect(readme).toContain('These KB entries originated from files in your project');
+      expect(readme).toContain('local-doc');
+      expect(readme).toContain('docs/api-design.md');
+      expect(readme).toContain('../docs/api-design.md'); // Link format
+    });
+
+    it('includes Framework section when frameworkResult provided with copied files', async () => {
+      const selections = [{ slug: 'test-file', reason: 'Test' }];
+      const frameworkResult = {
+        framework: 'langgraph',
+        displayName: 'LangGraph',
+        copiedFiles: ['src/agent.py', 'src/tools.py'],
+        skippedFiles: [] as string[],
+        success: true,
+        kbDocSlug: 'langgraph-best-practices',
+      };
+
+      await writeContextReadme(contextDir, 'Build agent', selections, undefined, frameworkResult);
+
+      const readme = await fs.readFile(path.join(contextDir, 'README.md'), 'utf-8');
+
+      expect(readme).toContain('## Framework');
+      expect(readme).toContain('Framework: **LangGraph**');
+      expect(readme).toContain('Boilerplate files added to your project');
+      expect(readme).toContain('[README.md](../README.md)');
+    });
+
+    it('does not include Framework section when no files were copied', async () => {
+      const selections = [{ slug: 'test-file', reason: 'Test' }];
+      const frameworkResult = {
+        framework: 'langgraph',
+        displayName: 'LangGraph',
+        copiedFiles: [] as string[],
+        skippedFiles: ['src/agent.py'], // All files skipped
+        success: true,
+        kbDocSlug: 'langgraph-best-practices',
+      };
+
+      await writeContextReadme(contextDir, 'Build agent', selections, undefined, frameworkResult);
+
+      const readme = await fs.readFile(path.join(contextDir, 'README.md'), 'utf-8');
+
+      expect(readme).not.toContain('## Framework');
+    });
   });
 
   describe('listContextFiles', () => {
@@ -206,6 +266,126 @@ Follow these rules for API design.`;
       const files = await listContextFiles(contextDir);
 
       expect(files).toEqual([]);
+    });
+  });
+
+  describe('shouldReferenceLocally', () => {
+    let tempFile: string;
+
+    beforeEach(async () => {
+      // Create a temp file that "exists" in the current project
+      tempFile = path.join(os.tmpdir(), `kahuna-test-file-${Date.now()}.md`);
+      await fs.writeFile(tempFile, '# Test content');
+    });
+
+    afterEach(async () => {
+      try {
+        await fs.unlink(tempFile);
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+
+    function createMockEntry(overrides?: Partial<KnowledgeEntry>): KnowledgeEntry {
+      return {
+        slug: 'test-entry',
+        type: 'knowledge',
+        title: 'Test Entry',
+        summary: 'Test summary',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        source: {
+          file: 'test.md',
+          project: null,
+          path: null,
+        },
+        classification: {
+          category: 'reference',
+          confidence: 0.9,
+          reasoning: 'Test',
+          topics: ['test'],
+        },
+        status: 'active',
+        content: '# Test',
+        ...overrides,
+      };
+    }
+
+    it('returns false when source.project is null', async () => {
+      const entry = createMockEntry({
+        source: { file: tempFile, project: null, path: null },
+      });
+
+      const result = await shouldReferenceLocally(entry);
+
+      expect(result).toBe(false);
+    });
+
+    it('returns false when source.file is empty', async () => {
+      const entry = createMockEntry({
+        source: { file: '', project: process.cwd(), path: null },
+      });
+
+      const result = await shouldReferenceLocally(entry);
+
+      expect(result).toBe(false);
+    });
+
+    it('returns false when source.project does not match cwd', async () => {
+      const entry = createMockEntry({
+        source: { file: tempFile, project: '/different/project', path: null },
+      });
+
+      const result = await shouldReferenceLocally(entry);
+
+      expect(result).toBe(false);
+    });
+
+    it('returns false when source file does not exist', async () => {
+      const entry = createMockEntry({
+        source: { file: '/nonexistent/file.md', project: process.cwd(), path: null },
+      });
+
+      const result = await shouldReferenceLocally(entry);
+
+      expect(result).toBe(false);
+    });
+
+    it('returns true when project matches cwd and file exists', async () => {
+      const entry = createMockEntry({
+        source: { file: tempFile, project: process.cwd(), path: null },
+      });
+
+      const result = await shouldReferenceLocally(entry);
+
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('getRelativeLocalPath', () => {
+    it('returns relative path unchanged', () => {
+      const relativePath = 'docs/api-design.md';
+
+      const result = getRelativeLocalPath(relativePath);
+
+      expect(result).toBe('docs/api-design.md');
+    });
+
+    it('converts absolute path to relative path from cwd', () => {
+      const absolutePath = path.join(process.cwd(), 'docs', 'api-design.md');
+
+      const result = getRelativeLocalPath(absolutePath);
+
+      expect(result).toBe(path.join('docs', 'api-design.md'));
+    });
+
+    it('handles path outside cwd correctly', () => {
+      const outsidePath = '/some/other/path/file.md';
+
+      const result = getRelativeLocalPath(outsidePath);
+
+      // Should return a relative path (with ../ components)
+      expect(path.isAbsolute(result)).toBe(false);
     });
   });
 });

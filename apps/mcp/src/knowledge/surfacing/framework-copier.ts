@@ -1,7 +1,8 @@
 /**
  * Framework Boilerplate Copier
  *
- * Copies framework template files to the project's src/ directory.
+ * Copies framework template files to the project directory.
+ * Also copies shared project files (project-env → .env, project-gitignore → .gitignore).
  * Used by prepare_context when the agent selects a framework.
  *
  * See: docs/internal/plans/02-10_framework-selection.md
@@ -11,6 +12,15 @@ import * as fs from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { FRAMEWORKS } from '../../config.js';
+
+/**
+ * Mapping of template filenames to their destination names.
+ * Used for files that need renaming (e.g., project-env → .env to avoid tooling conflicts).
+ */
+const FILE_RENAME_MAP: Record<string, string> = {
+  'project-env': '.env',
+  'project-gitignore': '.gitignore',
+};
 
 /**
  * Result of a boilerplate copy operation.
@@ -26,6 +36,8 @@ export interface FrameworkCopyResult {
   skippedFiles: string[];
   /** Whether any files were copied */
   success: boolean;
+  /** KB doc slug to auto-surface (e.g., 'langgraph-best-practices') */
+  kbDocSlug: string;
 }
 
 /**
@@ -39,6 +51,18 @@ export class FrameworkError extends Error {
     super(message);
     this.name = 'FrameworkError';
   }
+}
+
+/**
+ * Resolve the path to the vck-templates directory.
+ * Uses package resolution to locate @kahuna/vck-templates.
+ *
+ * @returns Absolute path to the vck-templates package root
+ */
+function resolveVckTemplatesDir(): string {
+  const require = createRequire(import.meta.url);
+  const vckPackagePath = require.resolve('@kahuna/vck-templates/package.json');
+  return path.dirname(vckPackagePath);
 }
 
 /**
@@ -58,12 +82,18 @@ export function resolveFrameworkTemplateDir(frameworkId: string): string {
     );
   }
 
-  // Locate vck-templates package
-  const require = createRequire(import.meta.url);
-  const vckPackagePath = require.resolve('@kahuna/vck-templates/package.json');
-  const vckDir = path.dirname(vckPackagePath);
-
+  const vckDir = resolveVckTemplatesDir();
   return path.join(vckDir, 'templates', 'frameworks', frameworkId);
+}
+
+/**
+ * Get the destination filename, applying renaming rules if needed.
+ *
+ * @param filename - Original template filename
+ * @returns Destination filename (renamed if in FILE_RENAME_MAP)
+ */
+function getDestFilename(filename: string): string {
+  return FILE_RENAME_MAP[filename] ?? filename;
 }
 
 /**
@@ -93,7 +123,43 @@ async function getAllFiles(dir: string, baseDir: string): Promise<string[]> {
 }
 
 /**
+ * Copy a single file from source to destination, with optional renaming.
+ * Skips if destination already exists.
+ *
+ * @param srcPath - Source file path
+ * @param destPath - Destination file path (after any renaming)
+ * @param displayPath - Path to show in results (for user feedback)
+ * @param copiedFiles - Array to push copied file paths to
+ * @param skippedFiles - Array to push skipped file paths to
+ * @throws FrameworkError if copy fails
+ */
+async function copyFileIfNotExists(
+  srcPath: string,
+  destPath: string,
+  displayPath: string,
+  copiedFiles: string[],
+  skippedFiles: string[]
+): Promise<void> {
+  try {
+    await fs.access(destPath);
+    // File exists, skip it
+    skippedFiles.push(displayPath);
+  } catch {
+    // File doesn't exist, copy it
+    try {
+      await fs.mkdir(path.dirname(destPath), { recursive: true });
+      await fs.copyFile(srcPath, destPath);
+      copiedFiles.push(displayPath);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      throw new FrameworkError(`Failed to copy ${displayPath}: ${errorMsg}`, 'COPY_FAILED');
+    }
+  }
+}
+
+/**
  * Copy framework boilerplate to the project directory.
+ * Also copies shared project files (project-env → .env, project-gitignore → .gitignore).
  * Skips files that already exist (no overwriting).
  *
  * @param frameworkId - Framework identifier (e.g., 'langgraph')
@@ -125,33 +191,39 @@ export async function copyFrameworkBoilerplate(
     );
   }
 
-  // Get all template files
-  const templateFiles = await getAllFiles(templateDir, templateDir);
-
   const copiedFiles: string[] = [];
   const skippedFiles: string[] = [];
 
+  // 1. Copy shared project files (with renaming)
+  const vckDir = resolveVckTemplatesDir();
+  const sharedTemplatesDir = path.join(vckDir, 'templates');
+
+  for (const [srcFilename, destFilename] of Object.entries(FILE_RENAME_MAP)) {
+    const srcPath = path.join(sharedTemplatesDir, srcFilename);
+    const destPath = path.join(projectDir, destFilename);
+
+    // Check if source file exists before trying to copy
+    try {
+      await fs.access(srcPath);
+      await copyFileIfNotExists(srcPath, destPath, destFilename, copiedFiles, skippedFiles);
+    } catch {
+      // Source file doesn't exist, skip silently (not all shared files may be present)
+    }
+  }
+
+  // 2. Copy framework-specific files
+  const templateFiles = await getAllFiles(templateDir, templateDir);
+
   for (const relPath of templateFiles) {
     const srcPath = path.join(templateDir, relPath);
-    const destPath = path.join(projectDir, relPath);
+    // Apply renaming for any files in the framework dir that need it
+    const filename = path.basename(relPath);
+    const destFilename = getDestFilename(filename);
+    const destRelPath =
+      destFilename !== filename ? path.join(path.dirname(relPath), destFilename) : relPath;
+    const destPath = path.join(projectDir, destRelPath);
 
-    // Check if destination exists
-    try {
-      await fs.access(destPath);
-      // File exists, skip it
-      skippedFiles.push(relPath);
-    } catch {
-      // File doesn't exist, copy it
-      try {
-        // Ensure destination directory exists
-        await fs.mkdir(path.dirname(destPath), { recursive: true });
-        await fs.copyFile(srcPath, destPath);
-        copiedFiles.push(relPath);
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-        throw new FrameworkError(`Failed to copy ${relPath}: ${errorMsg}`, 'COPY_FAILED');
-      }
-    }
+    await copyFileIfNotExists(srcPath, destPath, destRelPath, copiedFiles, skippedFiles);
   }
 
   return {
@@ -160,5 +232,6 @@ export async function copyFrameworkBoilerplate(
     copiedFiles,
     skippedFiles,
     success: copiedFiles.length > 0 || skippedFiles.length > 0,
+    kbDocSlug: frameworkConfig.kbDocSlug,
   };
 }

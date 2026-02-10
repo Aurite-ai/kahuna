@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
+    "@kahuna/vck-templates": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "dotenv": "^16.4.0",
     "yaml": "^2.4.0",

@@ -9,7 +9,9 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import type { KnowledgeEntry } from '../storage/types.js';
 import { stripFrontmatter } from '../storage/utils.js';
+import type { FrameworkCopyResult } from './framework-copier.js';
 
 /**
  * Selection entry from the retrieval agent.
@@ -17,6 +19,15 @@ import { stripFrontmatter } from '../storage/utils.js';
 export interface ContextSelection {
   slug: string;
   reason: string;
+}
+
+/**
+ * A KB entry that should be referenced locally (not copied to context/).
+ */
+export interface ReferencedFile {
+  slug: string;
+  reason: string;
+  localPath: string;
 }
 
 /**
@@ -58,43 +69,139 @@ export async function writeContextFile(
  * @param contextDir - Path to the context directory
  * @param task - The task description that triggered context surfacing
  * @param selections - Files selected by the retrieval agent with reasons
+ * @param referencedFiles - Optional: Local project files to reference instead of copy
+ * @param frameworkResult - Optional: Framework boilerplate copy result
  */
 export async function writeContextReadme(
   contextDir: string,
   task: string,
-  selections: ContextSelection[]
+  selections: ContextSelection[],
+  referencedFiles?: ReferencedFile[],
+  frameworkResult?: FrameworkCopyResult
 ): Promise<void> {
   const date = new Date().toISOString().split('T')[0];
+  const parts: string[] = [];
 
-  // Build file table
-  const tableRows = selections
-    .map((s) => `| [${s.slug}.md](./${s.slug}.md) | ${s.reason} |`)
-    .join('\n');
+  parts.push(`# Context for: ${task}`);
+  parts.push('');
+  parts.push(`Surfaced from Kahuna knowledge base on ${date}.`);
+  parts.push('');
 
-  // Build "Start Here" section from first 2-3 selections
-  const startHere = selections
-    .slice(0, 3)
-    .map((s, i) => `${i + 1}. Review ${s.slug}.md — ${s.reason}`)
-    .join('\n');
+  // Framework section (if boilerplate was copied)
+  if (frameworkResult && frameworkResult.copiedFiles.length > 0) {
+    parts.push('## Framework');
+    parts.push('');
+    parts.push(`Framework: **${frameworkResult.displayName}**`);
+    parts.push(
+      'Boilerplate files added to your project. See [README.md](../README.md) for structure and usage.'
+    );
+    parts.push('');
+  }
 
-  const readme = `# Context for: ${task}
+  // Build file table for copied files
+  if (selections.length > 0) {
+    const tableRows = selections
+      .map((s) => `| [${s.slug}.md](./${s.slug}.md) | ${s.reason} |`)
+      .join('\n');
 
-Surfaced from Kahuna knowledge base on ${date}.
+    parts.push('| File | Why Relevant |');
+    parts.push('|------|--------------|');
+    parts.push(tableRows);
+    parts.push('');
+  }
 
-| File | Why Relevant |
-|------|--------------|
-${tableRows}
+  // Local project files section (referenced, not copied)
+  if (referencedFiles && referencedFiles.length > 0) {
+    parts.push('## Local Project Files');
+    parts.push('');
+    parts.push('These KB entries originated from files in your project. Read them directly:');
+    parts.push('');
+    parts.push('| Topic | Location |');
+    parts.push('|-------|----------|');
+    for (const ref of referencedFiles) {
+      parts.push(`| ${ref.slug} | [${ref.localPath}](../${ref.localPath}) |`);
+    }
+    parts.push('');
+  }
 
-## Start Here
+  // Build "Start Here" section
+  // Combine selections and referenced files for start here
+  const allItems = [
+    ...selections.map((s) => ({ slug: s.slug, reason: s.reason, isLocal: false })),
+    ...(referencedFiles || []).map((r) => ({
+      slug: r.slug,
+      reason: r.reason,
+      isLocal: true,
+      localPath: r.localPath,
+    })),
+  ];
 
-${startHere}
+  if (allItems.length > 0) {
+    parts.push('## Start Here');
+    parts.push('');
 
----
+    const startHere = allItems.slice(0, 3).map((item, i) => {
+      if ('localPath' in item && item.localPath) {
+        return `${i + 1}. Review ${item.localPath} — ${item.reason}`;
+      }
+      return `${i + 1}. Review ${item.slug}.md — ${item.reason}`;
+    });
+    parts.push(startHere.join('\n'));
+    parts.push('');
+  }
 
-*Prepared by Kahuna | Use \`kahuna_ask\` for additional questions*
-`;
+  parts.push('---');
+  parts.push('');
+  parts.push('*Prepared by Kahuna | Use `kahuna_ask` for additional questions*');
+  parts.push('');
 
-  await fs.writeFile(path.join(contextDir, 'README.md'), readme, 'utf-8');
+  await fs.writeFile(path.join(contextDir, 'README.md'), parts.join('\n'), 'utf-8');
+}
+
+/**
+ * Check if a KB entry should be referenced locally instead of copied.
+ * Returns true if the entry originated from a file in the current project
+ * and that file still exists.
+ *
+ * @param entry - The knowledge entry to check
+ * @returns Promise<boolean> - True if entry should be referenced locally
+ */
+export async function shouldReferenceLocally(entry: KnowledgeEntry): Promise<boolean> {
+  // Check if entry has source info and came from the current project
+  if (!entry.source?.project || !entry.source?.file) {
+    return false;
+  }
+
+  // Check if source project matches current working directory
+  if (entry.source.project !== process.cwd()) {
+    return false;
+  }
+
+  // Check if the source file still exists
+  try {
+    await fs.access(entry.source.file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get the relative path from context/ to the source file.
+ * Assumes contextDir is a direct child of process.cwd().
+ *
+ * @param sourceFile - Absolute or project-relative path to the source file
+ * @returns Relative path suitable for markdown links from context/README.md
+ */
+export function getRelativeLocalPath(sourceFile: string): string {
+  // If the path is already relative, just use it
+  if (!path.isAbsolute(sourceFile)) {
+    return sourceFile;
+  }
+
+  // Get path relative to cwd
+  const relativeToCwd = path.relative(process.cwd(), sourceFile);
+  return relativeToCwd;
 }
 
 /**
