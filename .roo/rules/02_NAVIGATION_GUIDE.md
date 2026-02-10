@@ -57,14 +57,16 @@ docs/
 
 ### Architecture Documents
 
-| Document                          | Contents                                   |
-| --------------------------------- | ------------------------------------------ |
-| `01-repository-infrastructure.md` | Monorepo setup, tooling, TypeScript config |
+| Document                          | Contents                                               |
+| --------------------------------- | ------------------------------------------------------ |
+| `01-repository-infrastructure.md` | Monorepo setup, tooling, TypeScript config              |
+| `02-context-management-system.md` | Knowledge module architecture, tool pipeline, agents    |
 
 ### Design Documents
 
 | Document                       | Contents                                    |
 | ------------------------------ | ------------------------------------------- |
+| `README.md`                    | Product overview, core concepts, index      |
 | `tool-specifications.md`       | MCP tool specs, schemas, response formats   |
 | `knowledge-architecture.md`    | Knowledge base structure, file formats      |
 | `user-journey.md`              | End-to-end copilot usage flow               |
@@ -114,14 +116,23 @@ Orchestrator subtask prompts specify exact paths. See `.roo/rules-orchestrator/O
 
 ```
 apps/
-└── mcp/                    # MCP server (stdio) for coding copilots
+└── mcp/                    # MCP server (stdio) — context management tools for copilots
+    └── src/
+        ├── knowledge/      # Knowledge base domain logic
+        │   ├── agents/     # Agent prompts, tools, shared runner
+        │   ├── storage/    # KB storage service, types, utilities
+        │   └── surfacing/  # Context writer (project context/ dir)
+        ├── tools/          # MCP tool handlers (learn, ask, prepare-context, health-check, initialize)
+        ├── config.ts       # Centralized configuration (models, server constants)
+        └── index.ts        # Server entry point
 
 packages/
-├── file-router/            # File-based routing/categorization
-├── mcp-server/             # MCP server framework utilities
-├── shared/                 # Shared types, schemas, utilities
-├── testing/                # Test scenarios and CLI tools
-└── vck-templates/          # VCK content (copilot configs, frameworks)
+├── testing/                # QA testing infrastructure
+│   ├── scenarios/          # Test scenarios (customer-support-agent, etc.)
+│   └── src/                # CLI: create, list, collect commands
+└── vck-templates/          # VCK content (copilot configs, framework scaffolds)
+    ├── src/                # Template generator logic
+    └── templates/          # Static template files (copilot-configs, frameworks)
 ```
 
 ---

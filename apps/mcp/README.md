@@ -1,23 +1,26 @@
 # @kahuna/mcp
 
-MCP (Model Context Protocol) server that wraps the Kahuna tRPC API as MCP tools, allowing AI assistants like Claude to interact with Kahuna programmatically.
+MCP server providing context management tools for coding copilots. Runs locally via stdio transport — copilots call Kahuna tools to learn from files, surface relevant context, and get answers from the knowledge base.
 
 ## Overview
 
-This app provides a bridge between AI assistants and the Kahuna platform:
-
 ```
-┌─────────────────────┐     MCP Protocol      ┌─────────────────────┐
-│   Claude Desktop    │ ◄──────────────────► │     @kahuna/mcp     │
-│   (or other client) │                       │                     │
-└─────────────────────┘                       └──────────┬──────────┘
-                                                         │
-                                                   tRPC HTTP
-                                                         │
-                                              ┌──────────▼──────────┐
-                                              │    @kahuna/api      │
-                                              │   (Express + tRPC)  │
-                                              └─────────────────────┘
+┌─────────────────────┐     MCP (stdio)     ┌─────────────────────┐
+│   Coding Copilot    │ ◄────────────────► │     @kahuna/mcp     │
+│   (Claude, Roo,     │                     │                     │
+│    Cursor, etc.)    │                     │  knowledge/ module  │
+└─────────────────────┘                     │  ├── agents/        │
+                                            │  ├── storage/       │
+                                            │  └── surfacing/     │
+                                            └─────────────────────┘
+                                                      │
+                                                reads/writes
+                                                      │
+                                            ┌─────────▼──────────┐
+                                            │  ~/.kahuna/         │
+                                            │  knowledge/         │
+                                            │  (flat .mdc files)  │
+                                            └────────────────────┘
 ```
 
 ## Quick Start
@@ -30,387 +33,128 @@ From the monorepo root:
 pnpm install
 ```
 
-### 2. Build the App
+### 2. Set Up Environment
+
+```bash
+cp .env.example .env
+# Add your ANTHROPIC_API_KEY to .env
+```
+
+### 3. Build
 
 ```bash
 pnpm --filter @kahuna/mcp build
 ```
 
-### 3. Configure Claude Desktop
+### 4. Connect a Copilot
 
-**Option A: Using Claude MCP CLI (Recommended)**
-
-Run this command from your terminal:
+**Using Claude MCP CLI:**
 
 ```bash
-claude mcp add kahuna --transport stdio --env KAHUNA_API_URL=http://localhost:3000 -- node /path/to/kahuna/apps/mcp/dist/index.js
+claude mcp add kahuna --transport stdio -- node /path/to/kahuna/apps/mcp/dist/index.js
 ```
 
-> **Note:** Update the path `/path/to/kahuna/apps/mcp/dist/index.js` to your local kahuna git repo directory.
-
-**Option B: Manual Configuration (Project-Specific)**
-
-Create a `.mcp.json` file in your project's `.claude/` directory :
+**Manual configuration** (`.mcp.json` in your project):
 
 ```json
 {
   "mcpServers": {
     "kahuna": {
       "command": "node",
-      "args": ["/path/to/kahuna/apps/mcp/dist/index.js"],
-      "env": {
-        "KAHUNA_API_URL": "http://localhost:3000",
-        "KAHUNA_SESSION_TOKEN": "your-session-token-here"
-      }
+      "args": ["/path/to/kahuna/apps/mcp/dist/index.js"]
     }
   }
 }
 ```
-> **Note:** 
-1. Update the `args` path to your local git repo directory path`/path/to/kahuna/apps/`.
-2. `KAHUNA_SESSION_TOKEN` for now is a placeholder until we finalize we need to add authentication to mcp. 
-
-### 4. Start the Kahuna API
-
-```bash
-pnpm --filter @kahuna/api dev
-```
-
-### 5. Restart Claude Desktop
-
-The Kahuna tools should now be available in Claude.
-
-## Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `KAHUNA_API_URL` | Base URL of the Kahuna API | `http://localhost:3000` |
-| `KAHUNA_SESSION_TOKEN` | Session token for authentication | (none - required) |
-
-### Getting a Session Token
-
-1. Log in to Kahuna via the web UI
-2. Open browser developer tools → Application → Cookies
-3. Copy the `kahuna_session` cookie value
 
 ## Available Tools
 
-### `initialize`
+### `kahuna_learn`
 
-Initialize a new project with Kahuna copilot configuration. This tool copies the Claude Code copilot configuration from Kahuna's VCK templates to your current working directory.
+Send files or folders to Kahuna to learn from and add to the knowledge base.
 
-**What it sets up:**
-- `.claude/settings.json` - Permissions and default mode
-- `.claude/rules/` - Project rules and guidelines
-- `.claude/skills/` - Architect and code skills
-- `.claude/context/`, `.claude/plans/` - Empty directories for working files
-- `CLAUDE.md` - Main copilot instructions
+- **Input:** `paths: string[]`, `description?: string`
+- **Process:** Reads files → LLM categorization agent classifies each → stores as `.mdc` files in `~/.kahuna/knowledge/`
+- **Response:** Markdown summary with file table, key topics, and `<hints>`
 
-**Parameters:**
-- `targetPath` (required) - Directory to initialize.
-- `overwrite` (optional) - Whether to overwrite existing files. Defaults to false.
+### `kahuna_prepare_context`
 
-**Examples:**
+Prepare the `context/` folder with task-relevant knowledge.
 
-```json
-// Initialize current directory
-{ "targetPath": "." }
+- **Input:** `task: string`, `files?: string[]`
+- **Process:** LLM retrieval agent searches KB → selects relevant files → writes clean `.md` files to `project/context/` with a `README.md` index
+- **Response:** Markdown with surfaced files table, "Start Here" section, and `<hints>`
 
-// Initialize specific path
-{ "targetPath": "/path/to/my-agent-project" }
+### `kahuna_ask`
 
-// Overwrite existing files
-{ "targetPath": ".", "overwrite": true }
-```
+Quick Q&A using the knowledge base.
 
-### `health_check`
+- **Input:** `question: string`
+- **Process:** LLM Q&A agent searches KB → reads relevant files → synthesizes answer with source citations
+- **Response:** Markdown answer with sources and `<hints>`
 
-Verify the MCP server is running correctly. Useful for testing your setup.
+### `kahuna_initialize`
 
-**Actions:**
-- `ping` - Confirm MCP server is alive (no API needed)
-- `api` - Ping the Kahuna API to verify end-to-end connectivity
+Initialize a project with Kahuna copilot configuration (VCK templates).
 
-**Examples:**
+- **Input:** `targetPath: string`, `overwrite?: boolean`
+- **Creates:** `.claude/` config directory, `CLAUDE.md`, copilot rules and skills
 
-```json
-// Just check MCP server is running
-{ "action": "ping" }
+### `kahuna_health_check`
 
-// Check API connectivity (requires Kahuna API to be running)
-{ "action": "api" }
-```
+Verify the MCP server is running.
 
-### `manage_projects`
-
-Manage Kahuna projects. Projects are containers for context files and VCK generations.
-
-**Actions:**
-- `create` - Create a new project
-- `list` - List all your projects
-- `get` - Get a specific project by ID
-- `update` - Update a project
-- `delete` - Delete a project
-
-**Examples:**
-
-```json
-// Create a project
-{ "action": "create", "name": "My AI Agent", "description": "Customer support bot" }
-
-// List all projects
-{ "action": "list" }
-
-// Get a specific project
-{ "action": "get", "id": "clxxx..." }
-
-// Update a project
-{ "action": "update", "id": "clxxx...", "name": "New Name" }
-
-// Delete a project
-{ "action": "delete", "id": "clxxx..." }
-```
-
-## Adding New Tools
-
-This package serves as a template for wrapping tRPC routers as MCP tools. Here's how to add a new tool:
-
-### Step 1: Create the Tool File
-
-Create a new file in `src/tools/`:
-
-```typescript
-// src/tools/context.ts
-import type { KahunaClient } from '../client.js';
-
-/**
- * Tool definition following MCP schema
- */
-export const contextToolDefinition = {
-  name: 'manage_context_files',
-  description: `Manage context files for a Kahuna project.
-
-Available actions:
-- create: Create a new context file (requires: projectId, filename, content, fileType)
-- list: List all context files for a project (requires: projectId)
-- get: Get a specific context file by ID (requires: id)
-- update: Update a context file (requires: id, optional: filename, content)
-- delete: Delete a context file (requires: id)`,
-
-  inputSchema: {
-    type: 'object' as const,
-    properties: {
-      action: {
-        type: 'string',
-        enum: ['create', 'list', 'get', 'update', 'delete'],
-      },
-      id: { type: 'string' },
-      projectId: { type: 'string' },
-      filename: { type: 'string' },
-      content: { type: 'string' },
-      fileType: { type: 'string' },
-    },
-    required: ['action'],
-  },
-};
-
-/**
- * Tool handler - routes actions to API client methods
- */
-export async function contextToolHandler(
-  args: Record<string, unknown>,
-  client: KahunaClient,
-) {
-  const { action, id, projectId, filename, content, fileType } = args as {
-    action: string;
-    id?: string;
-    projectId?: string;
-    filename?: string;
-    content?: string;
-    fileType?: string;
-  };
-
-  switch (action) {
-    case 'create':
-      if (!projectId || !filename || !content || !fileType) {
-        return errorResponse('Missing required parameters');
-      }
-      const created = await client.contextCreate({
-        projectId,
-        filename,
-        content,
-        fileType,
-      });
-      return successResponse({ message: 'File created', file: created });
-
-    case 'list':
-      if (!projectId) {
-        return errorResponse('Missing required parameter: projectId');
-      }
-      const files = await client.contextList({ projectId });
-      return successResponse({ files });
-
-    // ... other actions
-
-    default:
-      return errorResponse(`Unknown action: ${action}`);
-  }
-}
-
-// Helper functions (copy from project.ts or extract to shared utils)
-function successResponse(data: unknown) {
-  return {
-    content: [{ type: 'text' as const, text: JSON.stringify({ success: true, data }, null, 2) }],
-  };
-}
-
-function errorResponse(message: string) {
-  return {
-    content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: message }, null, 2) }],
-    isError: true,
-  };
-}
-
-export const contextTool = {
-  definition: contextToolDefinition,
-  handler: contextToolHandler,
-};
-```
-
-### Step 2: Register in index.ts
-
-```typescript
-// In src/index.ts
-
-import { contextTool } from './tools/context.js';
-
-// Add to allTools array
-const allTools = [
-  projectTool.definition,
-  contextTool.definition, // Add new tool
-];
-
-// Add to routeToolCall switch
-async function routeToolCall(toolName: string, args: Record<string, unknown>, client: KahunaClient) {
-  switch (toolName) {
-    case 'manage_projects':
-      return projectTool.handler(args, client);
-    case 'manage_context_files':  // Add new case
-      return contextTool.handler(args, client);
-    default:
-      // ...
-  }
-}
-```
-
-### Step 3: Update the API Client Methods
-
-If your tool uses new tRPC routers not already in the client, add methods to `src/client.ts`:
-
-```typescript
-// In the KahunaClient class, add methods for new router procedures:
-async newRouterCreate(input: { name: string }): Promise<NewEntity> {
-  return this.mutate<NewEntity>('newRouter.create', input);
-}
-
-async newRouterList(): Promise<NewEntity[]> {
-  return this.query<NewEntity[]>('newRouter.list');
-}
-```
-
-## Best Practices
-
-### Tool Design
-
-1. **Use action-based tools** - Single tool with `action` parameter for CRUD operations
-2. **Clear descriptions** - LLMs use descriptions to understand when to use tools
-3. **Validate inputs** - Check required parameters before calling tRPC
-4. **Return JSON** - Consistent JSON responses are easier for LLMs to parse
-5. **Include examples** - Show example inputs in the description
-
-### Error Handling
-
-1. **Validate early** - Check required params before API calls
-2. **Meaningful errors** - Include hints about what went wrong
-3. **Set isError flag** - Helps MCP clients distinguish errors
-4. **Don't expose internals** - Sanitize error messages for users
-
-### Response Format
-
-Use consistent response structure:
-
-```typescript
-// Success
-{
-  "success": true,
-  "data": {
-    "message": "Human-readable result",
-    "entity": { /* created/updated entity */ }
-  }
-}
-
-// Error
-{
-  "success": false,
-  "error": "Human-readable error message",
-  "details": { /* optional additional info */ }
-}
-```
+- **Input:** `action: "ping"`
+- **Response:** Server status confirmation
 
 ## Architecture
 
 ```
-apps/mcp/
-├── src/
-│   ├── index.ts          # MCP server entry point
-│   ├── client.ts         # HTTP client for Kahuna API calls
-│   └── tools/
-│       ├── project.ts    # Project management tool (example/template)
-│       ├── context.ts    # Context files tool (TODO)
-│       ├── vck.ts        # VCK generation tool (TODO)
-│       └── results.ts    # Build results tool (TODO)
-├── package.json
-├── tsconfig.json
-└── README.md
+apps/mcp/src/
+├── index.ts                # MCP server entry point, tool registration
+├── config.ts               # Model identifiers, server constants
+├── knowledge/              # Knowledge base domain logic
+│   ├── agents/             # Agent prompts, tools, shared runner
+│   │   ├── prompts.ts      # System prompts (categorization, retrieval, Q&A)
+│   │   ├── knowledge-tools.ts  # Agent tools (list, read, select, categorize)
+│   │   └── run-agent.ts    # Shared agentic loop runner
+│   ├── storage/            # KB storage service
+│   │   ├── types.ts        # KnowledgeEntry, classification types
+│   │   ├── knowledge-storage.ts  # CRUD for .mdc files
+│   │   └── utils.ts        # Slug generation, frontmatter parsing
+│   └── surfacing/          # Context surfacing
+│       └── context-writer.ts  # Write .md + README to project/context/
+└── tools/                  # MCP tool handlers (thin wrappers)
+    ├── types.ts            # ToolContext, MCPToolResponse, markdownResponse()
+    ├── learn.ts            # kahuna_learn handler
+    ├── prepare-context.ts  # kahuna_prepare_context handler
+    ├── ask.ts              # kahuna_ask handler
+    ├── initialize.ts       # kahuna_initialize handler
+    └── health-check.ts     # kahuna_health_check handler
 ```
+
+**Design principle:** Tool handlers are thin wrappers that validate input, call into `knowledge/`, and format markdown responses. Domain logic lives in the `knowledge/` module.
 
 ## Development
 
-### Running in Development Mode
-
 ```bash
-# From monorepo root
+# Run in watch mode
 pnpm --filter @kahuna/mcp dev
-```
 
-### Testing Manually
+# Run tests
+pnpm --filter @kahuna/mcp test
 
-The MCP server uses stdio, so you can test by piping JSON:
+# Watch tests
+pnpm --filter @kahuna/mcp test:watch
 
-```bash
-echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | node dist/index.js
-```
-
-### Type Checking
-
-```bash
+# Type-check
 pnpm --filter @kahuna/mcp typecheck
 ```
 
-## Roadmap
-
-- [x] Basic MCP server structure
-- [x] Health check tool (for testing setup)
-- [x] Project management tool (example)
-- [ ] Context files tool
-- [ ] VCK generation tool
-- [ ] Build results tool
-- [ ] Organization rules tool (new tRPC router required)
-- [ ] IT rules tool (new tRPC router required)
-- [ ] Prompts management tool (new tRPC router required)
+The MCP server uses **stdio** transport — it reads/writes JSON-RPC over stdin/stdout. Use `dev` for local development; connect via an MCP client.
 
 ## Related Documentation
 
-- [MCP Implementation Plan](../../docs/internal/mcp-implementation-plan.md)
-- [MCP Protocol Specification](https://modelcontextprotocol.io/)
-- [Kahuna API Architecture](../../docs/architecture/02-feedback-loop-architecture.md)
+- [Architecture: Context Management System](../../docs/architecture/02-context-management-system.md)
+- [Design: Tool Specifications](../../docs/design/tool-specifications.md)
+- [Design: Knowledge Architecture](../../docs/design/knowledge-architecture.md)

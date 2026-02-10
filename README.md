@@ -1,8 +1,8 @@
 # Kahuna
 
-Kahuna helps non-technical users build AI agents by generating **Vibe Code Kits (VCKs)**—downloadable packages containing copilot configuration, business context, framework rules, and boilerplate code that give coding assistants (Claude Code, Cursor, Codex, etc.) everything they need to succeed. The platform's core value comes from its feedback loop: user context flows into VCK generation, the coding copilot builds an agent, results are analyzed, and learnings improve future VCKs. This loop is developed empirically—through rapid testing and measurement rather than upfront design—because optimal VCK quality can only be discovered, not predicted.
+Kahuna is a context management platform that helps coding copilots succeed with complex tasks. The primary interface is an **MCP server** that provides tools for sending context, retrieving relevant information, and verifying results. Behind the MCP tools, a **Knowledge Base** of organized markdown files (written by agents, for agents) grows and improves over time.
 
-> **Note:** This repository is in early infrastructure setup. See [docs/](docs/) for architecture and design documentation.
+> **Note:** This repository is in early development. See [docs/](docs/) for architecture and design documentation.
 
 ## Prerequisites
 
@@ -15,44 +15,19 @@ Kahuna helps non-technical users build AI agents by generating **Vibe Code Kits 
 # Install dependencies
 pnpm install
 
-# Set up environment (API needs its own .env)
-cp .env.example apps/api/.env
-
-# Set up database (generates Prisma client needed for build)
-pnpm db:migrate
-pnpm db:seed
+# Set up environment
+cp apps/mcp/.env.example apps/mcp/.env
 
 # Build workspace packages
 pnpm build
 
-# Start development
-pnpm dev
-```
-
-## Database
-
-Kahuna uses SQLite for local development (stored at `apps/api/dev.db`).
-
-```bash
-# Generate Prisma client after schema changes
-pnpm db:generate
-
-# Run migrations
-pnpm db:migrate
-
-# Seed database with test data
-pnpm db:seed
-
-# Reset database (drops all data, re-runs migrations and seed)
-pnpm db:reset
-
-# Open Prisma Studio (database browser)
-pnpm db:studio
+# Run tests
+pnpm test
 ```
 
 ## MCP Server Setup
 
-The MCP server allows AI assistants (Claude Desktop, etc.) to interact with Kahuna programmatically.
+The MCP server allows AI assistants (Claude Desktop, Roo Code, etc.) to interact with Kahuna programmatically via stdio transport.
 
 ```bash
 # Build the MCP server
@@ -61,73 +36,65 @@ pnpm --filter @kahuna/mcp build
 
 ### Option A: Using Claude MCP CLI (Recommended)
 
-Run this command from your terminal:
-
 ```bash
-claude mcp add kahuna --transport stdio --env KAHUNA_API_URL=http://localhost:3000 -- node /path/to/kahuna/apps/mcp/dist/index.js
+claude mcp add kahuna --transport stdio -- node /path/to/kahuna/apps/mcp/dist/index.js
 ```
 
-> **Note:** Update the path `/path/to/kahuna/apps/mcp/dist/index.js` to your local kahuna git repo directory.
+> **Note:** Update the path to your local kahuna repo directory.
 
 ### Option B: Manual Configuration
 
-Create a `.mcp.json` file in your project's `.claude/` directory :
+Create a `.mcp.json` file in your project directory:
 
 ```json
 {
   "mcpServers": {
     "kahuna": {
       "command": "node",
-      "args": ["/path/to/kahuna/apps/mcp/dist/index.js"],
-      "env": {
-        "KAHUNA_API_URL": "http://localhost:3000",
-        "KAHUNA_SESSION_TOKEN": "your-session-token"
-      }
+      "args": ["/path/to/kahuna/apps/mcp/dist/index.js"]
     }
   }
 }
 ```
 
-> **Note:**
-1. Update the `args` path to your local git repo directory path`/path/to/kahuna/apps/`.
-2. `KAHUNA_SESSION_TOKEN` for now is a placeholder until we finalize we need to add authentication to mcp. 
-
-For detailed documentation, available tools, and development instructions, see [apps/mcp/README.md](apps/mcp/README.md).
+For detailed tool documentation and development instructions, see [apps/mcp/README.md](apps/mcp/README.md).
 
 ## Scripts
 
-| Command          | Description                   |
-| ---------------- | ----------------------------- |
-| `pnpm dev`       | Start all development servers |
-| `pnpm dev:web`   | Start frontend only           |
-| `pnpm dev:api`   | Start backend only            |
-| `pnpm build`     | Build all packages            |
-| `pnpm start`     | Start production servers      |
-| `pnpm lint`      | Lint codebase                 |
-| `pnpm lint:fix`  | Lint and auto-fix issues      |
-| `pnpm format`    | Format codebase               |
-| `pnpm typecheck` | Type-check all packages       |
-| `pnpm test`      | Run all tests                 |
-| `pnpm clean`     | Remove build artifacts        |
-| `pnpm db:*`      | Database commands (see above) |
+| Command          | Description                        |
+| ---------------- | ---------------------------------- |
+| `pnpm build`     | Build all packages (via Turborepo) |
+| `pnpm test`      | Run all tests across workspace     |
+| `pnpm lint`      | Lint codebase (Biome)              |
+| `pnpm lint:fix`  | Lint and auto-fix issues           |
+| `pnpm format`    | Format codebase (Biome)            |
+| `pnpm typecheck` | Type-check all packages            |
+| `pnpm clean`     | Remove build artifacts and caches  |
+
+### Testing CLI
+
+| Command              | Description                                |
+| -------------------- | ------------------------------------------ |
+| `pnpm kahuna-test`   | Run testing CLI                            |
+| `pnpm test:create`   | Create a test project from a scenario      |
+| `pnpm test:list`     | List available scenarios and test projects |
+| `pnpm test:collect`  | Collect results from a test session        |
 
 ## Project Structure
 
 ```
 kahuna/
 ├── apps/
-│   ├── api/          # Express backend (tRPC + Prisma)
-│   ├── mcp/          # MCP server for AI assistants
-│   └── web/          # React frontend (Vite)
+│   └── mcp/              # MCP server (stdio) — context management tools
 ├── packages/
-│   ├── shared/       # Shared types, schemas, utilities
-│   ├── vck-templates/# VCK content (copilot configs, frameworks)
-│   └── testing/      # Test scenarios and CLI tools
-└── docs/             # Documentation
+│   ├── testing/          # QA testing infrastructure (scenarios + CLI)
+│   └── vck-templates/    # VCK content (copilot configs, frameworks)
+└── docs/                 # Documentation
 ```
 
 ## Documentation
 
-- [Architecture Overview](docs/architecture/01-repository-infrastructure.md)
-- [Product Vision](docs/architecture/product-vision.md)
+- [Architecture: Repository Infrastructure](docs/architecture/01-repository-infrastructure.md)
+- [Architecture: Context Management System](docs/architecture/02-context-management-system.md)
+- [Product Design](docs/design/README.md)
 - [Internal Working Docs](docs/internal/README.md)
