@@ -20,6 +20,7 @@ export {
   readKnowledgeFileTool,
   selectFilesForContextTool,
   categorizeFileTool,
+  selectFrameworkTool,
   retrievalTools,
   qaTools,
   categorizationTools,

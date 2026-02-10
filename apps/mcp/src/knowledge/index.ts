@@ -46,6 +46,7 @@ export {
   readKnowledgeFileTool,
   selectFilesForContextTool,
   categorizeFileTool,
+  selectFrameworkTool,
   retrievalTools,
   qaTools,
   categorizationTools,
@@ -63,4 +64,9 @@ export {
   writeContextReadme,
   listContextFiles,
   type ContextSelection,
+  // Framework
+  copyFrameworkBoilerplate,
+  resolveFrameworkTemplateDir,
+  FrameworkError,
+  type FrameworkCopyResult,
 } from './surfacing/index.js';

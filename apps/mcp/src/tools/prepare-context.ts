@@ -3,6 +3,7 @@
  *
  * Searches the knowledge base for files relevant to a task using an LLM agent,
  * then writes them as clean markdown to the project's context/ folder.
+ * Can also scaffold framework boilerplate when the agent selects a framework.
  *
  * See: docs/internal/designs/context-management-system.md
  */
@@ -12,10 +13,12 @@ import { z } from 'zod';
 import { MODELS } from '../config.js';
 import {
   type AgentResult,
+  type FrameworkCopyResult,
   type KnowledgeEntry,
   RETRIEVAL_PROMPT,
   buildRetrievalUserMessage,
   clearContextDir,
+  copyFrameworkBoilerplate,
   generateMdcFile,
   retrievalTools,
   runAgent,
@@ -96,6 +99,14 @@ interface FileSelection {
 }
 
 /**
+ * Framework selection from the retrieval agent's select_framework tool call.
+ */
+interface FrameworkSelection {
+  framework: string;
+  reason: string;
+}
+
+/**
  * Extract file selections from agent tool results.
  */
 function extractSelections(agentResult: AgentResult): FileSelection[] {
@@ -108,6 +119,21 @@ function extractSelections(agentResult: AgentResult): FileSelection[] {
   return selections || [];
 }
 
+/**
+ * Extract framework selection from agent tool results.
+ */
+function extractFrameworkSelection(agentResult: AgentResult): FrameworkSelection | null {
+  const frameworkResult = agentResult.toolResults.find(
+    (r) => (r as Record<string, unknown>).tool === 'select_framework'
+  );
+  if (!frameworkResult) return null;
+  const r = frameworkResult as Record<string, unknown>;
+  return {
+    framework: r.framework as string,
+    reason: r.reason as string,
+  };
+}
+
 // =============================================================================
 // MARKDOWN RESPONSE BUILDERS
 // =============================================================================
@@ -115,12 +141,33 @@ function extractSelections(agentResult: AgentResult): FileSelection[] {
 function buildContextReadyMarkdown(
   task: string,
   selections: FileSelection[],
-  entries: Map<string, KnowledgeEntry>
+  entries: Map<string, KnowledgeEntry>,
+  frameworkResult?: FrameworkCopyResult
 ): string {
   const parts: string[] = [];
 
   parts.push('# Context Ready\n');
   parts.push(`**Task:** ${task}\n`);
+
+  // Framework section (if scaffolded)
+  if (frameworkResult && frameworkResult.copiedFiles.length > 0) {
+    parts.push(`## Framework Scaffolded: ${frameworkResult.displayName}\n`);
+    parts.push('**Files copied:**');
+    for (const file of frameworkResult.copiedFiles) {
+      parts.push(`- ${file}`);
+    }
+    if (frameworkResult.skippedFiles.length > 0) {
+      parts.push('\n**Files skipped (already exist):**');
+      for (const file of frameworkResult.skippedFiles) {
+        parts.push(`- ${file}`);
+      }
+    }
+    parts.push('');
+  } else if (frameworkResult && frameworkResult.skippedFiles.length > 0) {
+    parts.push(`## Framework: ${frameworkResult.displayName}\n`);
+    parts.push('All framework files already exist in your project. No files copied.\n');
+  }
+
   parts.push('## Relevant Context Surfaced\n');
   parts.push('| Topic | File | Why Relevant |');
   parts.push('|-------|------|--------------|');
@@ -133,17 +180,30 @@ function buildContextReadyMarkdown(
 
   // Start Here section
   parts.push('\n## Start Here\n');
-  parts.push('1. **Read context/README.md** — Full navigation');
+  let stepNum = 1;
+
+  // If framework was scaffolded, mention it first
+  if (frameworkResult && frameworkResult.copiedFiles.length > 0) {
+    parts.push(`${stepNum}. **Explore scaffolded code** — Check src/ for framework structure`);
+    stepNum++;
+  }
+
+  parts.push(`${stepNum}. **Read context/README.md** — Full navigation`);
+  stepNum++;
+
   const topSelections = selections.slice(0, 2);
-  for (let i = 0; i < topSelections.length; i++) {
-    const sel = topSelections[i];
+  for (const sel of topSelections) {
     const entry = entries.get(sel.slug);
     const title = entry?.title || sel.slug;
-    parts.push(`${i + 2}. **Check ${sel.slug}.md** — ${title}`);
+    parts.push(`${stepNum}. **Check ${sel.slug}.md** — ${title}`);
+    stepNum++;
   }
 
   parts.push('\n<hints>');
   parts.push('- Context folder is ready — read files directly');
+  if (frameworkResult?.copiedFiles.length) {
+    parts.push('- Framework boilerplate is in src/ — start from there');
+  }
   parts.push('- If you need more context mid-task, use kahuna_ask');
   parts.push('- After completing work, use kahuna_learn to capture learnings');
   parts.push('</hints>');
@@ -229,10 +289,11 @@ export async function prepareContextToolHandler(
       anthropic
     );
 
-    // Extract file selections
+    // Extract file selections and framework selection
     const selections = extractSelections(agentResult);
+    const frameworkSelection = extractFrameworkSelection(agentResult);
 
-    if (selections.length === 0) {
+    if (selections.length === 0 && !frameworkSelection) {
       return markdownResponse(buildNoRelevantFilesMarkdown(task, allEntries.length));
     }
 
@@ -255,7 +316,19 @@ export async function prepareContextToolHandler(
     // Write README.md
     await writeContextReadme(contextDir, task, selections);
 
-    return markdownResponse(buildContextReadyMarkdown(task, selections, entryMap));
+    // Copy framework boilerplate if selected
+    let frameworkResult: FrameworkCopyResult | undefined;
+    if (frameworkSelection) {
+      try {
+        frameworkResult = await copyFrameworkBoilerplate(frameworkSelection.framework);
+      } catch (error) {
+        // Log but don't fail the whole operation
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`Framework copy failed: ${errorMsg}`);
+      }
+    }
+
+    return markdownResponse(buildContextReadyMarkdown(task, selections, entryMap, frameworkResult));
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return markdownResponse(

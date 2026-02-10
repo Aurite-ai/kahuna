@@ -11,3 +11,10 @@ export {
   listContextFiles,
   type ContextSelection,
 } from './context-writer.js';
+
+export {
+  copyFrameworkBoilerplate,
+  resolveFrameworkTemplateDir,
+  FrameworkError,
+  type FrameworkCopyResult,
+} from './framework-copier.js';

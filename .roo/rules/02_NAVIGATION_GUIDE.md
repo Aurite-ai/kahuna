@@ -130,9 +130,12 @@ packages/
 ├── testing/                # QA testing infrastructure
 │   ├── scenarios/          # Test scenarios (customer-support-agent, etc.)
 │   └── src/                # CLI: create, list, collect commands
-└── vck-templates/          # VCK content (copilot configs, framework scaffolds)
+└── vck-templates/          # VCK content (copilot configs, framework scaffolds, KB seeds)
     ├── src/                # Template generator logic
-    └── templates/          # Static template files (copilot-configs, frameworks)
+    └── templates/          # Static template files
+        ├── copilot-configs/  # Copilot configuration templates
+        ├── frameworks/       # Framework boilerplate templates
+        └── knowledge-base/   # KB seed files (.mdc) copied during initialize
 ```
 
 ---

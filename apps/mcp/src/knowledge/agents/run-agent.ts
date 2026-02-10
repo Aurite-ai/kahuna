@@ -39,7 +39,11 @@ export interface AgentResult {
 }
 
 /** Tool names whose results we capture as structured data */
-const STRUCTURED_TOOL_NAMES = new Set(['select_files_for_context', 'categorize_file']);
+const STRUCTURED_TOOL_NAMES = new Set([
+  'select_files_for_context',
+  'categorize_file',
+  'select_framework',
+]);
 
 /**
  * Run an agentic loop with the given configuration.

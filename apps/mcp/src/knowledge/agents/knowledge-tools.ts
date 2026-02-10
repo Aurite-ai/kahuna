@@ -9,6 +9,7 @@
 
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import { z } from 'zod';
+import { getFrameworkIds } from '../../config.js';
 import type { KnowledgeStorageService } from '../storage/types.js';
 
 // =============================================================================
@@ -126,15 +127,41 @@ export const categorizeFileTool: Tool = {
   },
 };
 
+/**
+ * Tool definition for selecting a framework scaffold.
+ * Structured output: agent returns framework ID and reason.
+ */
+export const selectFrameworkTool: Tool = {
+  name: 'select_framework',
+  description:
+    'Select a framework scaffold when the task involves building an agent, workflow, or LLM-powered application',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      framework: {
+        type: 'string',
+        enum: getFrameworkIds(),
+        description: 'The framework to scaffold',
+      },
+      reason: {
+        type: 'string',
+        description: 'Why this framework is appropriate for the task',
+      },
+    },
+    required: ['framework', 'reason'],
+  },
+};
+
 // =============================================================================
 // TOOL GROUPS (for different agent configurations)
 // =============================================================================
 
-/** Tools for the retrieval agent (prepare_context): list + read + select */
+/** Tools for the retrieval agent (prepare_context): list + read + select files + select framework */
 export const retrievalTools: Tool[] = [
   listKnowledgeFilesTool,
   readKnowledgeFileTool,
   selectFilesForContextTool,
+  selectFrameworkTool,
 ];
 
 /** Tools for the Q&A agent (ask): list + read */
@@ -176,6 +203,14 @@ const categorizeFileInputSchema = z.object({
   title: z.string(),
   summary: z.string(),
   topics: z.array(z.string()),
+});
+
+/**
+ * Schema for validating select_framework tool input.
+ */
+const selectFrameworkInputSchema = z.object({
+  framework: z.string().min(1, 'Framework cannot be empty'),
+  reason: z.string().min(1, 'Reason cannot be empty'),
 });
 
 /**
@@ -236,6 +271,15 @@ export async function executeKnowledgeTool(
 
     case 'categorize_file': {
       const parseResult = categorizeFileInputSchema.safeParse(toolInput);
+      if (!parseResult.success) {
+        const issues = parseResult.error.issues.map((i) => i.message).join(', ');
+        return `Invalid input: ${issues}`;
+      }
+      return JSON.stringify(parseResult.data);
+    }
+
+    case 'select_framework': {
+      const parseResult = selectFrameworkInputSchema.safeParse(toolInput);
       if (!parseResult.success) {
         const issues = parseResult.error.issues.map((i) => i.message).join(', ');
         return `Invalid input: ${issues}`;

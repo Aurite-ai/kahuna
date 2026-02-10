@@ -1,12 +1,13 @@
 /**
- * Initialize Tool - Copy copilot configuration to user's working directory
+ * Initialize Tool - Copy copilot configuration and seed knowledge base
  *
  * This tool copies the Claude Code copilot configuration from the VCK templates
- * to the directory where the user is running Claude Code. This sets up the
- * project with the proper rules, skills, and settings for agent development.
+ * to the directory where the user is running Claude Code, and seeds the knowledge
+ * base with starter content from the VCK templates.
  */
 
 import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
@@ -16,16 +17,17 @@ import { type MCPToolResponse, type ToolContext, markdownResponse } from './type
  */
 export const initializeToolDefinition = {
   name: 'kahuna_initialize',
-  description: `Initialize a new project with Kahuna copilot configuration.
+  description: `Initialize a new project with Kahuna copilot configuration and seed the knowledge base.
 
 This tool copies the Claude Code copilot configuration from Kahuna's VCK templates
-to the specified directory. It sets up:
+to the specified directory and seeds the knowledge base with starter content. It sets up:
 - .claude/settings.json - Permissions and default mode
 - .claude/rules/ - Project rules and guidelines
 - .claude/skills/ - Skills
 - .claude/agents/ - Subagents
 - .claude/context/, .claude/plans/ - Empty directories for context and plan files
 - .claude/CLAUDE.md - Main copilot instructions
+- Knowledge base seed files (e.g., framework best practices)
 
 The configuration includes the orchestrator workflow that guides Claude through
 proper architect → code → test cycles for agent development.
@@ -42,6 +44,7 @@ kahuna_initialize(targetPath="/path/to/project", overwrite=true)
 - targetPath must be an existing directory
 - Set overwrite=true to replace existing files
 - Restart Claude Code after initialization to pick up new config
+- Knowledge base seed files are only copied if they don't already exist (unless overwrite=true)
 </hints>`,
 
   inputSchema: {
@@ -81,15 +84,14 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 /**
- * Get the absolute path to the VCK templates directory.
+ * Get the absolute path to the VCK copilot config templates directory.
  */
 function getTemplatesPath(): string {
-  // Get the directory of this file
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
 
   // Navigate from apps/mcp/src/tools/ to packages/vck-templates/templates/copilot-configs/claude-code/
-  const templatesPath = path.resolve(
+  return path.resolve(
     __dirname,
     '..',
     '..',
@@ -101,8 +103,35 @@ function getTemplatesPath(): string {
     'copilot-configs',
     'claude-code'
   );
+}
 
-  return templatesPath;
+/**
+ * Get the absolute path to the KB seed templates directory.
+ */
+function getSeedTemplatesPath(): string {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+
+  // Navigate from apps/mcp/src/tools/ to packages/vck-templates/templates/knowledge-base/
+  return path.resolve(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    '..',
+    'packages',
+    'vck-templates',
+    'templates',
+    'knowledge-base'
+  );
+}
+
+/**
+ * Get the knowledge base directory path.
+ * Uses KAHUNA_KNOWLEDGE_DIR env var if set, otherwise defaults to ~/.kahuna/knowledge/
+ */
+function getKnowledgeBaseDir(): string {
+  return process.env.KAHUNA_KNOWLEDGE_DIR || path.join(os.homedir(), '.kahuna', 'knowledge');
 }
 
 /**
@@ -141,6 +170,52 @@ async function copyDirectoryRecursive(
       }
     }
   }
+}
+
+/**
+ * Seed the knowledge base with .mdc files from the seed templates directory.
+ *
+ * Scans the seed templates directory for .mdc files and copies them to the
+ * KB directory. Skips files that already exist unless overwrite is true.
+ *
+ * @returns Object with arrays of seeded and skipped file names
+ */
+async function seedKnowledgeBase(
+  overwrite: boolean
+): Promise<{ seeded: string[]; skipped: string[]; kbDir: string }> {
+  const seeded: string[] = [];
+  const skipped: string[] = [];
+
+  const kbDir = getKnowledgeBaseDir();
+  const seedDir = getSeedTemplatesPath();
+
+  // If seed templates directory doesn't exist, return empty results
+  if (!(await pathExists(seedDir))) {
+    return { seeded, skipped, kbDir };
+  }
+
+  // Create KB directory if it doesn't exist
+  if (!(await pathExists(kbDir))) {
+    await fs.mkdir(kbDir, { recursive: true });
+  }
+
+  // Read seed directory for .mdc files (flat scan, no recursion)
+  const items = await fs.readdir(seedDir);
+  const mdcFiles = items.filter((item) => item.endsWith('.mdc'));
+
+  for (const file of mdcFiles) {
+    const sourcePath = path.join(seedDir, file);
+    const targetPath = path.join(kbDir, file);
+
+    if ((await pathExists(targetPath)) && !overwrite) {
+      skipped.push(file);
+    } else {
+      await fs.copyFile(sourcePath, targetPath);
+      seeded.push(file);
+    }
+  }
+
+  return { seeded, skipped, kbDir };
 }
 
 /**
@@ -214,6 +289,9 @@ export async function initializeToolHandler(
       }
     }
 
+    // Seed knowledge base
+    const seedResult = await seedKnowledgeBase(overwrite);
+
     // Build markdown response
     const copiedRelative = copiedFiles.map((f) => path.relative(absoluteTargetPath, f));
     const skippedRelative = skippedFiles.map((f) => path.relative(absoluteTargetPath, f));
@@ -221,6 +299,8 @@ export async function initializeToolHandler(
     let markdown = `# Initialized
 
 Kahuna copilot configuration copied to: \`${absoluteTargetPath}\`
+
+## Copilot Configuration
 
 **Files copied:** ${copiedFiles.length}`;
 
@@ -233,9 +313,24 @@ Kahuna copilot configuration copied to: \`${absoluteTargetPath}\`
       markdown += `\n\nCopied files:\n${copiedRelative.map((f) => `- ${f}`).join('\n')}`;
     }
 
+    // Knowledge Base section
+    markdown += `\n\n## Knowledge Base
+
+**KB directory:** \`${seedResult.kbDir}\`
+**Files seeded:** ${seedResult.seeded.length}`;
+
+    if (seedResult.skipped.length > 0) {
+      markdown += `\n**Files skipped (already exist):** ${seedResult.skipped.length}`;
+      markdown += `\n\nSkipped seed files:\n${seedResult.skipped.map((f) => `- ${f}`).join('\n')}`;
+    }
+
+    if (seedResult.seeded.length > 0) {
+      markdown += `\n\nSeeded files:\n${seedResult.seeded.map((f) => `- ${f}`).join('\n')}`;
+    }
+
     markdown += `\n\n<hints>
 - Stop the current Claude Code instance with Ctrl+C and restart to pick up new config
-${skippedFiles.length > 0 ? `- To overwrite existing files: kahuna_initialize(targetPath="${targetPath}", overwrite=true)\n` : ''}</hints>`;
+${skippedFiles.length > 0 || seedResult.skipped.length > 0 ? `- To overwrite existing files: kahuna_initialize(targetPath="${targetPath}", overwrite=true)\n` : ''}</hints>`;
 
     return markdownResponse(markdown);
   } catch (error) {
