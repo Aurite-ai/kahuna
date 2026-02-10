@@ -21,8 +21,7 @@ import {
   categorizationTools,
   runAgent,
 } from '../knowledge/index.js';
-import { type MCPToolResponse, markdownResponse } from './response-utils.js';
-import type { ToolContext } from './types.js';
+import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
  * Tool definition for MCP registration.

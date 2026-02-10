@@ -11,8 +11,7 @@ import * as path from 'node:path';
 import { z } from 'zod';
 import { MODELS } from '../config.js';
 import { buildQASystemPrompt, listContextFiles, qaTools, runAgent } from '../knowledge/index.js';
-import { type MCPToolResponse, markdownResponse } from './response-utils.js';
-import type { ToolContext } from './types.js';
+import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
  * Tool definition for MCP registration.
