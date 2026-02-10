@@ -11,6 +11,8 @@
 export const MODELS = {
   /** Model used for file categorization (fast, cheap) */
   categorization: 'claude-3-haiku-20240307',
+  /** Model used for KB retrieval agent (prepare_context tool) */
+  retrieval: 'claude-3-haiku-20240307',
   /** Model used for the ask tool's agentic Q&A loop */
   ask: 'claude-sonnet-4-20250514',
 } as const;
@@ -19,4 +21,4 @@ export const MODELS = {
  * MCP server identity.
  */
 export const SERVER_NAME = 'kahuna-mcp-server';
-export const SERVER_VERSION = '0.0.1';
+export const SERVER_VERSION = '0.2.0';

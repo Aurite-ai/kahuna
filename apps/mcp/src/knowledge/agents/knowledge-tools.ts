@@ -1,0 +1,249 @@
+/**
+ * Knowledge Base Agent Tools
+ *
+ * Internal tools for agents to explore and read from the knowledge base.
+ * Includes enriched listing, structured selection, and categorization tools.
+ *
+ * See: docs/internal/designs/context-management-system.md
+ */
+
+import type { Tool } from '@anthropic-ai/sdk/resources/messages';
+import { z } from 'zod';
+import type { KnowledgeStorageService } from '../storage/types.js';
+
+// =============================================================================
+// TOOL DEFINITIONS
+// =============================================================================
+
+/**
+ * Tool definition for listing knowledge base files.
+ * Returns enriched listing: slug, title, category, summary, topics per entry.
+ */
+export const listKnowledgeFilesTool: Tool = {
+  name: 'list_knowledge_files',
+  description:
+    'List all files in the knowledge base with summaries and metadata. Use this to decide which files to read.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {},
+    required: [],
+  },
+};
+
+/**
+ * Tool definition for reading a specific knowledge base file.
+ * Returns the full content of the file.
+ */
+export const readKnowledgeFileTool: Tool = {
+  name: 'read_knowledge_file',
+  description:
+    'Read the full content of a specific knowledge base file. Use after listing files to read ones relevant to the task/question.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      slug: {
+        type: 'string',
+        description: 'The file slug from the list',
+      },
+    },
+    required: ['slug'],
+  },
+};
+
+/**
+ * Tool definition for selecting files to surface in context/.
+ * Structured output: agent returns list of slugs with reasons.
+ */
+export const selectFilesForContextTool: Tool = {
+  name: 'select_files_for_context',
+  description: 'Select which knowledge base files to surface for this task',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      selections: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            slug: {
+              type: 'string',
+              description: 'File slug from the knowledge base',
+            },
+            reason: {
+              type: 'string',
+              description: 'Brief reason why this file is relevant to the task',
+            },
+          },
+          required: ['slug', 'reason'],
+        },
+        description: 'Files to surface to the project context/ folder',
+      },
+    },
+    required: ['selections'],
+  },
+};
+
+/**
+ * Tool definition for categorizing a file.
+ * Structured output: agent returns category, confidence, reasoning, title, summary, topics.
+ */
+export const categorizeFileTool: Tool = {
+  name: 'categorize_file',
+  description: 'Classify the file and extract metadata',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      category: {
+        type: 'string',
+        enum: ['policy', 'requirement', 'reference', 'decision', 'pattern', 'context'],
+      },
+      confidence: {
+        type: 'number',
+        minimum: 0,
+        maximum: 1,
+      },
+      reasoning: {
+        type: 'string',
+        description: 'One sentence explaining why this category was chosen',
+      },
+      title: {
+        type: 'string',
+        description:
+          'Clear, descriptive title. Use proper casing for acronyms. Unique enough to identify among hundreds of files.',
+      },
+      summary: {
+        type: 'string',
+        description: '2-4 sentence overview of what this file contains',
+      },
+      topics: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 5,
+        description: '3-5 key topics as natural language phrases',
+      },
+    },
+    required: ['category', 'confidence', 'reasoning', 'title', 'summary', 'topics'],
+  },
+};
+
+// =============================================================================
+// TOOL GROUPS (for different agent configurations)
+// =============================================================================
+
+/** Tools for the retrieval agent (prepare_context): list + read + select */
+export const retrievalTools: Tool[] = [
+  listKnowledgeFilesTool,
+  readKnowledgeFileTool,
+  selectFilesForContextTool,
+];
+
+/** Tools for the Q&A agent (ask): list + read */
+export const qaTools: Tool[] = [listKnowledgeFilesTool, readKnowledgeFileTool];
+
+/** Tools for the categorization agent (learn): categorize_file only */
+export const categorizationTools: Tool[] = [categorizeFileTool];
+
+// =============================================================================
+// TOOL EXECUTION
+// =============================================================================
+
+/**
+ * Schema for validating read_knowledge_file tool input.
+ */
+const readKnowledgeFileInputSchema = z.object({
+  slug: z.string().min(1, 'Slug cannot be empty'),
+});
+
+/**
+ * Schema for validating select_files_for_context tool input.
+ */
+const selectFilesInputSchema = z.object({
+  selections: z.array(
+    z.object({
+      slug: z.string(),
+      reason: z.string(),
+    })
+  ),
+});
+
+/**
+ * Schema for validating categorize_file tool input.
+ */
+const categorizeFileInputSchema = z.object({
+  category: z.string(),
+  confidence: z.number(),
+  reasoning: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  topics: z.array(z.string()),
+});
+
+/**
+ * Execute a knowledge base agent tool call.
+ *
+ * @param toolName - Name of the tool to execute
+ * @param toolInput - Input parameters for the tool
+ * @param storage - Knowledge storage service instance
+ * @returns String result from the tool execution
+ */
+export async function executeKnowledgeTool(
+  toolName: string,
+  toolInput: Record<string, unknown>,
+  storage: KnowledgeStorageService
+): Promise<string> {
+  switch (toolName) {
+    case 'list_knowledge_files': {
+      const entries = await storage.list({ status: 'active' });
+      if (entries.length === 0) {
+        return 'No files in knowledge base.';
+      }
+
+      // Enriched format: slug, title, category, summary, topics
+      const lines = entries.map((e) => {
+        const topicsStr =
+          e.classification.topics.length > 0
+            ? `  Topics: ${e.classification.topics.join(', ')}`
+            : '';
+        return `- ${e.slug} [${e.classification.category}]\n  "${e.summary}"${topicsStr ? `\n${topicsStr}` : ''}`;
+      });
+
+      return `Knowledge base files (${entries.length} entries):\n\n${lines.join('\n\n')}`;
+    }
+
+    case 'read_knowledge_file': {
+      const parseResult = readKnowledgeFileInputSchema.safeParse(toolInput);
+      if (!parseResult.success) {
+        const issues = parseResult.error.issues.map((i) => i.message).join(', ');
+        return `Invalid input: ${issues}`;
+      }
+      const { slug } = parseResult.data;
+      const entry = await storage.get(slug);
+      if (!entry) {
+        return `File not found: ${slug}`;
+      }
+      return `# ${entry.title}\n\n${entry.content}`;
+    }
+
+    case 'select_files_for_context': {
+      const parseResult = selectFilesInputSchema.safeParse(toolInput);
+      if (!parseResult.success) {
+        const issues = parseResult.error.issues.map((i) => i.message).join(', ');
+        return `Invalid input: ${issues}`;
+      }
+      const { selections } = parseResult.data;
+      return JSON.stringify({ selections });
+    }
+
+    case 'categorize_file': {
+      const parseResult = categorizeFileInputSchema.safeParse(toolInput);
+      if (!parseResult.success) {
+        const issues = parseResult.error.issues.map((i) => i.message).join(', ');
+        return `Invalid input: ${issues}`;
+      }
+      return JSON.stringify(parseResult.data);
+    }
+
+    default:
+      return `Unknown tool: ${toolName}`;
+  }
+}
