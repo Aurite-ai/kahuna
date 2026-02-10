@@ -61,9 +61,7 @@ describe('runAgent', () => {
     const anthropic = createMockAnthropic([
       {
         stop_reason: 'end_turn',
-        content: [
-          { type: 'text', text: 'The answer is 42.' },
-        ],
+        content: [{ type: 'text', text: 'The answer is 42.' }],
       },
     ]);
 
@@ -90,9 +88,7 @@ describe('runAgent', () => {
       // Second response: agent gives final answer
       {
         stop_reason: 'end_turn',
-        content: [
-          { type: 'text', text: 'The knowledge base is empty.' },
-        ],
+        content: [{ type: 'text', text: 'The knowledge base is empty.' }],
       },
     ]);
 
@@ -152,9 +148,7 @@ describe('runAgent', () => {
       // Agent gives answer
       {
         stop_reason: 'end_turn',
-        content: [
-          { type: 'text', text: 'Found the test entry.' },
-        ],
+        content: [{ type: 'text', text: 'Found the test entry.' }],
       },
     ]);
 
@@ -210,9 +204,7 @@ describe('runAgent', () => {
             id: 'tool_select',
             name: 'select_files_for_context',
             input: {
-              selections: [
-                { slug: 'api-guidelines', reason: 'Has rate limiting info' },
-              ],
+              selections: [{ slug: 'api-guidelines', reason: 'Has rate limiting info' }],
             },
           },
         ],
@@ -220,9 +212,7 @@ describe('runAgent', () => {
       // Agent finishes
       {
         stop_reason: 'end_turn',
-        content: [
-          { type: 'text', text: 'Selected 1 file.' },
-        ],
+        content: [{ type: 'text', text: 'Selected 1 file.' }],
       },
     ]);
 
@@ -269,9 +259,7 @@ describe('runAgent', () => {
       },
       {
         stop_reason: 'end_turn',
-        content: [
-          { type: 'text', text: 'Categorized.' },
-        ],
+        content: [{ type: 'text', text: 'Categorized.' }],
       },
     ]);
 
@@ -289,9 +277,7 @@ describe('runAgent', () => {
     const anthropic = createMockAnthropic([
       {
         stop_reason: 'max_tokens',
-        content: [
-          { type: 'text', text: 'Partial response...' },
-        ],
+        content: [{ type: 'text', text: 'Partial response...' }],
       },
     ]);
 

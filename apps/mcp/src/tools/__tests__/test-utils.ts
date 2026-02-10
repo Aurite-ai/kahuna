@@ -5,7 +5,7 @@
  */
 
 import { vi } from 'vitest';
-import type { KnowledgeEntry, KnowledgeStorageService } from '../../storage/index.js';
+import type { KnowledgeEntry, KnowledgeStorageService } from '../../knowledge/index.js';
 import type { ToolContext } from '../types.js';
 
 /**
@@ -27,6 +27,7 @@ export function createMockStorage(
 
 /**
  * Create a mock KnowledgeEntry for testing.
+ * Uses the simplified schema (no tags, no entities).
  */
 export function createMockEntry(overrides?: Partial<KnowledgeEntry>): KnowledgeEntry {
   const now = new Date().toISOString();
@@ -39,26 +40,30 @@ export function createMockEntry(overrides?: Partial<KnowledgeEntry>): KnowledgeE
     updated_at: now,
     source: {
       file: 'test.md',
-      project: 'test-project',
+      project: '/home/user/test-project',
       path: null,
     },
     classification: {
       category: 'reference',
       confidence: 0.9,
       reasoning: 'Test reasoning',
-      tags: ['test', 'example'],
-      topics: ['testing'],
-      entities: {
-        technologies: ['TypeScript'],
-        frameworks: [],
-        libraries: [],
-        apis: [],
-      },
+      topics: ['testing', 'example'],
     },
     status: 'active',
     content: '# Test Content\n\nThis is test content about testing.',
     ...overrides,
   };
+}
+
+/**
+ * Create a mock Anthropic client for testing.
+ */
+export function createMockAnthropic() {
+  return {
+    messages: {
+      create: vi.fn(),
+    },
+  } as unknown as ToolContext['anthropic'];
 }
 
 /**
@@ -69,5 +74,6 @@ export function createMockContext(
 ): ToolContext {
   return {
     storage: createMockStorage(storageOverrides),
+    anthropic: createMockAnthropic(),
   };
 }

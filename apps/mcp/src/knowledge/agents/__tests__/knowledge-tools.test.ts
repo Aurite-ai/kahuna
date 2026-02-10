@@ -168,11 +168,7 @@ describe('executeKnowledgeTool', () => {
     it('returns error for empty slug', async () => {
       const storage = createMockStorage([]);
 
-      const result = await executeKnowledgeTool(
-        'read_knowledge_file',
-        { slug: '' },
-        storage
-      );
+      const result = await executeKnowledgeTool('read_knowledge_file', { slug: '' }, storage);
 
       expect(result).toContain('Invalid input');
     });

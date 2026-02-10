@@ -156,9 +156,7 @@ Follow these rules for API design.`;
     });
 
     it('includes date and Kahuna attribution', async () => {
-      await writeContextReadme(contextDir, 'Test', [
-        { slug: 'test', reason: 'Test reason' },
-      ]);
+      await writeContextReadme(contextDir, 'Test', [{ slug: 'test', reason: 'Test reason' }]);
 
       const readme = await fs.readFile(path.join(contextDir, 'README.md'), 'utf-8');
 

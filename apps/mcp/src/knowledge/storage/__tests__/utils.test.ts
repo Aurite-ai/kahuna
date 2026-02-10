@@ -301,11 +301,7 @@ describe('generateMdcFile', () => {
     const generated = generateMdcFile(frontmatterWithTopics, 'Content');
     const parsed = parseMdcFile(generated);
 
-    expect(parsed.frontmatter.classification.topics).toEqual([
-      'topic-a',
-      'topic-b',
-      'topic-c',
-    ]);
+    expect(parsed.frontmatter.classification.topics).toEqual(['topic-a', 'topic-b', 'topic-c']);
   });
 });
 

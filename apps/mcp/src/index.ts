@@ -26,7 +26,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
-import { FileKnowledgeStorageService } from './storage/index.js';
+import { FileKnowledgeStorageService } from './knowledge/index.js';
 import { askTool } from './tools/ask.js';
 import { healthCheckTool } from './tools/health-check.js';
 import { initializeTool } from './tools/initialize.js';
@@ -80,11 +80,7 @@ async function routeToolCall(
         content: [
           {
             type: 'text',
-            text: JSON.stringify({
-              success: false,
-              error: `Unknown tool: ${toolName}`,
-              availableTools: allTools.map((t) => t.name),
-            }),
+            text: `Unknown tool: ${toolName}`,
           },
         ],
         isError: true,

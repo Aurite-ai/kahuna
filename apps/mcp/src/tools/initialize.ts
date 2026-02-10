@@ -9,7 +9,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
+import { type MCPToolResponse, markdownResponse } from './response-utils.js';
 import type { ToolContext } from './types.js';
 
 /**
@@ -31,13 +31,19 @@ to the specified directory. It sets up:
 The configuration includes the orchestrator workflow that guides Claude through
 proper architect → code → test cycles for agent development.
 
-Parameters:
-- targetPath: (required) Directory to initialize.
-- overwrite: (optional) Whether to overwrite existing files. Defaults to false.
+<examples>
+### Initialize a project
+kahuna_initialize(targetPath="/path/to/project")
 
-Examples:
-- Initialize: { "targetPath": "/path/to/project" }
-- Overwrite existing: { "targetPath": "/path/to/project", "overwrite": true }`,
+### Overwrite existing config
+kahuna_initialize(targetPath="/path/to/project", overwrite=true)
+</examples>
+
+<hints>
+- targetPath must be an existing directory
+- Set overwrite=true to replace existing files
+- Restart Claude Code after initialization to pick up new config
+</hints>`,
 
   inputSchema: {
     type: 'object' as const,
@@ -155,15 +161,16 @@ export async function initializeToolHandler(
 
     // Verify target directory exists
     if (!(await pathExists(absoluteTargetPath))) {
-      return errorResponse(`Target directory does not exist: ${absoluteTargetPath}`, {
-        hint: 'Create the directory first or provide a valid path',
-      });
+      return markdownResponse(
+        `Target directory does not exist: ${absoluteTargetPath}\n\n<hints>\n- Create the directory first or provide a valid path\n</hints>`,
+        true
+      );
     }
 
     // Verify target is a directory
     const targetStat = await fs.stat(absoluteTargetPath);
     if (!targetStat.isDirectory()) {
-      return errorResponse(`Target path is not a directory: ${absoluteTargetPath}`);
+      return markdownResponse(`Target path is not a directory: ${absoluteTargetPath}`, true);
     }
 
     // Get source template path
@@ -171,10 +178,10 @@ export async function initializeToolHandler(
 
     // Verify source exists
     if (!(await pathExists(sourcePath))) {
-      return errorResponse('VCK templates not found', {
-        expectedPath: sourcePath,
-        hint: 'Make sure you are running this from the Kahuna monorepo',
-      });
+      return markdownResponse(
+        `VCK templates not found at: ${sourcePath}\n\n<hints>\n- Make sure you are running this from the Kahuna monorepo\n</hints>`,
+        true
+      );
     }
 
     // Track copied and skipped files
@@ -208,42 +215,36 @@ export async function initializeToolHandler(
       }
     }
 
-    // Build response message
-    const message = [
-      `Initialized Kahuna copilot configuration in: ${absoluteTargetPath}`,
-      '',
-      `Files copied: ${copiedFiles.length}`,
-    ];
+    // Build markdown response
+    const copiedRelative = copiedFiles.map((f) => path.relative(absoluteTargetPath, f));
+    const skippedRelative = skippedFiles.map((f) => path.relative(absoluteTargetPath, f));
+
+    let markdown = `# Initialized
+
+Kahuna copilot configuration copied to: \`${absoluteTargetPath}\`
+
+**Files copied:** ${copiedFiles.length}`;
 
     if (skippedFiles.length > 0) {
-      message.push(
-        `Files skipped (already exist): ${skippedFiles.length}`,
-        '',
-        `To overwrite existing files, use: { "targetPath": "${targetPath}", "overwrite": true }`
-      );
+      markdown += `\n**Files skipped (already exist):** ${skippedFiles.length}`;
+      markdown += `\n\nSkipped files:\n${skippedRelative.map((f) => `- ${f}`).join('\n')}`;
     }
 
-    message.push(
-      'Next steps: Advise the user to stop the current Claude Code instance with Ctrl+C and restart it in order to refresh the conversation to use the new files'
-    );
+    if (copiedFiles.length > 0) {
+      markdown += `\n\nCopied files:\n${copiedRelative.map((f) => `- ${f}`).join('\n')}`;
+    }
 
-    return successResponse({
-      message: message.join('\n'),
-      targetPath: absoluteTargetPath,
-      copiedFiles: copiedFiles.map((f) => path.relative(absoluteTargetPath, f)),
-      skippedFiles: skippedFiles.map((f) => path.relative(absoluteTargetPath, f)),
-      stats: {
-        copied: copiedFiles.length,
-        skipped: skippedFiles.length,
-        total: copiedFiles.length + skippedFiles.length,
-      },
-    });
+    markdown += `\n\n<hints>
+- Stop the current Claude Code instance with Ctrl+C and restart to pick up new config
+${skippedFiles.length > 0 ? `- To overwrite existing files: kahuna_initialize(targetPath="${targetPath}", overwrite=true)\n` : ''}</hints>`;
+
+    return markdownResponse(markdown);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return errorResponse(`Failed to initialize: ${errorMessage}`, {
-      targetPath,
-      overwrite,
-    });
+    return markdownResponse(
+      `Failed to initialize: ${errorMessage}\n\n<hints>\n- Check that the target path is accessible\n</hints>`,
+      true
+    );
   }
 }
 

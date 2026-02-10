@@ -15,10 +15,7 @@ import { listCommand } from './commands/list.js';
 
 const program = new Command();
 
-program
-  .name('kahuna-test')
-  .description('CLI for VCK quality testing')
-  .version('0.0.0');
+program.name('kahuna-test').description('CLI for VCK quality testing').version('0.0.0');
 
 // create - Assemble project from VCK template + scenario
 program

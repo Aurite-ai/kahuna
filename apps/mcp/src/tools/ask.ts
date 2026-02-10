@@ -1,32 +1,18 @@
 /**
- * Kahuna Ask Tool - Simple Q&A with AI agent
+ * Kahuna Ask Tool - Quick Q&A with AI agent
  *
- * This tool provides intelligent question answering using the knowledge base.
- * An internal agent explores the knowledge base files to find and synthesize answers.
+ * Mid-task question answering. An LLM agent searches the knowledge base,
+ * reads relevant files, and synthesizes an answer. Does not modify context/.
  *
- * Flow:
- * 1. Copilot calls ask tool with question
- * 2. Question goes to internal agent
- * 3. Agent sees file names in knowledge base
- * 4. Agent reads files as needed to answer the question
- * 5. Agent responds with answer
- * 6. Answer returned to Copilot
+ * See: docs/internal/designs/context-management-system.md
  */
 
-import Anthropic from '@anthropic-ai/sdk';
-import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages';
+import * as path from 'node:path';
 import { z } from 'zod';
-import { executeKnowledgeTool, knowledgeTools } from '../agents/index.js';
 import { MODELS } from '../config.js';
-import type { KnowledgeStorageService } from '../storage/index.js';
-import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
+import { buildQASystemPrompt, listContextFiles, qaTools, runAgent } from '../knowledge/index.js';
+import { type MCPToolResponse, markdownResponse } from './response-utils.js';
 import type { ToolContext } from './types.js';
-
-/**
- * Agent configuration constants
- */
-const AGENT_MAX_ITERATIONS = 10;
-const AGENT_MAX_TOKENS = 2000;
 
 /**
  * Tool definition for MCP registration.
@@ -43,16 +29,23 @@ USE THIS TOOL WHEN:
 
 Searches the knowledge base and synthesizes an answer with source citations.
 
-**Examples:**
-- Direct question: question="Why did we choose keyword search over embeddings?"
-- Clarification: question="What's our error handling pattern for API calls?"
-- Check if exists: question="Do we have rate limiting requirements documented?"
+<examples>
+### Direct question
+kahuna_ask(question="Why did we choose keyword search over embeddings?")
 
-**Hints:**
+### Clarification
+kahuna_ask(question="What's our error handling pattern for API calls?")
+
+### Check if exists
+kahuna_ask(question="Do we have rate limiting requirements documented?")
+</examples>
+
+<hints>
 - Searches knowledge base with AI-powered answer synthesis
 - Use for quick questions mid-task
 - For comprehensive context setup, use kahuna_prepare_context instead
-- Returns answer with source citations`,
+- Returns answer with source citations
+</hints>`,
 
   inputSchema: {
     type: 'object' as const,
@@ -76,137 +69,82 @@ const askInputSchema = z.object({
     .refine((val) => val.length > 0, { message: 'Missing or empty question' }),
 });
 
-/**
- * Synthesize answer using an agentic Claude loop
- *
- * The agent has tools to explore the knowledge base and will
- * read files as needed to answer the question.
- */
-async function synthesizeAnswer(
-  question: string,
-  storage: KnowledgeStorageService
-): Promise<string> {
-  const client = new Anthropic();
-
-  const systemPrompt = `You are a knowledge assistant for an enterprise codebase. Your job is to answer questions using the knowledge base.
-
-You have tools to:
-1. List all files in the knowledge base (see their names/titles)
-2. Read specific files that seem relevant
-
-Process:
-1. First, list the knowledge base files to see what's available
-2. Based on the file names/titles, read the ones that might help answer the question
-3. Synthesize an answer from what you find
-4. If you can't find the answer, say so clearly
-
-Guidelines:
-- Only answer based on what you find in the knowledge base
-- Cite your sources (mention which files you found the info in)
-- Be concise but complete
-- If the knowledge base doesn't have the answer, say "I couldn't find information about this in the knowledge base"`;
-
-  const messages: Anthropic.MessageParam[] = [
-    {
-      role: 'user',
-      content: question,
-    },
-  ];
-
-  // Agentic loop - let Claude use tools until it has an answer
-  for (let i = 0; i < AGENT_MAX_ITERATIONS; i++) {
-    const response = await client.messages.create({
-      model: MODELS.ask,
-      max_tokens: AGENT_MAX_TOKENS,
-      system: systemPrompt,
-      tools: knowledgeTools,
-      messages,
-    });
-
-    // Check if we're done (no more tool use)
-    if (response.stop_reason === 'end_turn') {
-      // Extract the final text response
-      const textBlock = response.content.find((block) => block.type === 'text');
-      return textBlock?.type === 'text' ? textBlock.text : 'No answer generated.';
-    }
-
-    // Process tool uses
-    const toolUseBlocks = response.content.filter((block) => block.type === 'tool_use');
-
-    if (toolUseBlocks.length === 0) {
-      // No tool use and not end_turn - extract any text
-      const textBlock = response.content.find((block) => block.type === 'text');
-      return textBlock?.type === 'text' ? textBlock.text : 'No answer generated.';
-    }
-
-    // Add assistant's response to messages
-    messages.push({
-      role: 'assistant',
-      content: response.content,
-    });
-
-    // Execute tools and add results
-    const toolResults: ToolResultBlockParam[] = [];
-    for (const block of toolUseBlocks) {
-      if (block.type === 'tool_use') {
-        const result = await executeKnowledgeTool(
-          block.name,
-          block.input as Record<string, unknown>,
-          storage
-        );
-        toolResults.push({
-          type: 'tool_result',
-          tool_use_id: block.id,
-          content: result,
-        });
-      }
-    }
-
-    messages.push({
-      role: 'user',
-      content: toolResults,
-    });
-  }
-
-  return 'Agent reached maximum iterations without completing the answer.';
-}
+// =============================================================================
+// TOOL HANDLER
+// =============================================================================
 
 /**
  * Handle the kahuna_ask tool call.
  *
- * @param args - Tool arguments from MCP client
- * @param storage - Knowledge storage service instance
- * @returns MCP tool response
+ * Pipeline:
+ * 1. Validate input
+ * 2. Scan context/ directory for already-surfaced files
+ * 3. Build Q&A system prompt (includes context file info)
+ * 4. Run Q&A agent with list + read tools
+ * 5. Return markdown response with answer
  */
 export async function askToolHandler(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<MCPToolResponse> {
-  const { storage } = ctx;
-  // Validate input with Zod
+  const { storage, anthropic } = ctx;
+
+  // Validate input
   const parseResult = askInputSchema.safeParse(args);
   if (!parseResult.success) {
     const issues = parseResult.error.issues.map((i) => i.message).join(', ');
-    return errorResponse(`Invalid input: ${issues}`, {
-      hint: 'Provide a clear question about the project',
-    });
+    return markdownResponse(
+      `Invalid input: ${issues}\n\n<hints>\n- Provide a clear question about the project\n</hints>`,
+      true
+    );
   }
 
   const { question } = parseResult.data;
 
   try {
-    // Let the agent answer the question
-    const answer = await synthesizeAnswer(question, storage);
+    // Scan context/ directory
+    const contextDir = path.join(process.cwd(), 'context');
+    const contextFiles = await listContextFiles(contextDir);
 
-    return successResponse({
+    // Build system prompt with context file awareness
+    const systemPrompt = buildQASystemPrompt(contextFiles);
+
+    // Run Q&A agent
+    const agentResult = await runAgent(
+      {
+        model: MODELS.ask,
+        systemPrompt,
+        tools: qaTools,
+        maxTokens: 2000,
+      },
       question,
-      answer,
-    });
+      storage,
+      anthropic
+    );
+
+    // Build markdown response
+    const answer =
+      agentResult.textResponse || "I couldn't find information about this in the knowledge base.";
+
+    const markdown = `# Answer
+
+**Question:** ${question}
+
+${answer}
+
+<hints>
+- Full details may be in the cited knowledge base entries
+- Use kahuna_prepare_context if you need broader context for a task
+- Use kahuna_learn to add new information to the knowledge base
+</hints>`;
+
+    return markdownResponse(markdown);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return errorResponse(`Failed to answer question: ${errorMessage}`, {
-      hint: 'Check if the knowledge base is accessible and try again',
-    });
+    return markdownResponse(
+      `Failed to answer question: ${errorMessage}\n\n<hints>\n- Check if the knowledge base is accessible and try again\n</hints>`,
+      true
+    );
   }
 }
 

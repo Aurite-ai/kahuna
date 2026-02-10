@@ -1,24 +1,28 @@
 /**
- * Kahuna Prepare Context Tool - Smart context retrieval
+ * Kahuna Prepare Context Tool - Agentic context retrieval
  *
- * This tool intelligently selects and prepares relevant context files
- * before the copilot starts working on a task.
+ * Searches the knowledge base for files relevant to a task using an LLM agent,
+ * then writes them as clean markdown to the project's context/ folder.
  *
- * The "prepare" terminology emphasizes:
- * - This should be called FIRST, before starting any task
- * - It's proactive context gathering, not reactive searching
- * - Files are formatted and ready to use immediately
- *
- * IMPLEMENTATION: Metadata-based ranking (MVP)
- * - Uses existing metadata (tags, topics, summary, entities)
- * - Fast and explainable
- * - No infrastructure required
- * - Upgradeable to embeddings later
+ * See: docs/internal/designs/context-management-system.md
  */
 
+import * as path from 'node:path';
 import { z } from 'zod';
-import type { KnowledgeEntry } from '../storage/index.js';
-import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
+import { MODELS } from '../config.js';
+import {
+  type AgentResult,
+  type KnowledgeEntry,
+  RETRIEVAL_PROMPT,
+  buildRetrievalUserMessage,
+  clearContextDir,
+  retrievalTools,
+  runAgent,
+  writeContextFile,
+  writeContextReadme,
+} from '../knowledge/index.js';
+import { generateMdcFile } from '../knowledge/storage/utils.js';
+import { type MCPToolResponse, markdownResponse } from './response-utils.js';
 import type { ToolContext } from './types.js';
 
 /**
@@ -26,7 +30,7 @@ import type { ToolContext } from './types.js';
  */
 export const prepareContextToolDefinition = {
   name: 'kahuna_prepare_context',
-  description: `Retrieve relevant knowledge from the Kahuna knowledge base for a task.
+  description: `Prepare the context/ folder with relevant knowledge for a task.
 
 USE THIS TOOL WHEN:
 - Starting any new task or feature
@@ -34,17 +38,25 @@ USE THIS TOOL WHEN:
 - Before beginning implementation work
 - User asks "what do we know about X"
 
-This is the PRIMARY context retrieval tool. Call it ONCE at task start. Relevant content is returned directly in the response.
+This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from context/ files.
 
-**Examples:**
-- Starting a task: task="Add rate limiting to the search tool"
-- With files you'll touch: task="Refactor error handling in tools", files=["src/agent/tools.py"]
-- Exploring a topic: task="Understand our API design patterns"
+<examples>
+### Starting a task
+kahuna_prepare_context(task="Add rate limiting to the search tool")
 
-**Hints:**
-- Call ONCE at task start, then work from the returned content
+### With files you'll touch
+kahuna_prepare_context(task="Refactor error handling in tools", files=["src/agent/tools.py"])
+
+### Exploring a topic
+kahuna_prepare_context(task="Understand our API design patterns")
+</examples>
+
+<hints>
+- Call ONCE at task start, then read context/ files directly
 - Natural language task description works best
-- If you need more context mid-task, use kahuna_ask instead`,
+- After calling, read context/README.md for navigation
+- If you need more context mid-task, use kahuna_ask instead
+</hints>`,
 
   inputSchema: {
     type: 'object' as const,
@@ -77,359 +89,180 @@ const prepareContextInputSchema = z.object({
 });
 
 /**
- * Ranked file with relevance information
+ * Selection from the retrieval agent's select_files_for_context tool call.
  */
-interface RankedEntry extends KnowledgeEntry {
-  relevanceScore: number;
-  matchedTags?: string[];
-  matchedTopics?: string[];
-  matchedEntities?: string[];
-  relevanceReasoning: string;
+interface FileSelection {
+  slug: string;
+  reason: string;
 }
 
 /**
- * Calculate text similarity between two strings (simple word overlap)
+ * Extract file selections from agent tool results.
  */
-function calculateSimilarity(text1: string, text2: string): number {
-  const words1 = text1.toLowerCase().split(/\s+/);
-  const words2 = text2.toLowerCase().split(/\s+/);
-
-  const set1 = new Set(words1);
-  const set2 = new Set(words2);
-
-  const intersection = new Set([...set1].filter((x) => set2.has(x)));
-
-  if (set1.size === 0 || set2.size === 0) return 0;
-
-  return (intersection.size * 2) / (set1.size + set2.size);
+function extractSelections(agentResult: AgentResult): FileSelection[] {
+  const selectResult = agentResult.toolResults.find(
+    (r) => (r as Record<string, unknown>).tool === 'select_files_for_context'
+  );
+  if (!selectResult) return [];
+  const r = selectResult as Record<string, unknown>;
+  const selections = r.selections as FileSelection[] | undefined;
+  return selections || [];
 }
 
-/**
- * Extract keywords from file paths for relevance matching
- */
-function extractFileKeywords(files: string[]): string[] {
-  const keywords: string[] = [];
-  for (const file of files) {
-    // Extract filename and path components
-    const parts = file.split(/[/\\]/).filter(Boolean);
-    for (const part of parts) {
-      // Remove extension and split by separators
-      const baseName = part.replace(/\.[^.]+$/, '');
-      const words = baseName.split(/[-_.]/).filter((w) => w.length > 2);
-      keywords.push(...words.map((w) => w.toLowerCase()));
-    }
+// =============================================================================
+// MARKDOWN RESPONSE BUILDERS
+// =============================================================================
+
+function buildContextReadyMarkdown(
+  task: string,
+  selections: FileSelection[],
+  entries: Map<string, KnowledgeEntry>
+): string {
+  const parts: string[] = [];
+
+  parts.push('# Context Ready\n');
+  parts.push(`**Task:** ${task}\n`);
+  parts.push('## Relevant Context Surfaced\n');
+  parts.push('| Topic | File | Why Relevant |');
+  parts.push('|-------|------|--------------|');
+
+  for (const sel of selections) {
+    const entry = entries.get(sel.slug);
+    const title = entry?.title || sel.slug;
+    parts.push(`| ${title} | context/${sel.slug}.md | ${sel.reason} |`);
   }
-  return [...new Set(keywords)];
+
+  // Start Here section
+  parts.push('\n## Start Here\n');
+  parts.push('1. **Read context/README.md** — Full navigation');
+  const topSelections = selections.slice(0, 2);
+  for (let i = 0; i < topSelections.length; i++) {
+    const sel = topSelections[i];
+    const entry = entries.get(sel.slug);
+    const title = entry?.title || sel.slug;
+    parts.push(`${i + 2}. **Check ${sel.slug}.md** — ${title}`);
+  }
+
+  parts.push('\n<hints>');
+  parts.push('- Context folder is ready — read files directly');
+  parts.push('- If you need more context mid-task, use kahuna_ask');
+  parts.push('- After completing work, use kahuna_learn to capture learnings');
+  parts.push('</hints>');
+
+  return parts.join('\n');
 }
 
-/**
- * Rank entries by relevance to task description using metadata
- *
- * Scoring weights:
- * - Tag match: 3 points per matching tag
- * - Topic match: 2 points per matching topic
- * - Entity match: 2 points per matching entity (technology, framework, library, API)
- * - Summary similarity: 0-3 points based on text overlap
- * - Title match: 1 point if task mentions title
- * - Category relevance: 0.5 points for category keyword match
- * - File keyword match: 2 points per keyword match from working files
- */
-function rankEntriesByMetadata(
-  entries: KnowledgeEntry[],
-  taskDescription: string,
-  fileKeywords: string[] = []
-): RankedEntry[] {
-  const taskLower = taskDescription.toLowerCase();
-  const taskWords = taskLower.split(/\s+/);
+function buildEmptyKBMarkdown(): string {
+  return `# No Context Available
 
-  return entries
-    .map((entry) => {
-      let score = 0;
-      const matchedTags: string[] = [];
-      const matchedTopics: string[] = [];
-      const matchedEntities: string[] = [];
-      const reasons: string[] = [];
+The knowledge base is empty. No files to surface for this task.
 
-      const classification = entry.classification;
-
-      // 1. Tag matching (weight: 3)
-      if (classification.tags && classification.tags.length > 0) {
-        for (const tag of classification.tags) {
-          if (taskLower.includes(tag.toLowerCase()) || taskWords.includes(tag.toLowerCase())) {
-            score += 3;
-            matchedTags.push(tag);
-          }
-          // Also check against file keywords
-          if (fileKeywords.includes(tag.toLowerCase())) {
-            score += 2;
-            if (!matchedTags.includes(tag)) matchedTags.push(tag);
-          }
-        }
-      }
-
-      // 2. Topic matching (weight: 2)
-      if (classification.topics && classification.topics.length > 0) {
-        for (const topic of classification.topics) {
-          if (taskLower.includes(topic.toLowerCase())) {
-            score += 2;
-            matchedTopics.push(topic);
-          }
-          // Also check against file keywords
-          if (fileKeywords.includes(topic.toLowerCase())) {
-            score += 2;
-            if (!matchedTopics.includes(topic)) matchedTopics.push(topic);
-          }
-        }
-      }
-
-      // 3. Entity matching (weight: 2)
-      if (classification.entities) {
-        const entities = classification.entities;
-        const allEntities: string[] = [
-          ...(entities.technologies || []),
-          ...(entities.frameworks || []),
-          ...(entities.libraries || []),
-          ...(entities.apis || []),
-        ];
-
-        for (const entity of allEntities) {
-          if (taskLower.includes(entity.toLowerCase())) {
-            score += 2;
-            matchedEntities.push(entity);
-          }
-          // Also check against file keywords
-          if (fileKeywords.includes(entity.toLowerCase())) {
-            score += 2;
-            if (!matchedEntities.includes(entity)) matchedEntities.push(entity);
-          }
-        }
-      }
-
-      // 4. Summary similarity (weight: 0-3)
-      if (entry.summary) {
-        const similarity = calculateSimilarity(entry.summary, taskDescription);
-        const summaryScore = Math.round(similarity * 3);
-        if (summaryScore > 0) {
-          score += summaryScore;
-          reasons.push(`summary similarity: ${Math.round(similarity * 100)}%`);
-        }
-      }
-
-      // 5. Title match (weight: 1)
-      if (taskLower.includes(entry.title.toLowerCase())) {
-        score += 1;
-        reasons.push('title mentioned');
-      }
-
-      // 6. Category relevance (small boost)
-      const category = classification.category;
-      if (
-        (category === 'pattern' && /implement|build|create|write|code/.test(taskLower)) ||
-        (category === 'policy' && /policy|rule|business|requirement/.test(taskLower)) ||
-        (category === 'reference' && /api|architecture|integration|spec/.test(taskLower)) ||
-        (category === 'requirement' && /requirement|spec|must|should/.test(taskLower)) ||
-        (category === 'decision' && /decision|why|rationale|chose/.test(taskLower)) ||
-        (category === 'context' && /context|background|overview/.test(taskLower))
-      ) {
-        score += 0.5;
-        reasons.push(`${category} category relevant`);
-      }
-
-      // Generate reasoning
-      let reasoning = '';
-      if (matchedTags.length > 0) {
-        reasons.unshift(`tags: ${matchedTags.join(', ')}`);
-      }
-      if (matchedTopics.length > 0) {
-        reasons.unshift(`topics: ${matchedTopics.join(', ')}`);
-      }
-      if (matchedEntities.length > 0) {
-        reasons.unshift(`entities: ${matchedEntities.join(', ')}`);
-      }
-
-      reasoning = reasons.length > 0 ? reasons.join(' | ') : 'no direct matches';
-
-      return {
-        ...entry,
-        relevanceScore: score,
-        matchedTags,
-        matchedTopics,
-        matchedEntities,
-        relevanceReasoning: reasoning,
-      };
-    })
-    .sort((a, b) => b.relevanceScore - a.relevanceScore);
+<hints>
+- Use kahuna_learn to add files to the knowledge base first
+- Share policy docs, specs, or reference materials
+- Then call kahuna_prepare_context again
+</hints>`;
 }
 
-/**
- * Format context for copilot consumption
- */
-function formatContextForCopilot(entries: RankedEntry[], task: string): string {
-  const lines: string[] = [];
+function buildNoRelevantFilesMarkdown(task: string, totalFiles: number): string {
+  return `# No Relevant Context
 
-  lines.push('# Context Ready\n');
-  lines.push(`**Task:** ${task}\n`);
+The knowledge base has ${totalFiles} files, but none are relevant to: "${task}"
 
-  if (entries.length === 0) {
-    lines.push('No relevant context found in the knowledge base.\n');
-    lines.push('<hints>');
-    lines.push('- Use kahuna_learn to add files to the knowledge base');
-    lines.push('- Try rephrasing the task description');
-    lines.push('</hints>');
-    return lines.join('\n');
-  }
-
-  lines.push('## Relevant Context Surfaced\n');
-  lines.push('| Topic | Category | Why Relevant |');
-  lines.push('|-------|----------|--------------|');
-
-  for (const entry of entries) {
-    lines.push(`| ${entry.title} | ${entry.classification.category} | ${entry.relevanceReasoning} |`);
-  }
-
-  lines.push('\n## Start Here\n');
-
-  for (let i = 0; i < Math.min(3, entries.length); i++) {
-    const entry = entries[i];
-    lines.push(`${i + 1}. **${entry.title}** - ${entry.summary || entry.title}`);
-  }
-
-  lines.push('\n<hints>');
-  lines.push('- Relevant content is included in the selectedFiles above');
-  lines.push('- If you need more context mid-task, use kahuna_ask');
-  lines.push('- After completing work, use kahuna_learn to capture learnings');
-  lines.push('</hints>');
-
-  return lines.join('\n');
+<hints>
+- Try rephrasing the task description
+- Use kahuna_learn to add files related to this task
+- Use kahuna_ask to check if the knowledge base has related information
+</hints>`;
 }
 
-/**
- * Count entries by category
- */
-function countByCategory(entries: RankedEntry[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const entry of entries) {
-    const cat = entry.classification.category || 'unknown';
-    counts[cat] = (counts[cat] || 0) + 1;
-  }
-  return counts;
-}
+// =============================================================================
+// TOOL HANDLER
+// =============================================================================
 
 /**
  * Handle the kahuna_prepare_context tool call.
  *
- * Process flow:
+ * Pipeline:
  * 1. Validate input
- * 2. Fetch all active entries from local storage
- * 3. Extract keywords from working files (if provided)
- * 4. Rank entries by relevance using metadata
- * 5. Apply minimum relevance threshold
- * 6. Take top N entries
- * 7. Format for copilot consumption
- *
- * @param args - Tool arguments from MCP client
- * @param storage - Knowledge storage service instance
- * @returns MCP tool response
+ * 2. Check if KB is empty → return "no knowledge" markdown
+ * 3. Run retrieval agent with list + read + select_files tools
+ * 4. Extract selections from agent result
+ * 5. Write files to context/ directory
+ * 6. Return markdown response
  */
 export async function prepareContextToolHandler(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<MCPToolResponse> {
-  const { storage } = ctx;
-  // Validate input with Zod
+  const { storage, anthropic } = ctx;
+
+  // Validate input
   const parseResult = prepareContextInputSchema.safeParse(args);
   if (!parseResult.success) {
     const issues = parseResult.error.issues.map((i) => i.message).join(', ');
-    return errorResponse(`Invalid input: ${issues}`, {
-      hint: 'Provide a clear task description',
-    });
+    return markdownResponse(
+      `Invalid input: ${issues}\n\n<hints>\n- Provide a clear task description\n</hints>`,
+      true
+    );
   }
 
-  const { task, files = [] } = parseResult.data;
-
-  // Internal defaults (not exposed to user)
-  const maxFiles = 10;
-  const minRelevanceScore = 1;
+  const { task, files } = parseResult.data;
 
   try {
-    // Step 1: Fetch all active entries from local storage
+    // Check if KB is empty
     const allEntries = await storage.list({ status: 'active' });
 
     if (allEntries.length === 0) {
-      return successResponse({
-        message: 'No files found in knowledge base',
-        hint: 'Use kahuna_learn to add files to the knowledge base first',
-        selectedFiles: [],
-        summary: {
-          totalFiles: 0,
-          selectedFiles: 0,
-          categories: {},
-        },
-        formattedContext: formatContextForCopilot([], task),
-      });
+      return markdownResponse(buildEmptyKBMarkdown());
     }
 
-    // Step 2: Extract keywords from working files
-    const fileKeywords = extractFileKeywords(files);
-
-    // Optionally read content from working files to boost relevance
-    // (future enhancement - for now just use path keywords)
-
-    // Step 3: Rank by relevance
-    const rankedEntries = rankEntriesByMetadata(allEntries, task, fileKeywords);
-
-    // Step 4: Apply minimum relevance threshold
-    const relevantEntries = rankedEntries.filter((e) => e.relevanceScore >= minRelevanceScore);
-
-    // Step 5: Take top N entries
-    const selectedEntries = relevantEntries.slice(0, maxFiles);
-
-    if (selectedEntries.length === 0) {
-      return successResponse({
-        message: 'No files met the minimum relevance threshold',
-        hint: 'Try rephrasing your task description or use kahuna_learn to add more context',
-        selectedFiles: [],
-        summary: {
-          totalFiles: allEntries.length,
-          selectedFiles: 0,
-          categories: {},
-        },
-        formattedContext: formatContextForCopilot([], task),
-      });
-    }
-
-    // Step 6: Format for copilot
-    const formattedContext = formatContextForCopilot(selectedEntries, task);
-
-    return successResponse({
-      message: `Prepared ${selectedEntries.length} relevant file(s) for: "${task}"`,
-      summary: {
-        totalFiles: allEntries.length,
-        selectedFiles: selectedEntries.length,
-        avgRelevanceScore: (
-          selectedEntries.reduce((sum, e) => sum + e.relevanceScore, 0) / selectedEntries.length
-        ).toFixed(2),
-        categories: countByCategory(selectedEntries),
+    // Run retrieval agent
+    const userMessage = buildRetrievalUserMessage(task, files);
+    const agentResult = await runAgent(
+      {
+        model: MODELS.retrieval,
+        systemPrompt: RETRIEVAL_PROMPT,
+        tools: retrievalTools,
       },
-      selectedFiles: selectedEntries.map((e) => ({
-        title: e.title,
-        slug: e.slug,
-        category: e.classification.category,
-        relevanceScore: e.relevanceScore.toFixed(1),
-        reasoning: e.relevanceReasoning,
-        matchedTags: e.matchedTags,
-        matchedTopics: e.matchedTopics,
-        matchedEntities: e.matchedEntities,
-        // Include content for direct use
-        content: e.content,
-      })),
-      formattedContext, // Ready-to-use formatted context
-    });
+      userMessage,
+      storage,
+      anthropic
+    );
+
+    // Extract file selections
+    const selections = extractSelections(agentResult);
+
+    if (selections.length === 0) {
+      return markdownResponse(buildNoRelevantFilesMarkdown(task, allEntries.length));
+    }
+
+    // Write to context/ directory
+    const contextDir = path.join(process.cwd(), 'context');
+    await clearContextDir(contextDir);
+
+    // Build entry lookup for selected files
+    const entryMap = new Map<string, KnowledgeEntry>();
+    for (const sel of selections) {
+      const entry = await storage.get(sel.slug);
+      if (entry) {
+        entryMap.set(sel.slug, entry);
+        // Generate .mdc content and write stripped version to context/
+        const mdcContent = generateMdcFile(entry, entry.content);
+        await writeContextFile(contextDir, sel.slug, mdcContent);
+      }
+    }
+
+    // Write README.md
+    await writeContextReadme(contextDir, task, selections);
+
+    return markdownResponse(buildContextReadyMarkdown(task, selections, entryMap));
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return errorResponse(`Failed to prepare context: ${errorMessage}`, {
-      hint: 'Check if the knowledge base directory is accessible (~/.kahuna/knowledge/)',
-    });
+    return markdownResponse(
+      `Failed to prepare context: ${errorMessage}\n\n<hints>\n- Check if the knowledge base directory is accessible (~/.kahuna/knowledge/)\n</hints>`,
+      true
+    );
   }
 }
 

@@ -1,8 +1,57 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { KnowledgeStorageService } from '../../storage/index.js';
+import type { AgentResult } from '../../knowledge/index.js';
 import { prepareContextToolDefinition, prepareContextToolHandler } from '../prepare-context.js';
 import type { ToolContext } from '../types.js';
 import { createMockContext, createMockEntry } from './test-utils.js';
+
+// Mock the agent runner
+vi.mock('../../knowledge/agents/run-agent.js', () => ({
+  runAgent: vi.fn(),
+}));
+
+// Mock the context writer
+vi.mock('../../knowledge/surfacing/context-writer.js', () => ({
+  clearContextDir: vi.fn(),
+  writeContextFile: vi.fn(),
+  writeContextReadme: vi.fn(),
+  listContextFiles: vi.fn(),
+}));
+
+// Mock generateMdcFile from storage utils
+vi.mock('../../knowledge/storage/utils.js', () => ({
+  generateMdcFile: vi.fn().mockReturnValue('---\ntype: knowledge\n---\n# Content'),
+  stripFrontmatter: vi.fn().mockReturnValue('# Content'),
+  generateSlug: vi.fn(),
+  validateCategory: vi.fn(),
+  parseMdcFile: vi.fn(),
+}));
+
+import { runAgent } from '../../knowledge/agents/run-agent.js';
+import {
+  clearContextDir,
+  writeContextFile,
+  writeContextReadme,
+} from '../../knowledge/surfacing/context-writer.js';
+
+const mockRunAgent = vi.mocked(runAgent);
+const mockClearContextDir = vi.mocked(clearContextDir);
+const mockWriteContextFile = vi.mocked(writeContextFile);
+const mockWriteContextReadme = vi.mocked(writeContextReadme);
+
+/**
+ * Helper: Build a mock AgentResult with select_files_for_context.
+ */
+function mockRetrievalResult(selections: Array<{ slug: string; reason: string }>): AgentResult {
+  return {
+    textResponse: 'I selected the relevant files.',
+    toolResults: [
+      {
+        tool: 'select_files_for_context',
+        selections,
+      },
+    ],
+  };
+}
 
 describe('prepareContextToolDefinition', () => {
   it('has the correct name', () => {
@@ -17,29 +66,23 @@ describe('prepareContextToolDefinition', () => {
     expect(prepareContextToolDefinition.inputSchema.required).not.toContain('files');
   });
 
-  it('has files as optional array parameter', () => {
-    const filesSchema = prepareContextToolDefinition.inputSchema.properties.files;
-    expect(filesSchema.type).toBe('array');
-    expect(filesSchema.items.type).toBe('string');
-  });
-
-  it('does not have projectId, categories, maxFiles, or minRelevanceScore parameters', () => {
-    const props = prepareContextToolDefinition.inputSchema.properties;
-    expect(props).not.toHaveProperty('projectId');
-    expect(props).not.toHaveProperty('categories');
-    expect(props).not.toHaveProperty('maxFiles');
-    expect(props).not.toHaveProperty('minRelevanceScore');
+  it('has description with <examples> and <hints>', () => {
+    expect(prepareContextToolDefinition.description).toContain('<examples>');
+    expect(prepareContextToolDefinition.description).toContain('<hints>');
   });
 });
 
 describe('prepareContextToolHandler', () => {
   let ctx: ToolContext;
-  let mockStorage: KnowledgeStorageService;
 
   beforeEach(() => {
     vi.clearAllMocks();
     ctx = createMockContext();
-    mockStorage = ctx.storage;
+
+    // Default: context writer mocks resolve
+    mockClearContextDir.mockResolvedValue(undefined);
+    mockWriteContextFile.mockResolvedValue(undefined);
+    mockWriteContextReadme.mockResolvedValue(undefined);
   });
 
   describe('input validation', () => {
@@ -47,364 +90,105 @@ describe('prepareContextToolHandler', () => {
       const result = await prepareContextToolHandler({}, ctx);
 
       expect(result.isError).toBe(true);
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(false);
-      expect(response.error).toContain('task');
-    });
-
-    it('accepts empty files array (optional parameter)', async () => {
-      vi.mocked(mockStorage.list).mockResolvedValue([createMockEntry()]);
-
-      const result = await prepareContextToolHandler({ task: 'test task', files: [] }, ctx);
-
-      expect(result.isError).toBeUndefined();
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
+      expect(result.content[0].text).toContain('task');
     });
   });
 
-  describe('basic functionality', () => {
-    it('returns all active entries when task provided', async () => {
-      const entries = [
-        createMockEntry({ slug: 'entry-1', title: 'Entry 1' }),
-        createMockEntry({ slug: 'entry-2', title: 'Entry 2' }),
-        createMockEntry({ slug: 'entry-3', title: 'Entry 3' }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await prepareContextToolHandler({ task: 'general task' }, ctx);
-
-      expect(mockStorage.list).toHaveBeenCalledWith({ status: 'active' });
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
-      expect(response.data.summary.totalFiles).toBe(3);
-    });
-
-    it('handles empty knowledge base gracefully', async () => {
-      vi.mocked(mockStorage.list).mockResolvedValue([]);
+  describe('empty KB', () => {
+    it('returns no-knowledge markdown when KB is empty', async () => {
+      vi.mocked(ctx.storage.list).mockResolvedValue([]);
 
       const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
 
       expect(result.isError).toBeUndefined();
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
-      expect(response.data.message).toContain('No files found');
-      expect(response.data.hint).toContain('kahuna_learn');
-      expect(response.data.selectedFiles).toEqual([]);
+      const text = result.content[0].text;
+      expect(text).toContain('No Context Available');
+      expect(text).toContain('knowledge base is empty');
+      expect(text).toContain('<hints>');
+      expect(text).toContain('kahuna_learn');
+      // Agent should NOT be called
+      expect(mockRunAgent).not.toHaveBeenCalled();
     });
   });
 
-  describe('with files parameter', () => {
-    it('uses file paths to boost relevance', async () => {
+  describe('successful retrieval', () => {
+    it('runs agent, writes to context/, returns markdown', async () => {
       const entries = [
-        createMockEntry({
-          slug: 'auth-guide',
-          title: 'Authentication Guide',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['authentication', 'security'],
-            topics: ['auth'],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-        createMockEntry({
-          slug: 'unrelated',
-          title: 'Unrelated Document',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['database', 'sql'],
-            topics: ['data'],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
+        createMockEntry({ slug: 'api-guidelines', title: 'API Guidelines' }),
+        createMockEntry({ slug: 'error-patterns', title: 'Error Handling Patterns' }),
       ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
+      vi.mocked(ctx.storage.list).mockResolvedValue(entries);
+      vi.mocked(ctx.storage.get)
+        .mockResolvedValueOnce(entries[0])
+        .mockResolvedValueOnce(entries[1]);
 
-      const result = await prepareContextToolHandler(
-        {
-          task: 'fix a bug',
-          files: ['src/auth/login.ts'],
-        },
-        ctx
+      mockRunAgent.mockResolvedValue(
+        mockRetrievalResult([
+          { slug: 'api-guidelines', reason: 'Contains API design standards' },
+          { slug: 'error-patterns', reason: 'Error handling patterns' },
+        ])
       );
 
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
-      // Auth guide should be ranked higher due to 'auth' keyword from file path
-      expect(response.data.selectedFiles[0].slug).toBe('auth-guide');
+      const result = await prepareContextToolHandler({ task: 'Add rate limiting' }, ctx);
+
+      // Verify agent was called
+      expect(mockRunAgent).toHaveBeenCalledOnce();
+
+      // Verify context writer was called
+      expect(mockClearContextDir).toHaveBeenCalledOnce();
+      expect(mockWriteContextFile).toHaveBeenCalledTimes(2);
+      expect(mockWriteContextReadme).toHaveBeenCalledOnce();
+      expect(mockWriteContextReadme).toHaveBeenCalledWith(
+        expect.any(String),
+        'Add rate limiting',
+        expect.arrayContaining([
+          expect.objectContaining({ slug: 'api-guidelines' }),
+          expect.objectContaining({ slug: 'error-patterns' }),
+        ])
+      );
+
+      // Verify markdown response
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      expect(text).toContain('# Context Ready');
+      expect(text).toContain('API Guidelines');
+      expect(text).toContain('context/api-guidelines.md');
+      expect(text).toContain('<hints>');
     });
   });
 
-  describe('relevance ranking', () => {
-    it('ranks entries with matching tags higher', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'auth-guide',
-          title: 'Authentication Guide',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['authentication', 'security', 'oauth'],
-            topics: ['auth'],
-            entities: { technologies: ['OAuth2'], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-        createMockEntry({
-          slug: 'unrelated',
-          title: 'Unrelated Document',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['database', 'sql'],
-            topics: ['data'],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
+  describe('no relevant files', () => {
+    it('returns no-relevant markdown when agent selects nothing', async () => {
+      vi.mocked(ctx.storage.list).mockResolvedValue([createMockEntry({ slug: 'unrelated' })]);
+
+      mockRunAgent.mockResolvedValue(mockRetrievalResult([]));
 
       const result = await prepareContextToolHandler(
-        { task: 'implement authentication using oauth' },
+        { task: 'Something completely unrelated' },
         ctx
       );
 
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
-      // Auth guide should be ranked first due to tag matches
-      expect(response.data.selectedFiles[0].slug).toBe('auth-guide');
-      expect(response.data.selectedFiles[0].matchedTags).toContain('authentication');
-      expect(response.data.selectedFiles[0].matchedTags).toContain('oauth');
-    });
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      expect(text).toContain('No Relevant Context');
+      expect(text).toContain('1 files');
+      expect(text).toContain('<hints>');
 
-    it('scores topic matches', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'topic-entry',
-          title: 'Topic Entry',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: [],
-            topics: ['authentication'],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await prepareContextToolHandler(
-        { task: 'implement authentication' },
-        ctx
-      );
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.data.selectedFiles[0].matchedTopics).toContain('authentication');
-    });
-
-    it('scores entity matches', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'tech-entry',
-          title: 'Tech Entry',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: [],
-            topics: [],
-            entities: {
-              technologies: ['TypeScript'],
-              frameworks: [],
-              libraries: [],
-              apis: [],
-            },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await prepareContextToolHandler(
-        { task: 'write typescript code' },
-        ctx
-      );
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.data.selectedFiles[0].matchedEntities).toContain('TypeScript');
-    });
-
-    it('sorts entries by relevance score descending', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'low-relevance',
-          title: 'Low Relevance',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['api'], // Has at least one matching tag to pass threshold
-            topics: [],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-        createMockEntry({
-          slug: 'high-relevance',
-          title: 'High Relevance',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['api', 'rest', 'implementation'],
-            topics: ['api-design'],
-            entities: { technologies: ['REST'], frameworks: [], libraries: [], apis: ['REST API'] },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await prepareContextToolHandler({ task: 'implement rest api' }, ctx);
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.data.selectedFiles.length).toBe(2);
-      expect(response.data.selectedFiles[0].slug).toBe('high-relevance');
-      expect(response.data.selectedFiles[1].slug).toBe('low-relevance');
-    });
-  });
-
-  describe('response format', () => {
-    it('includes summary with statistics', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'entry-1',
-          classification: { ...createMockEntry().classification, category: 'reference' },
-        }),
-        createMockEntry({
-          slug: 'entry-2',
-          classification: { ...createMockEntry().classification, category: 'policy' },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.data.summary).toBeDefined();
-      expect(response.data.summary.totalFiles).toBe(2);
-      expect(response.data.summary.categories).toBeDefined();
-    });
-
-    it('includes formatted context for direct use', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'api-guide',
-          title: 'API Guide',
-          content: '# API Guide\n\nThis is the API guide.',
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.data.formattedContext).toBeDefined();
-      expect(response.data.formattedContext).toContain('# Context Ready');
-      expect(response.data.formattedContext).toContain('API Guide');
-    });
-
-    it('includes selected files with content', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'test-entry',
-          title: 'Test Entry',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['test'],
-            topics: ['testing'],
-            entities: { technologies: ['TypeScript'], frameworks: [], libraries: [], apis: [] },
-          },
-          content: 'Test content',
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
-
-      const response = JSON.parse(result.content[0].text);
-      const selectedFile = response.data.selectedFiles[0];
-      expect(selectedFile.title).toBe('Test Entry');
-      expect(selectedFile.slug).toBe('test-entry');
-      expect(selectedFile.category).toBe('reference');
-      expect(selectedFile.relevanceScore).toBeDefined();
-      expect(selectedFile.reasoning).toBeDefined();
-      expect(selectedFile.content).toBe('Test content');
-    });
-
-    it('limits to 10 files by default', async () => {
-      const entries = Array.from({ length: 20 }, (_, i) =>
-        createMockEntry({ slug: `entry-${i}`, title: `Entry ${i}` })
-      );
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.data.selectedFiles.length).toBe(10);
+      // Context writer should NOT be called
+      expect(mockClearContextDir).not.toHaveBeenCalled();
     });
   });
 
   describe('error handling', () => {
     it('handles storage errors gracefully', async () => {
-      vi.mocked(mockStorage.list).mockRejectedValue(new Error('Storage unavailable'));
+      vi.mocked(ctx.storage.list).mockRejectedValue(new Error('Storage unavailable'));
 
       const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
 
       expect(result.isError).toBe(true);
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(false);
-      expect(response.error).toContain('Failed to prepare context');
-      expect(response.error).toContain('Storage unavailable');
-      expect(response.details.hint).toContain('knowledge base directory');
-    });
-  });
-
-  describe('empty results handling', () => {
-    it('handles no entries matching relevance threshold', async () => {
-      const entries = [
-        createMockEntry({
-          slug: 'unrelated',
-          title: 'Unrelated Document',
-          summary: 'Something completely unrelated',
-          classification: {
-            category: 'reference',
-            confidence: 0.9,
-            reasoning: 'Test',
-            tags: ['other'],
-            topics: ['other'],
-            entities: { technologies: [], frameworks: [], libraries: [], apis: [] },
-          },
-        }),
-      ];
-      vi.mocked(mockStorage.list).mockResolvedValue(entries);
-
-      // With default threshold, unrelated entries with no matches should still appear
-      // but with very low scores. If all entries have score < 1, they won't show.
-      const result = await prepareContextToolHandler(
-        { task: 'implement authentication with jwt tokens' },
-        ctx
-      );
-
-      const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true);
-      // The entry has no matching tags/topics/entities, so it should be below threshold
-      expect(response.data.message).toContain('No files met');
+      const text = result.content[0].text;
+      expect(text).toContain('Failed to prepare context');
+      expect(text).toContain('Storage unavailable');
     });
   });
 });
