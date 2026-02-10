@@ -2,10 +2,12 @@
  * Knowledge Storage Service implementation
  *
  * Provides file-based storage for knowledge entries in .mdc format.
- * See: docs/design/knowledge-architecture.md
+ * Simplified from the original: flat fields, no tags/entities, process.cwd() for project.
+ * See: docs/internal/designs/context-management-system.md
  */
 
 import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import type {
   HealthCheckResult,
@@ -20,10 +22,10 @@ import { generateMdcFile, generateSlug, parseMdcFile, validateCategory } from '.
 
 /**
  * Get the base directory for knowledge storage.
- * Uses KAHUNA_KNOWLEDGE_DIR env var if set, otherwise defaults to .kahuna-knowledge/
+ * Uses KAHUNA_KNOWLEDGE_DIR env var if set, otherwise defaults to ~/.kahuna/knowledge/
  */
 function getDefaultBaseDir(): string {
-  return process.env.KAHUNA_KNOWLEDGE_DIR || '.kahuna-knowledge';
+  return process.env.KAHUNA_KNOWLEDGE_DIR || path.join(os.homedir(), '.kahuna', 'knowledge');
 }
 
 /**
@@ -40,7 +42,7 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
   /**
    * Create a new FileKnowledgeStorageService
    *
-   * @param baseDir - Directory for storing .mdc files (defaults to .kahuna/knowledge/)
+   * @param baseDir - Directory for storing .mdc files (defaults to ~/.kahuna/knowledge/)
    */
   constructor(baseDir: string = getDefaultBaseDir()) {
     this.baseDir = baseDir;
@@ -72,10 +74,11 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
   }
 
   /**
-   * Create or update a knowledge entry
+   * Create or update a knowledge entry.
    *
-   * If a file with the same slug exists, it will be updated (preserving created_at).
-   * Returns the complete entry with slug derived from title.
+   * Accepts simplified SaveKnowledgeEntryInput with flat fields.
+   * Sets source.project = process.cwd() automatically.
+   * Preserves created_at on updates.
    */
   async save(input: SaveKnowledgeEntryInput): Promise<KnowledgeEntry> {
     await this.ensureDir();
@@ -103,30 +106,23 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
       // File doesn't exist, use current time for created_at
     }
 
-    // Build frontmatter
+    // Build frontmatter with simplified flat fields
     const frontmatter: KnowledgeEntryFrontmatter = {
       type: 'knowledge',
       title: input.title,
-      summary: input.metadata?.summary ?? '',
+      summary: input.summary,
       created_at: createdAt,
       updated_at: now,
       source: {
         file: input.sourceFile,
-        project: input.projectId ?? null,
+        project: process.cwd(),
         path: input.sourcePath ?? null,
       },
       classification: {
         category: validateCategory(input.category),
         confidence: input.confidence,
         reasoning: input.reasoning,
-        tags: input.metadata?.tags ?? [],
-        topics: input.metadata?.topics ?? [],
-        entities: {
-          technologies: input.metadata?.entities?.technologies ?? [],
-          frameworks: input.metadata?.entities?.frameworks ?? [],
-          libraries: input.metadata?.entities?.libraries ?? [],
-          apis: input.metadata?.entities?.apis ?? [],
-        },
+        topics: input.topics,
       },
       status: 'active',
     };
@@ -149,10 +145,10 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
   }
 
   /**
-   * List all knowledge entries with optional filtering
+   * List all knowledge entries with optional filtering.
    *
    * Reads all .mdc files from the directory, parses them,
-   * and applies filters in memory.
+   * and applies filters in memory. No tag-based filtering (tags removed).
    */
   async list(filter?: KnowledgeEntryFilter): Promise<KnowledgeEntry[]> {
     await this.ensureDir();
@@ -207,14 +203,6 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
       if (filter.category) {
         const categories = Array.isArray(filter.category) ? filter.category : [filter.category];
         if (!categories.includes(entry.classification.category)) {
-          return false;
-        }
-      }
-
-      // Filter by tags (entries must have at least one matching tag)
-      if (filter.tags && filter.tags.length > 0) {
-        const hasMatchingTag = filter.tags.some((tag) => entry.classification.tags.includes(tag));
-        if (!hasMatchingTag) {
           return false;
         }
       }
@@ -352,7 +340,7 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
         path: this.baseDir,
         entryCount: mdcFiles.length,
       };
-    } catch (error) {
+    } catch {
       return {
         ok: false,
         path: this.baseDir,
@@ -362,7 +350,7 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
   }
 
   /**
-   * Remove all .mdc files from the directory
+   * Remove all .mdc files from the directory.
    *
    * Used primarily for testing. Use with caution in production.
    */

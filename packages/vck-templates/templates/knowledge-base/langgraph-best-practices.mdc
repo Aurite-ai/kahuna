@@ -1,6 +1,32 @@
 ---
-name: langgraph
-description: Builds workflows using LangGraph. Use when the user wants to create a workflow or agent
+type: knowledge
+title: LangGraph Best Practices
+summary: >
+  Comprehensive reference for building LangGraph agent workflows including core
+  concepts, graph construction patterns, state management, advanced patterns
+  like Send API and Command, and production-ready code examples.
+created_at: "2026-02-10T00:00:00Z"
+updated_at: "2026-02-10T00:00:00Z"
+
+source:
+  file: langgraph-best-practices.mdc
+  project: null
+  path: null
+
+classification:
+  category: reference
+  confidence: 1.0
+  reasoning: >
+    Seed content providing technical reference documentation for the LangGraph
+    framework. Covers API patterns, state management, and code examples.
+  topics:
+    - LangGraph
+    - Agent Workflows
+    - State Management
+    - Python AI Agents
+    - Structured Output
+
+status: active
 ---
 
 # LangGraph Best Practices
@@ -73,10 +99,10 @@ LangGraph models agent workflows as graphs with three key components:
 
 ## LLM Usage
 
-When calling llms, such as through ChatAnthropic, always specify structured output and call the models with .with_structured_output. Also specify method="json_schema". 
+When calling llms, such as through ChatAnthropic, always specify structured output and call the models with .with_structured_output. Also specify method="json_schema".
 
 Here is an example code snippet:
-\`\`\`
+```
 from langchain_anthropic import ChatAnthropic
 from pydantic import BaseModel, Field
 
@@ -89,9 +115,9 @@ class Movie(BaseModel):
     director: str = Field(..., description="The director of the movie")
     rating: float = Field(..., description="The movie's rating out of 10")
 
-model_with_structure = model.with_structured_output(Movie, method="json_schema")  
+model_with_structure = model.with_structured_output(Movie, method="json_schema")
 response = model_with_structure.invoke("Provide details about the movie Inception")
-\`\`\`
+```
 In this code snippet, response will contain an object like Movie(title='Inception', year=2010, director='Christopher Nolan', rating=8.8)
 
 Generate production-ready, well-structured LangGraph workflows following these patterns.

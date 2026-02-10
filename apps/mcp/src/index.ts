@@ -16,6 +16,7 @@ import 'dotenv/config';
  * - kahuna_ask: Ask questions about the knowledge base
  */
 
+import Anthropic from '@anthropic-ai/sdk';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -25,7 +26,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
-import { FileKnowledgeStorageService } from './storage/index.js';
+import { FileKnowledgeStorageService } from './knowledge/index.js';
 import { askTool } from './tools/ask.js';
 import { healthCheckTool } from './tools/health-check.js';
 import { initializeTool } from './tools/initialize.js';
@@ -79,11 +80,7 @@ async function routeToolCall(
         content: [
           {
             type: 'text',
-            text: JSON.stringify({
-              success: false,
-              error: `Unknown tool: ${toolName}`,
-              availableTools: allTools.map((t) => t.name),
-            }),
+            text: `Unknown tool: ${toolName}`,
           },
         ],
         isError: true,
@@ -99,8 +96,11 @@ async function main() {
   // Create local knowledge storage service
   const storage = new FileKnowledgeStorageService();
 
+  // Create shared Anthropic client (used by agent-based tools)
+  const anthropic = new Anthropic();
+
   // Build the shared tool context
-  const ctx: ToolContext = { storage };
+  const ctx: ToolContext = { storage, anthropic };
 
   // Create MCP server
   const server = new Server(

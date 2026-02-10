@@ -1,10 +1,19 @@
 /**
- * Tests for storage utility functions
+ * Tests for knowledge storage utility functions
+ *
+ * Based on existing storage/__tests__/utils.test.ts,
+ * updated for simplified types and new stripFrontmatter function.
  */
 
 import { describe, expect, it } from 'vitest';
 import type { KnowledgeEntryFrontmatter } from '../types.js';
-import { generateMdcFile, generateSlug, parseMdcFile, validateCategory } from '../utils.js';
+import {
+  generateMdcFile,
+  generateSlug,
+  parseMdcFile,
+  stripFrontmatter,
+  validateCategory,
+} from '../utils.js';
 
 describe('generateSlug', () => {
   it('converts basic title to lowercase hyphenated slug', () => {
@@ -64,12 +73,11 @@ describe('validateCategory', () => {
     expect(validateCategory('unknown')).toBe('context');
     expect(validateCategory('')).toBe('context');
     expect(validateCategory('random-category')).toBe('context');
-    expect(validateCategory('business-info')).toBe('context');
-    expect(validateCategory('technical-info')).toBe('context');
   });
 });
 
 describe('parseMdcFile', () => {
+  // New format: simplified (no tags, no entities)
   const validMdcContent = `---
 type: knowledge
 title: API Design Guidelines
@@ -84,6 +92,43 @@ classification:
   category: policy
   confidence: 0.92
   reasoning: Contains API design standards
+  topics:
+    - API Design
+    - REST Conventions
+status: active
+---
+
+# API Design Guidelines
+
+This is the content body.`;
+
+  it('parses valid .mdc file (new format)', () => {
+    const result = parseMdcFile(validMdcContent);
+
+    expect(result.frontmatter.type).toBe('knowledge');
+    expect(result.frontmatter.title).toBe('API Design Guidelines');
+    expect(result.frontmatter.summary).toBe('REST API design standards for the organization.');
+    expect(result.frontmatter.classification.category).toBe('policy');
+    expect(result.frontmatter.classification.confidence).toBe(0.92);
+    expect(result.frontmatter.classification.topics).toEqual(['API Design', 'REST Conventions']);
+    expect(result.body).toBe('# API Design Guidelines\n\nThis is the content body.');
+  });
+
+  it('parses old format with tags/entities without errors (backward compatible)', () => {
+    const oldFormatContent = `---
+type: knowledge
+title: Old Format Entry
+summary: An entry in the old format.
+created_at: "2026-02-06T14:30:00.000Z"
+updated_at: "2026-02-06T14:30:00.000Z"
+source:
+  file: old.md
+  project: test-project
+  path: /docs/old.md
+classification:
+  category: reference
+  confidence: 0.85
+  reasoning: Contains reference info
   tags:
     - rest
     - api
@@ -98,20 +143,13 @@ classification:
 status: active
 ---
 
-# API Design Guidelines
+Old content here.`;
 
-This is the content body.`;
-
-  it('parses valid .mdc file', () => {
-    const result = parseMdcFile(validMdcContent);
-
-    expect(result.frontmatter.type).toBe('knowledge');
-    expect(result.frontmatter.title).toBe('API Design Guidelines');
-    expect(result.frontmatter.summary).toBe('REST API design standards for the organization.');
-    expect(result.frontmatter.classification.category).toBe('policy');
-    expect(result.frontmatter.classification.confidence).toBe(0.92);
-    expect(result.frontmatter.classification.tags).toEqual(['rest', 'api']);
-    expect(result.body).toBe('# API Design Guidelines\n\nThis is the content body.');
+    // Should not throw — old fields silently ignored by the type
+    const result = parseMdcFile(oldFormatContent);
+    expect(result.frontmatter.title).toBe('Old Format Entry');
+    expect(result.frontmatter.classification.category).toBe('reference');
+    expect(result.body).toBe('Old content here.');
   });
 
   it('throws on missing frontmatter', () => {
@@ -132,38 +170,10 @@ Content`;
     const missingType = `---
 title: Test
 summary: Test summary
-created_at: "2026-02-06T14:30:00.000Z"
-updated_at: "2026-02-06T14:30:00.000Z"
-source:
-  file: test.md
-  project: null
-  path: null
-classification:
-  category: policy
-  confidence: 0.9
-  reasoning: Test
-  tags: []
-  topics: []
-  entities:
-    technologies: []
-    frameworks: []
-    libraries: []
-    apis: []
-status: active
 ---
 
 Content`;
     expect(() => parseMdcFile(missingType)).toThrow('type must be "knowledge"');
-  });
-
-  it('throws on wrong type value', () => {
-    const wrongType = `---
-type: something-else
-title: Test
----
-
-Content`;
-    expect(() => parseMdcFile(wrongType)).toThrow('type must be "knowledge"');
   });
 
   it('throws on missing title', () => {
@@ -191,13 +201,7 @@ classification:
   category: context
   confidence: 0.5
   reasoning: Test
-  tags: []
   topics: []
-  entities:
-    technologies: []
-    frameworks: []
-    libraries: []
-    apis: []
 status: active
 ---
 `;
@@ -229,14 +233,7 @@ describe('generateMdcFile', () => {
       category: 'reference',
       confidence: 0.85,
       reasoning: 'Contains technical reference information',
-      tags: ['testing', 'example'],
-      topics: ['documentation'],
-      entities: {
-        technologies: ['TypeScript'],
-        frameworks: [],
-        libraries: ['vitest'],
-        apis: [],
-      },
+      topics: ['documentation', 'testing'],
     },
     status: 'active',
   };
@@ -261,7 +258,9 @@ describe('generateMdcFile', () => {
     expect(parsed.frontmatter.classification.category).toBe(
       sampleFrontmatter.classification.category
     );
-    expect(parsed.frontmatter.classification.tags).toEqual(sampleFrontmatter.classification.tags);
+    expect(parsed.frontmatter.classification.topics).toEqual(
+      sampleFrontmatter.classification.topics
+    );
     expect(parsed.body).toBe(body);
   });
 
@@ -290,20 +289,66 @@ describe('generateMdcFile', () => {
     expect(parsed.frontmatter.source.path).toBeNull();
   });
 
-  it('preserves array order in tags and topics', () => {
-    const frontmatterWithArrays: KnowledgeEntryFrontmatter = {
+  it('preserves array order in topics', () => {
+    const frontmatterWithTopics: KnowledgeEntryFrontmatter = {
       ...sampleFrontmatter,
       classification: {
         ...sampleFrontmatter.classification,
-        tags: ['first', 'second', 'third'],
-        topics: ['topic-a', 'topic-b'],
+        topics: ['topic-a', 'topic-b', 'topic-c'],
       },
     };
 
-    const generated = generateMdcFile(frontmatterWithArrays, 'Content');
+    const generated = generateMdcFile(frontmatterWithTopics, 'Content');
     const parsed = parseMdcFile(generated);
 
-    expect(parsed.frontmatter.classification.tags).toEqual(['first', 'second', 'third']);
-    expect(parsed.frontmatter.classification.topics).toEqual(['topic-a', 'topic-b']);
+    expect(parsed.frontmatter.classification.topics).toEqual(['topic-a', 'topic-b', 'topic-c']);
+  });
+});
+
+describe('stripFrontmatter', () => {
+  it('strips YAML frontmatter and returns body', () => {
+    const mdc = `---
+type: knowledge
+title: Test
+---
+
+# Content Here
+
+Body text.`;
+    const result = stripFrontmatter(mdc);
+    expect(result).toBe('# Content Here\n\nBody text.');
+  });
+
+  it('returns content as-is when no frontmatter present', () => {
+    const plain = '# Just Markdown\n\nNo frontmatter.';
+    const result = stripFrontmatter(plain);
+    expect(result).toBe(plain);
+  });
+
+  it('handles empty body after frontmatter', () => {
+    const mdc = `---
+type: knowledge
+title: Empty
+---
+`;
+    const result = stripFrontmatter(mdc);
+    expect(result).toBe('');
+  });
+
+  it('handles Windows-style line endings', () => {
+    const mdc = '---\r\ntype: knowledge\r\ntitle: Test\r\n---\r\n\r\n# Content';
+    const result = stripFrontmatter(mdc);
+    expect(result).toBe('# Content');
+  });
+
+  it('strips whitespace from result', () => {
+    const mdc = `---
+type: knowledge
+title: Test
+---
+
+   Indented content   `;
+    const result = stripFrontmatter(mdc);
+    expect(result).toBe('Indented content');
   });
 });

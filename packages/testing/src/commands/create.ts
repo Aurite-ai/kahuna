@@ -170,7 +170,9 @@ export async function createCommand(options: {
   console.log(`📁 projects/${projectName}/`);
   console.log('');
   console.log('Next steps:');
-  console.log(`  1. Read the scenario prompts: packages/testing/scenarios/${scenario}/user-prompts.md`);
+  console.log(
+    `  1. Read the scenario prompts: packages/testing/scenarios/${scenario}/user-prompts.md`
+  );
   console.log(`  2. cd projects/${projectName}`);
   console.log('  3. Open Claude Code (or your copilot) and follow the user prompts');
   console.log(`  4. When done: pnpm kahuna-test collect ${projectName}`);

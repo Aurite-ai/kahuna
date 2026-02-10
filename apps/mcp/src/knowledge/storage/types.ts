@@ -1,8 +1,8 @@
 /**
- * Type definitions for local knowledge storage
+ * Type definitions for knowledge storage
  *
- * These types define the structure of .mdc files stored in ~/.kahuna/knowledge/
- * See: docs/design/knowledge-architecture.md
+ * Simplified types — no tags, no entities.
+ * See: docs/internal/designs/context-management-system.md
  */
 
 /**
@@ -22,25 +22,14 @@ export type KnowledgeCategory =
 export type KnowledgeStatus = 'active' | 'archived';
 
 /**
- * Named entities extracted from content
- */
-export interface KnowledgeEntities {
-  technologies: string[];
-  frameworks: string[];
-  libraries: string[];
-  apis: string[];
-}
-
-/**
- * Classification data from AI categorization
+ * Simplified classification data from AI categorization.
+ * Reduced from 8 fields (tags, entities, etc.) to 4.
  */
 export interface KnowledgeClassification {
   category: KnowledgeCategory;
   confidence: number;
   reasoning: string;
-  tags: string[];
   topics: string[];
-  entities: KnowledgeEntities;
 }
 
 /**
@@ -56,20 +45,14 @@ export interface KnowledgeSource {
  * YAML frontmatter structure for .mdc files
  */
 export interface KnowledgeEntryFrontmatter {
-  // Required fields
   type: 'knowledge';
-  title: string; // Source of truth for display name; slug derived from this
-  summary: string; // Brief description (AI-generated, used for ranking/preview)
+  title: string;
+  summary: string;
   created_at: string;
   updated_at: string;
 
-  // Source information
   source: KnowledgeSource;
-
-  // Classification
   classification: KnowledgeClassification;
-
-  // Status
   status: KnowledgeStatus;
 }
 
@@ -84,54 +67,32 @@ export interface KnowledgeEntry extends KnowledgeEntryFrontmatter {
 }
 
 /**
- * Input for saving (create or update) a knowledge entry
- * Maps from current contextCreate() parameters
+ * Simplified input for saving a knowledge entry.
+ * Flat fields — no metadata wrapper. source.project set automatically via process.cwd().
  */
 export interface SaveKnowledgeEntryInput {
-  // Title determines the filename slug
   title: string;
-
-  // Content body
+  summary: string;
   content: string;
-
-  // Source information
   sourceFile: string;
-  projectId?: string;
   sourcePath?: string;
-
-  // From AI categorization
-  category: string;
+  category: KnowledgeCategory;
   confidence: number;
   reasoning: string;
-  metadata?: {
-    tags?: string[];
-    topics?: string[];
-    entities?: {
-      technologies?: string[];
-      frameworks?: string[];
-      libraries?: string[];
-      apis?: string[];
-    };
-    summary?: string;
-  };
+  topics: string[];
 }
 
 /**
- * Filter criteria for listing entries
+ * Filter criteria for listing entries.
+ * Tags filter removed (tags no longer exist).
  */
 export interface KnowledgeEntryFilter {
   /** Filter by project (exact match on source.project) */
   project?: string;
-
   /** Filter by category */
   category?: KnowledgeCategory | KnowledgeCategory[];
-
   /** Filter by status */
   status?: KnowledgeStatus;
-
-  /** Filter by tags (entries must have at least one matching tag) */
-  tags?: string[];
-
   /** Full-text search in content (simple substring match) */
   contentSearch?: string;
 }
@@ -165,51 +126,42 @@ export class KnowledgeStorageError extends Error {
 }
 
 /**
- * Storage service for knowledge entries
- *
- * Handles all file I/O operations for the ~/.kahuna/knowledge/ directory.
- * Designed for ~1000 entries scale with on-demand file scanning.
- *
- * Files are identified by their slug (filename without extension).
- * Creating an entry with an existing slug updates the existing entry.
+ * Storage service interface for knowledge entries.
  */
 export interface KnowledgeStorageService {
   /**
-   * Create or update a knowledge entry
-   * If a file with the same slug exists, it will be updated
-   * @returns The created/updated entry
+   * Create or update a knowledge entry.
+   * If a file with the same slug exists, it will be updated.
    */
   save(entry: SaveKnowledgeEntryInput): Promise<KnowledgeEntry>;
 
   /**
-   * List all knowledge entries (with optional filtering)
-   * @param filter - Optional filter criteria
-   * @returns Array of entries matching filter
+   * List all knowledge entries (with optional filtering).
    */
   list(filter?: KnowledgeEntryFilter): Promise<KnowledgeEntry[]>;
 
   /**
-   * Get a single entry by slug
-   * @param slug - Filename without extension (e.g., "api-design-guidelines")
-   * @returns Entry or null if not found
+   * Get a single entry by slug.
    */
   get(slug: string): Promise<KnowledgeEntry | null>;
 
   /**
-   * Check if an entry exists
-   * @param slug - Filename without extension
+   * Check if an entry exists.
    */
   exists(slug: string): Promise<boolean>;
 
   /**
-   * Delete an entry (or mark as archived)
-   * @param slug - Filename without extension
-   * @param permanent - If true, delete file; if false, set status to archived
+   * Delete an entry (or mark as archived).
    */
   delete(slug: string, permanent?: boolean): Promise<void>;
 
   /**
-   * Check if the knowledge base directory exists and is accessible
+   * Check if the knowledge base directory exists and is accessible.
    */
   healthCheck(): Promise<HealthCheckResult>;
 }
+
+/**
+ * Hard file size limit for categorization (400KB ≈ 100k tokens)
+ */
+export const FILE_SIZE_LIMIT = 400_000;

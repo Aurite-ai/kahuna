@@ -1,5 +1,5 @@
 /**
- * Utility functions for local knowledge storage
+ * Utility functions for knowledge storage
  *
  * Handles slug generation and .mdc file parsing/generation.
  * See: docs/design/knowledge-architecture.md
@@ -67,16 +67,10 @@ export interface ParsedMdcFile {
 }
 
 /**
- * Parse .mdc file content into frontmatter and body
+ * Parse .mdc file content into frontmatter and body.
  *
- * .mdc format:
- * ```
- * ---
- * YAML frontmatter
- * ---
- *
- * Markdown content body
- * ```
+ * Lenient: accepts both old format (with tags/entities) and new format (without).
+ * Old fields are silently ignored — YAML parsing is permissive by default.
  *
  * @param content - Raw .mdc file content
  * @returns Parsed frontmatter object and body string
@@ -93,9 +87,9 @@ export function parseMdcFile(content: string): ParsedMdcFile {
   const frontmatterYaml = frontmatterMatch[1];
   const body = content.slice(frontmatterMatch[0].length).trim();
 
-  let frontmatter: KnowledgeEntryFrontmatter;
+  let parsed: Record<string, unknown>;
   try {
-    frontmatter = parseYaml(frontmatterYaml) as KnowledgeEntryFrontmatter;
+    parsed = parseYaml(frontmatterYaml) as Record<string, unknown>;
   } catch (error) {
     throw new Error(
       `Invalid .mdc file: failed to parse YAML frontmatter - ${error instanceof Error ? error.message : String(error)}`
@@ -103,12 +97,16 @@ export function parseMdcFile(content: string): ParsedMdcFile {
   }
 
   // Basic validation of required fields
-  if (!frontmatter.type || frontmatter.type !== 'knowledge') {
+  if (!parsed.type || parsed.type !== 'knowledge') {
     throw new Error('Invalid .mdc file: type must be "knowledge"');
   }
-  if (!frontmatter.title) {
+  if (!parsed.title) {
     throw new Error('Invalid .mdc file: missing required field "title"');
   }
+
+  // Cast to our simplified frontmatter type.
+  // Old fields like tags/entities are silently dropped since they're not in our type.
+  const frontmatter = parsed as unknown as KnowledgeEntryFrontmatter;
 
   return { frontmatter, body };
 }
@@ -128,4 +126,19 @@ export function generateMdcFile(frontmatter: KnowledgeEntryFrontmatter, body: st
   });
 
   return `---\n${yamlContent}---\n\n${body}`;
+}
+
+/**
+ * Strip YAML frontmatter from .mdc content, returning just the body markdown.
+ *
+ * @param mdcContent - Raw .mdc file content (with --- frontmatter ---)
+ * @returns Clean markdown content without frontmatter
+ */
+export function stripFrontmatter(mdcContent: string): string {
+  const frontmatterMatch = mdcContent.match(/^---\r?\n[\s\S]*?\r?\n---/);
+  if (!frontmatterMatch) {
+    // No frontmatter found, return as-is
+    return mdcContent.trim();
+  }
+  return mdcContent.slice(frontmatterMatch[0].length).trim();
 }

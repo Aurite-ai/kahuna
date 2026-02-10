@@ -1,32 +1,42 @@
 /**
- * Kahuna Prepare Context Tool - Smart context retrieval
+ * Kahuna Prepare Context Tool - Agentic context retrieval
  *
- * This tool intelligently selects and prepares relevant context files
- * before the copilot starts working on a task.
+ * Searches the knowledge base for files relevant to a task using an LLM agent,
+ * then writes them as clean markdown to the project's context/ folder.
+ * Can also scaffold framework boilerplate when the agent selects a framework.
  *
- * The "prepare" terminology emphasizes:
- * - This should be called FIRST, before starting any task
- * - It's proactive context gathering, not reactive searching
- * - Files are formatted and ready to use immediately
- *
- * IMPLEMENTATION: Metadata-based ranking (MVP)
- * - Uses existing metadata (tags, topics, summary, entities)
- * - Fast and explainable
- * - No infrastructure required
- * - Upgradeable to embeddings later
+ * See: docs/internal/designs/context-management-system.md
  */
 
+import * as path from 'node:path';
 import { z } from 'zod';
-import type { KnowledgeEntry } from '../storage/index.js';
-import { type MCPToolResponse, errorResponse, successResponse } from './response-utils.js';
-import type { ToolContext } from './types.js';
+import { MODELS } from '../config.js';
+import {
+  type AgentResult,
+  type FrameworkCopyResult,
+  type KnowledgeEntry,
+  RETRIEVAL_PROMPT,
+  type ReferencedFile,
+  buildRetrievalUserMessage,
+  clearContextDir,
+  copyFrameworkBoilerplate,
+  generateFileTree,
+  generateMdcFile,
+  getRelativeLocalPath,
+  retrievalTools,
+  runAgent,
+  shouldReferenceLocally,
+  writeContextFile,
+  writeContextReadme,
+} from '../knowledge/index.js';
+import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
  * Tool definition for MCP registration.
  */
 export const prepareContextToolDefinition = {
   name: 'kahuna_prepare_context',
-  description: `Retrieve relevant knowledge from the Kahuna knowledge base for a task.
+  description: `Prepare the context/ folder with relevant knowledge for a task.
 
 USE THIS TOOL WHEN:
 - Starting any new task or feature
@@ -34,17 +44,25 @@ USE THIS TOOL WHEN:
 - Before beginning implementation work
 - User asks "what do we know about X"
 
-This is the PRIMARY context retrieval tool. Call it ONCE at task start. Relevant content is returned directly in the response.
+This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from context/ files.
 
-**Examples:**
-- Starting a task: task="Add rate limiting to the search tool"
-- With files you'll touch: task="Refactor error handling in tools", files=["src/agent/tools.py"]
-- Exploring a topic: task="Understand our API design patterns"
+<examples>
+### Starting a task
+kahuna_prepare_context(task="Add rate limiting to the search tool")
 
-**Hints:**
-- Call ONCE at task start, then work from the returned content
+### With files you'll touch
+kahuna_prepare_context(task="Refactor error handling in tools", files=["src/agent/tools.py"])
+
+### Exploring a topic
+kahuna_prepare_context(task="Understand our API design patterns")
+</examples>
+
+<hints>
+- Call ONCE at task start, then read context/ files directly
 - Natural language task description works best
-- If you need more context mid-task, use kahuna_ask instead`,
+- After calling, read context/README.md for navigation
+- If you need more context mid-task, use kahuna_ask instead
+</hints>`,
 
   inputSchema: {
     type: 'object' as const,
@@ -60,6 +78,11 @@ This is the PRIMARY context retrieval tool. Call it ONCE at task start. Relevant
           type: 'string',
         },
       },
+      includeBoilerplate: {
+        type: 'boolean',
+        description:
+          'Whether to copy framework boilerplate to src/. Defaults to true. Set false if you already have project structure.',
+      },
     },
     required: ['task'],
   },
@@ -74,362 +97,344 @@ const prepareContextInputSchema = z.object({
     .transform((val) => val.trim())
     .refine((val) => val.length > 0, { message: 'Missing or empty task' }),
   files: z.array(z.string()).optional(),
+  includeBoilerplate: z.boolean().optional().default(true),
 });
 
 /**
- * Ranked file with relevance information
+ * Selection from the retrieval agent's select_files_for_context tool call.
  */
-interface RankedEntry extends KnowledgeEntry {
-  relevanceScore: number;
-  matchedTags?: string[];
-  matchedTopics?: string[];
-  matchedEntities?: string[];
-  relevanceReasoning: string;
+interface FileSelection {
+  slug: string;
+  reason: string;
 }
 
 /**
- * Calculate text similarity between two strings (simple word overlap)
+ * Framework selection from the retrieval agent's select_framework tool call.
  */
-function calculateSimilarity(text1: string, text2: string): number {
-  const words1 = text1.toLowerCase().split(/\s+/);
-  const words2 = text2.toLowerCase().split(/\s+/);
-
-  const set1 = new Set(words1);
-  const set2 = new Set(words2);
-
-  const intersection = new Set([...set1].filter((x) => set2.has(x)));
-
-  if (set1.size === 0 || set2.size === 0) return 0;
-
-  return (intersection.size * 2) / (set1.size + set2.size);
+interface FrameworkSelection {
+  framework: string;
+  reason: string;
 }
 
 /**
- * Extract keywords from file paths for relevance matching
+ * Extract file selections from agent tool results.
  */
-function extractFileKeywords(files: string[]): string[] {
-  const keywords: string[] = [];
-  for (const file of files) {
-    // Extract filename and path components
-    const parts = file.split(/[/\\]/).filter(Boolean);
-    for (const part of parts) {
-      // Remove extension and split by separators
-      const baseName = part.replace(/\.[^.]+$/, '');
-      const words = baseName.split(/[-_.]/).filter((w) => w.length > 2);
-      keywords.push(...words.map((w) => w.toLowerCase()));
+function extractSelections(agentResult: AgentResult): FileSelection[] {
+  const selectResult = agentResult.toolResults.find(
+    (r) => (r as Record<string, unknown>).tool === 'select_files_for_context'
+  );
+  if (!selectResult) return [];
+  const r = selectResult as Record<string, unknown>;
+  const selections = r.selections as FileSelection[] | undefined;
+  return selections || [];
+}
+
+/**
+ * Extract framework selection from agent tool results.
+ */
+function extractFrameworkSelection(agentResult: AgentResult): FrameworkSelection | null {
+  const frameworkResult = agentResult.toolResults.find(
+    (r) => (r as Record<string, unknown>).tool === 'select_framework'
+  );
+  if (!frameworkResult) return null;
+  const r = frameworkResult as Record<string, unknown>;
+  return {
+    framework: r.framework as string,
+    reason: r.reason as string,
+  };
+}
+
+// =============================================================================
+// MARKDOWN RESPONSE BUILDERS
+// =============================================================================
+
+function buildContextReadyMarkdown(
+  task: string,
+  selections: FileSelection[],
+  entries: Map<string, KnowledgeEntry>,
+  referencedFiles?: ReferencedFile[],
+  frameworkResult?: FrameworkCopyResult
+): string {
+  const parts: string[] = [];
+
+  parts.push('# Context Ready\n');
+  parts.push(`**Task:** ${task}\n`);
+
+  // Framework section (if scaffolded)
+  if (frameworkResult && frameworkResult.copiedFiles.length > 0) {
+    parts.push(`## Framework Scaffolded: ${frameworkResult.displayName}\n`);
+    parts.push('**Files copied:**');
+    for (const file of frameworkResult.copiedFiles) {
+      parts.push(`- ${file}`);
+    }
+    if (frameworkResult.skippedFiles.length > 0) {
+      parts.push('\n**Files skipped (already exist):**');
+      for (const file of frameworkResult.skippedFiles) {
+        parts.push(`- ${file}`);
+      }
+    }
+    parts.push('');
+  } else if (frameworkResult && frameworkResult.skippedFiles.length > 0) {
+    parts.push(`## Framework: ${frameworkResult.displayName}\n`);
+    parts.push('All framework files already exist in your project. No files copied.\n');
+  }
+
+  // Relevant context surfaced (copied to context/)
+  if (selections.length > 0) {
+    parts.push('## Relevant Context Surfaced\n');
+    parts.push('| Topic | File | Why Relevant |');
+    parts.push('|-------|------|--------------|');
+
+    for (const sel of selections) {
+      const entry = entries.get(sel.slug);
+      const title = entry?.title || sel.slug;
+      parts.push(`| ${title} | context/${sel.slug}.md | ${sel.reason} |`);
+    }
+    parts.push('');
+  }
+
+  // Local project files (referenced, not copied)
+  if (referencedFiles && referencedFiles.length > 0) {
+    parts.push('## Local Project Files\n');
+    parts.push('These KB entries originated from files in your project. Read them directly:\n');
+    parts.push('| Topic | Location | Why Relevant |');
+    parts.push('|-------|----------|--------------|');
+
+    for (const ref of referencedFiles) {
+      parts.push(`| ${ref.slug} | ${ref.localPath} | ${ref.reason} |`);
+    }
+    parts.push('');
+  }
+
+  // Start Here section
+  parts.push('## Start Here\n');
+  let stepNum = 1;
+
+  // If framework was scaffolded, mention it first
+  if (frameworkResult && frameworkResult.copiedFiles.length > 0) {
+    parts.push(`${stepNum}. **Explore scaffolded code** — Check src/ for framework structure`);
+    stepNum++;
+  }
+
+  parts.push(`${stepNum}. **Read context/README.md** — Full navigation`);
+  stepNum++;
+
+  // Include top selections from copied files
+  const topSelections = selections.slice(0, 2);
+  for (const sel of topSelections) {
+    const entry = entries.get(sel.slug);
+    const title = entry?.title || sel.slug;
+    parts.push(`${stepNum}. **Check ${sel.slug}.md** — ${title}`);
+    stepNum++;
+  }
+
+  // Include referenced files in start here too (if room)
+  if (referencedFiles && referencedFiles.length > 0 && stepNum <= 4) {
+    const remaining = Math.min(4 - stepNum + 1, referencedFiles.length);
+    for (let i = 0; i < remaining; i++) {
+      const ref = referencedFiles[i];
+      parts.push(`${stepNum}. **Check ${ref.localPath}** — ${ref.slug}`);
+      stepNum++;
     }
   }
-  return [...new Set(keywords)];
+
+  parts.push('\n<hints>');
+  parts.push('- Context folder is ready — read files directly');
+  if (referencedFiles && referencedFiles.length > 0) {
+    parts.push('- Some KB entries reference local project files — no need to copy');
+  }
+  if (frameworkResult?.copiedFiles.length) {
+    parts.push('- Framework boilerplate is in src/ — start from there');
+  }
+  parts.push('- If you need more context mid-task, use kahuna_ask');
+  parts.push('- After completing work, use kahuna_learn to capture learnings');
+  parts.push('</hints>');
+
+  return parts.join('\n');
 }
 
-/**
- * Rank entries by relevance to task description using metadata
- *
- * Scoring weights:
- * - Tag match: 3 points per matching tag
- * - Topic match: 2 points per matching topic
- * - Entity match: 2 points per matching entity (technology, framework, library, API)
- * - Summary similarity: 0-3 points based on text overlap
- * - Title match: 1 point if task mentions title
- * - Category relevance: 0.5 points for category keyword match
- * - File keyword match: 2 points per keyword match from working files
- */
-function rankEntriesByMetadata(
-  entries: KnowledgeEntry[],
-  taskDescription: string,
-  fileKeywords: string[] = []
-): RankedEntry[] {
-  const taskLower = taskDescription.toLowerCase();
-  const taskWords = taskLower.split(/\s+/);
+function buildEmptyKBMarkdown(): string {
+  return `# No Context Available
 
-  return entries
-    .map((entry) => {
-      let score = 0;
-      const matchedTags: string[] = [];
-      const matchedTopics: string[] = [];
-      const matchedEntities: string[] = [];
-      const reasons: string[] = [];
+The knowledge base is empty. No files to surface for this task.
 
-      const classification = entry.classification;
-
-      // 1. Tag matching (weight: 3)
-      if (classification.tags && classification.tags.length > 0) {
-        for (const tag of classification.tags) {
-          if (taskLower.includes(tag.toLowerCase()) || taskWords.includes(tag.toLowerCase())) {
-            score += 3;
-            matchedTags.push(tag);
-          }
-          // Also check against file keywords
-          if (fileKeywords.includes(tag.toLowerCase())) {
-            score += 2;
-            if (!matchedTags.includes(tag)) matchedTags.push(tag);
-          }
-        }
-      }
-
-      // 2. Topic matching (weight: 2)
-      if (classification.topics && classification.topics.length > 0) {
-        for (const topic of classification.topics) {
-          if (taskLower.includes(topic.toLowerCase())) {
-            score += 2;
-            matchedTopics.push(topic);
-          }
-          // Also check against file keywords
-          if (fileKeywords.includes(topic.toLowerCase())) {
-            score += 2;
-            if (!matchedTopics.includes(topic)) matchedTopics.push(topic);
-          }
-        }
-      }
-
-      // 3. Entity matching (weight: 2)
-      if (classification.entities) {
-        const entities = classification.entities;
-        const allEntities: string[] = [
-          ...(entities.technologies || []),
-          ...(entities.frameworks || []),
-          ...(entities.libraries || []),
-          ...(entities.apis || []),
-        ];
-
-        for (const entity of allEntities) {
-          if (taskLower.includes(entity.toLowerCase())) {
-            score += 2;
-            matchedEntities.push(entity);
-          }
-          // Also check against file keywords
-          if (fileKeywords.includes(entity.toLowerCase())) {
-            score += 2;
-            if (!matchedEntities.includes(entity)) matchedEntities.push(entity);
-          }
-        }
-      }
-
-      // 4. Summary similarity (weight: 0-3)
-      if (entry.summary) {
-        const similarity = calculateSimilarity(entry.summary, taskDescription);
-        const summaryScore = Math.round(similarity * 3);
-        if (summaryScore > 0) {
-          score += summaryScore;
-          reasons.push(`summary similarity: ${Math.round(similarity * 100)}%`);
-        }
-      }
-
-      // 5. Title match (weight: 1)
-      if (taskLower.includes(entry.title.toLowerCase())) {
-        score += 1;
-        reasons.push('title mentioned');
-      }
-
-      // 6. Category relevance (small boost)
-      const category = classification.category;
-      if (
-        (category === 'pattern' && /implement|build|create|write|code/.test(taskLower)) ||
-        (category === 'policy' && /policy|rule|business|requirement/.test(taskLower)) ||
-        (category === 'reference' && /api|architecture|integration|spec/.test(taskLower)) ||
-        (category === 'requirement' && /requirement|spec|must|should/.test(taskLower)) ||
-        (category === 'decision' && /decision|why|rationale|chose/.test(taskLower)) ||
-        (category === 'context' && /context|background|overview/.test(taskLower))
-      ) {
-        score += 0.5;
-        reasons.push(`${category} category relevant`);
-      }
-
-      // Generate reasoning
-      let reasoning = '';
-      if (matchedTags.length > 0) {
-        reasons.unshift(`tags: ${matchedTags.join(', ')}`);
-      }
-      if (matchedTopics.length > 0) {
-        reasons.unshift(`topics: ${matchedTopics.join(', ')}`);
-      }
-      if (matchedEntities.length > 0) {
-        reasons.unshift(`entities: ${matchedEntities.join(', ')}`);
-      }
-
-      reasoning = reasons.length > 0 ? reasons.join(' | ') : 'no direct matches';
-
-      return {
-        ...entry,
-        relevanceScore: score,
-        matchedTags,
-        matchedTopics,
-        matchedEntities,
-        relevanceReasoning: reasoning,
-      };
-    })
-    .sort((a, b) => b.relevanceScore - a.relevanceScore);
+<hints>
+- Use kahuna_learn to add files to the knowledge base first
+- Share policy docs, specs, or reference materials
+- Then call kahuna_prepare_context again
+</hints>`;
 }
 
-/**
- * Format context for copilot consumption
- */
-function formatContextForCopilot(entries: RankedEntry[], task: string): string {
-  const lines: string[] = [];
+function buildNoRelevantFilesMarkdown(task: string, totalFiles: number): string {
+  return `# No Relevant Context
 
-  lines.push('# Context Ready\n');
-  lines.push(`**Task:** ${task}\n`);
+The knowledge base has ${totalFiles} files, but none are relevant to: "${task}"
 
-  if (entries.length === 0) {
-    lines.push('No relevant context found in the knowledge base.\n');
-    lines.push('<hints>');
-    lines.push('- Use kahuna_learn to add files to the knowledge base');
-    lines.push('- Try rephrasing the task description');
-    lines.push('</hints>');
-    return lines.join('\n');
-  }
-
-  lines.push('## Relevant Context Surfaced\n');
-  lines.push('| Topic | Category | Why Relevant |');
-  lines.push('|-------|----------|--------------|');
-
-  for (const entry of entries) {
-    lines.push(`| ${entry.title} | ${entry.classification.category} | ${entry.relevanceReasoning} |`);
-  }
-
-  lines.push('\n## Start Here\n');
-
-  for (let i = 0; i < Math.min(3, entries.length); i++) {
-    const entry = entries[i];
-    lines.push(`${i + 1}. **${entry.title}** - ${entry.summary || entry.title}`);
-  }
-
-  lines.push('\n<hints>');
-  lines.push('- Relevant content is included in the selectedFiles above');
-  lines.push('- If you need more context mid-task, use kahuna_ask');
-  lines.push('- After completing work, use kahuna_learn to capture learnings');
-  lines.push('</hints>');
-
-  return lines.join('\n');
+<hints>
+- Try rephrasing the task description
+- Use kahuna_learn to add files related to this task
+- Use kahuna_ask to check if the knowledge base has related information
+</hints>`;
 }
 
-/**
- * Count entries by category
- */
-function countByCategory(entries: RankedEntry[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const entry of entries) {
-    const cat = entry.classification.category || 'unknown';
-    counts[cat] = (counts[cat] || 0) + 1;
-  }
-  return counts;
-}
+// =============================================================================
+// TOOL HANDLER
+// =============================================================================
 
 /**
  * Handle the kahuna_prepare_context tool call.
  *
- * Process flow:
+ * Pipeline:
  * 1. Validate input
- * 2. Fetch all active entries from local storage
- * 3. Extract keywords from working files (if provided)
- * 4. Rank entries by relevance using metadata
- * 5. Apply minimum relevance threshold
- * 6. Take top N entries
- * 7. Format for copilot consumption
- *
- * @param args - Tool arguments from MCP client
- * @param storage - Knowledge storage service instance
- * @returns MCP tool response
+ * 2. Check if KB is empty → return "no knowledge" markdown
+ * 3. Run retrieval agent with list + read + select_files tools
+ * 4. Extract selections from agent result
+ * 5. Write files to context/ directory
+ * 6. Return markdown response
  */
 export async function prepareContextToolHandler(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<MCPToolResponse> {
-  const { storage } = ctx;
-  // Validate input with Zod
+  const { storage, anthropic } = ctx;
+
+  // Validate input
   const parseResult = prepareContextInputSchema.safeParse(args);
   if (!parseResult.success) {
     const issues = parseResult.error.issues.map((i) => i.message).join(', ');
-    return errorResponse(`Invalid input: ${issues}`, {
-      hint: 'Provide a clear task description',
-    });
+    return markdownResponse(
+      `Invalid input: ${issues}\n\n<hints>\n- Provide a clear task description\n</hints>`,
+      true
+    );
   }
 
-  const { task, files = [] } = parseResult.data;
-
-  // Internal defaults (not exposed to user)
-  const maxFiles = 10;
-  const minRelevanceScore = 1;
+  const { task, files, includeBoilerplate } = parseResult.data;
 
   try {
-    // Step 1: Fetch all active entries from local storage
+    // Check if KB is empty
     const allEntries = await storage.list({ status: 'active' });
 
     if (allEntries.length === 0) {
-      return successResponse({
-        message: 'No files found in knowledge base',
-        hint: 'Use kahuna_learn to add files to the knowledge base first',
-        selectedFiles: [],
-        summary: {
-          totalFiles: 0,
-          selectedFiles: 0,
-          categories: {},
-        },
-        formattedContext: formatContextForCopilot([], task),
-      });
+      return markdownResponse(buildEmptyKBMarkdown());
     }
 
-    // Step 2: Extract keywords from working files
-    const fileKeywords = extractFileKeywords(files);
+    // Generate project file tree for the retrieval agent
+    const fileTree = await generateFileTree({ maxDepth: 4, maxEntries: 200 });
 
-    // Optionally read content from working files to boost relevance
-    // (future enhancement - for now just use path keywords)
-
-    // Step 3: Rank by relevance
-    const rankedEntries = rankEntriesByMetadata(allEntries, task, fileKeywords);
-
-    // Step 4: Apply minimum relevance threshold
-    const relevantEntries = rankedEntries.filter((e) => e.relevanceScore >= minRelevanceScore);
-
-    // Step 5: Take top N entries
-    const selectedEntries = relevantEntries.slice(0, maxFiles);
-
-    if (selectedEntries.length === 0) {
-      return successResponse({
-        message: 'No files met the minimum relevance threshold',
-        hint: 'Try rephrasing your task description or use kahuna_learn to add more context',
-        selectedFiles: [],
-        summary: {
-          totalFiles: allEntries.length,
-          selectedFiles: 0,
-          categories: {},
-        },
-        formattedContext: formatContextForCopilot([], task),
-      });
-    }
-
-    // Step 6: Format for copilot
-    const formattedContext = formatContextForCopilot(selectedEntries, task);
-
-    return successResponse({
-      message: `Prepared ${selectedEntries.length} relevant file(s) for: "${task}"`,
-      summary: {
-        totalFiles: allEntries.length,
-        selectedFiles: selectedEntries.length,
-        avgRelevanceScore: (
-          selectedEntries.reduce((sum, e) => sum + e.relevanceScore, 0) / selectedEntries.length
-        ).toFixed(2),
-        categories: countByCategory(selectedEntries),
+    // Run retrieval agent
+    const userMessage = buildRetrievalUserMessage(task, files, fileTree);
+    const agentResult = await runAgent(
+      {
+        model: MODELS.retrieval,
+        systemPrompt: RETRIEVAL_PROMPT,
+        tools: retrievalTools,
       },
-      selectedFiles: selectedEntries.map((e) => ({
-        title: e.title,
-        slug: e.slug,
-        category: e.classification.category,
-        relevanceScore: e.relevanceScore.toFixed(1),
-        reasoning: e.relevanceReasoning,
-        matchedTags: e.matchedTags,
-        matchedTopics: e.matchedTopics,
-        matchedEntities: e.matchedEntities,
-        // Include content for direct use
-        content: e.content,
-      })),
-      formattedContext, // Ready-to-use formatted context
-    });
+      userMessage,
+      storage,
+      anthropic
+    );
+
+    // Extract file selections and framework selection
+    const selections = extractSelections(agentResult);
+    const frameworkSelection = extractFrameworkSelection(agentResult);
+
+    if (selections.length === 0 && !frameworkSelection) {
+      return markdownResponse(buildNoRelevantFilesMarkdown(task, allEntries.length));
+    }
+
+    // Write to context/ directory
+    const contextDir = path.join(process.cwd(), 'context');
+    await clearContextDir(contextDir);
+
+    // Build entry lookup and partition into copy vs reference
+    const entryMap = new Map<string, KnowledgeEntry>();
+    const entriesToCopy: FileSelection[] = [];
+    const referencedFiles: ReferencedFile[] = [];
+
+    for (const sel of selections) {
+      const entry = await storage.get(sel.slug);
+      if (entry) {
+        entryMap.set(sel.slug, entry);
+
+        // Check if this entry should be referenced locally instead of copied
+        const shouldReference = await shouldReferenceLocally(entry);
+        if (shouldReference) {
+          const localPath = getRelativeLocalPath(entry);
+          referencedFiles.push({
+            slug: sel.slug,
+            reason: sel.reason,
+            localPath,
+          });
+        } else {
+          entriesToCopy.push(sel);
+          // Generate .mdc content and write stripped version to context/
+          const mdcContent = generateMdcFile(entry, entry.content);
+          await writeContextFile(contextDir, sel.slug, mdcContent);
+        }
+      }
+    }
+
+    // Copy framework boilerplate if selected and includeBoilerplate is true
+    let frameworkResult: FrameworkCopyResult | undefined;
+    if (frameworkSelection) {
+      try {
+        // Only copy boilerplate files if includeBoilerplate is true
+        if (includeBoilerplate) {
+          frameworkResult = await copyFrameworkBoilerplate(frameworkSelection.framework);
+        }
+
+        // Auto-surface the framework's KB doc regardless of includeBoilerplate setting
+        // (we want the docs even if we skip the boilerplate files)
+        const kbDocSlug = frameworkResult?.kbDocSlug ?? `framework-${frameworkSelection.framework}`;
+        const alreadySelected = selections.some((sel) => sel.slug === kbDocSlug);
+        const alreadyReferenced = referencedFiles.some((ref) => ref.slug === kbDocSlug);
+
+        if (!alreadySelected && !alreadyReferenced) {
+          const kbEntry = await storage.get(kbDocSlug);
+          if (kbEntry) {
+            const displayName = frameworkResult?.displayName ?? frameworkSelection.framework;
+            // Add to entriesToCopy for README and response (framework docs should always be copied)
+            entriesToCopy.push({
+              slug: kbDocSlug,
+              reason: `Framework best practices for ${displayName}`,
+            });
+            entryMap.set(kbDocSlug, kbEntry);
+            // Write to context/
+            const mdcContent = generateMdcFile(kbEntry, kbEntry.content);
+            await writeContextFile(contextDir, kbDocSlug, mdcContent);
+          }
+        }
+      } catch (error) {
+        // Log but don't fail the whole operation
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`Framework copy failed: ${errorMsg}`);
+      }
+    }
+
+    // Write README.md with copied entries, referenced files, and framework result
+    await writeContextReadme(
+      contextDir,
+      task,
+      entriesToCopy,
+      referencedFiles.length > 0 ? referencedFiles : undefined,
+      frameworkResult
+    );
+
+    return markdownResponse(
+      buildContextReadyMarkdown(
+        task,
+        entriesToCopy,
+        entryMap,
+        referencedFiles.length > 0 ? referencedFiles : undefined,
+        frameworkResult
+      )
+    );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return errorResponse(`Failed to prepare context: ${errorMessage}`, {
-      hint: 'Check if the knowledge base directory is accessible (~/.kahuna/knowledge/)',
-    });
+    return markdownResponse(
+      `Failed to prepare context: ${errorMessage}\n\n<hints>\n- Check if the knowledge base directory is accessible (~/.kahuna/knowledge/)\n</hints>`,
+      true
+    );
   }
 }
 

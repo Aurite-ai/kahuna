@@ -1,5 +1,5 @@
 /**
- * Storage module for local knowledge base
+ * Knowledge storage module
  *
  * Provides types, utilities, and services for managing .mdc files in ~/.kahuna/knowledge/
  */
@@ -8,7 +8,6 @@
 export type {
   KnowledgeCategory,
   KnowledgeStatus,
-  KnowledgeEntities,
   KnowledgeClassification,
   KnowledgeSource,
   KnowledgeEntryFrontmatter,
@@ -20,7 +19,7 @@ export type {
   KnowledgeStorageService,
 } from './types.js';
 
-export { KnowledgeStorageError } from './types.js';
+export { KnowledgeStorageError, FILE_SIZE_LIMIT } from './types.js';
 
 // Utilities
 export {
@@ -28,9 +27,9 @@ export {
   validateCategory,
   parseMdcFile,
   generateMdcFile,
+  stripFrontmatter,
   type ParsedMdcFile,
 } from './utils.js';
 
 // Storage Service
 export { FileKnowledgeStorageService } from './knowledge-storage.js';
-

@@ -1,6 +1,6 @@
-# Design: Repository Infrastructure
+# Architecture: Repository Infrastructure
 
-**Date:** 2025-01-30 (updated 2026-02-09)
+**Date:** 2025-01-30 (updated 2026-02-10)
 **Status:** Approved
 
 ## Overview
@@ -36,16 +36,16 @@ kahuna/
 ├── apps/
 │   └── mcp/                   # MCP server (stdio) for coding copilots
 │       ├── src/
-│       ├── scripts/
+│       │   ├── knowledge/     # KB domain logic (agents, storage, surfacing)
+│       │   ├── tools/         # MCP tool handlers
+│       │   ├── config.ts      # Model IDs, server constants
+│       │   └── index.ts       # Server entry point
 │       ├── .env.example
 │       ├── package.json
 │       ├── tsconfig.json
 │       └── vitest.config.ts
 ├── packages/
-│   ├── file-router/           # File-based routing/categorization
-│   ├── mcp-server/            # MCP server framework utilities
-│   ├── shared/                # Shared types, schemas, utilities
-│   ├── testing/               # Test scenarios and CLI tools
+│   ├── testing/               # QA testing infrastructure (scenarios + CLI)
 │   └── vck-templates/         # VCK content (copilot configs, frameworks)
 ├── docs/                      # Documentation
 ├── biome.json                 # Linting + formatting config
@@ -74,7 +74,7 @@ packages:
 
 - Scope: `@kahuna`
 - Apps: `@kahuna/mcp`
-- Packages: `@kahuna/shared`, `@kahuna/file-router`, `@kahuna/testing`, `@kahuna/vck-templates`
+- Packages: `@kahuna/testing`, `@kahuna/vck-templates`
 
 ### Workspace Dependencies
 

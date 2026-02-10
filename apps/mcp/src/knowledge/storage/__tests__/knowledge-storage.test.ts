@@ -1,5 +1,8 @@
 /**
- * Tests for FileKnowledgeStorageService
+ * Tests for FileKnowledgeStorageService (knowledge/ module)
+ *
+ * Based on the existing storage/__tests__/knowledge-storage.test.ts
+ * but updated for simplified types (no tags, no entities, flat fields).
  */
 
 import * as fs from 'node:fs/promises';
@@ -18,7 +21,7 @@ describe('FileKnowledgeStorageService', () => {
   beforeEach(async () => {
     testDir = path.join(
       os.tmpdir(),
-      `kahuna-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      `kahuna-knowledge-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
     );
     storage = new FileKnowledgeStorageService(testDir);
   });
@@ -32,30 +35,20 @@ describe('FileKnowledgeStorageService', () => {
     }
   });
 
-  // Helper to create a valid input
+  // Helper to create a valid simplified input
   function createTestInput(
     overrides: Partial<SaveKnowledgeEntryInput> = {}
   ): SaveKnowledgeEntryInput {
     return {
       title: 'Test Entry',
+      summary: 'A test knowledge entry for unit testing.',
       content: '# Test Content\n\nThis is test content.',
       sourceFile: 'test.md',
-      projectId: 'test-project',
       sourcePath: '/docs/test.md',
       category: 'reference',
       confidence: 0.9,
       reasoning: 'Test categorization',
-      metadata: {
-        tags: ['test', 'example'],
-        topics: ['testing'],
-        entities: {
-          technologies: ['TypeScript'],
-          frameworks: [],
-          libraries: ['vitest'],
-          apis: [],
-        },
-        summary: 'A test knowledge entry for unit testing.',
-      },
+      topics: ['testing', 'documentation'],
       ...overrides,
     };
   }
@@ -70,12 +63,12 @@ describe('FileKnowledgeStorageService', () => {
       expect(entry.type).toBe('knowledge');
       expect(entry.title).toBe('API Design Guidelines');
       expect(entry.content).toBe(input.content);
-      expect(entry.summary).toBe(input.metadata?.summary);
+      expect(entry.summary).toBe(input.summary);
       expect(entry.source.file).toBe(input.sourceFile);
-      expect(entry.source.project).toBe(input.projectId);
+      expect(entry.source.project).toBe(process.cwd()); // Automatically set
       expect(entry.classification.category).toBe('reference');
       expect(entry.classification.confidence).toBe(0.9);
-      expect(entry.classification.tags).toEqual(['test', 'example']);
+      expect(entry.classification.topics).toEqual(['testing', 'documentation']);
       expect(entry.status).toBe('active');
 
       // Verify timestamps
@@ -123,12 +116,14 @@ describe('FileKnowledgeStorageService', () => {
       const policyInput = createTestInput({ title: 'Policy Doc', category: 'policy' });
       const referenceInput = createTestInput({ title: 'Reference Doc', category: 'reference' });
       const patternInput = createTestInput({ title: 'Pattern Doc', category: 'pattern' });
-      const unknownInput = createTestInput({ title: 'Unknown Doc', category: 'unknown-category' });
+      // Force an invalid category to test fallback
+      const unknownInput = createTestInput({ title: 'Unknown Doc' });
+      (unknownInput as unknown as Record<string, unknown>).category = 'unknown-category';
 
       const policyEntry = await storage.save(policyInput);
       const referenceEntry = await storage.save(referenceInput);
       const patternEntry = await storage.save(patternInput);
-      const unknownEntry = await storage.save(unknownInput);
+      const unknownEntry = await storage.save(unknownInput as SaveKnowledgeEntryInput);
 
       expect(policyEntry.classification.category).toBe('policy');
       expect(referenceEntry.classification.category).toBe('reference');
@@ -136,24 +131,32 @@ describe('FileKnowledgeStorageService', () => {
       expect(unknownEntry.classification.category).toBe('context'); // Fallback
     });
 
-    it('handles missing optional metadata', async () => {
+    it('sets source.project from process.cwd()', async () => {
+      const input = createTestInput({ title: 'Project Test' });
+
+      const entry = await storage.save(input);
+
+      expect(entry.source.project).toBe(process.cwd());
+    });
+
+    it('handles missing optional sourcePath', async () => {
       const input: SaveKnowledgeEntryInput = {
         title: 'Minimal Entry',
+        summary: 'Minimal test',
         content: 'Minimal content',
         sourceFile: 'minimal.md',
         category: 'context',
         confidence: 0.5,
         reasoning: 'Minimal test',
+        topics: [],
       };
 
       const entry = await storage.save(input);
 
-      expect(entry.summary).toBe('');
-      expect(entry.classification.tags).toEqual([]);
+      expect(entry.summary).toBe('Minimal test');
       expect(entry.classification.topics).toEqual([]);
-      expect(entry.classification.entities.technologies).toEqual([]);
-      expect(entry.source.project).toBeNull();
       expect(entry.source.path).toBeNull();
+      expect(entry.source.project).toBe(process.cwd());
     });
 
     it('throws on empty slug from title', async () => {
@@ -182,21 +185,24 @@ describe('FileKnowledgeStorageService', () => {
         createTestInput({
           title: 'API Guidelines',
           category: 'policy',
-          metadata: { tags: ['api', 'rest'], topics: ['backend'], summary: 'API stuff' },
+          summary: 'API stuff',
+          topics: ['backend'],
         })
       );
       await storage.save(
         createTestInput({
           title: 'React Patterns',
           category: 'pattern',
-          metadata: { tags: ['react', 'frontend'], topics: ['ui'], summary: 'React stuff' },
+          summary: 'React stuff',
+          topics: ['ui'],
         })
       );
       await storage.save(
         createTestInput({
           title: 'Database Schema',
           category: 'reference',
-          metadata: { tags: ['database', 'sql'], topics: ['backend'], summary: 'DB stuff' },
+          summary: 'DB stuff',
+          topics: ['backend'],
         })
       );
     });
@@ -227,17 +233,7 @@ describe('FileKnowledgeStorageService', () => {
       expect(titles).toContain('React Patterns');
     });
 
-    it('filters by tags (any match)', async () => {
-      const entries = await storage.list({ tags: ['api', 'react'] });
-
-      expect(entries).toHaveLength(2);
-      const titles = entries.map((e) => e.title);
-      expect(titles).toContain('API Guidelines');
-      expect(titles).toContain('React Patterns');
-    });
-
     it('filters by contentSearch (content match)', async () => {
-      // Add specific content to search for
       await storage.save(
         createTestInput({
           title: 'Unique Search Target',
@@ -266,18 +262,10 @@ describe('FileKnowledgeStorageService', () => {
     });
 
     it('filters by project', async () => {
-      // Add entry with different project
-      await storage.save(
-        createTestInput({
-          title: 'Other Project Entry',
-          projectId: 'other-project',
-        })
-      );
+      // All entries have source.project = process.cwd()
+      const entries = await storage.list({ project: process.cwd() });
 
-      const entries = await storage.list({ project: 'other-project' });
-
-      expect(entries).toHaveLength(1);
-      expect(entries[0].title).toBe('Other Project Entry');
+      expect(entries).toHaveLength(3);
     });
 
     it('filters by status', async () => {
@@ -290,26 +278,6 @@ describe('FileKnowledgeStorageService', () => {
       expect(activeEntries).toHaveLength(2);
       expect(archivedEntries).toHaveLength(1);
       expect(archivedEntries[0].title).toBe('API Guidelines');
-    });
-
-    it('combines multiple filters', async () => {
-      await storage.save(
-        createTestInput({
-          title: 'Combined Filter Target',
-          category: 'pattern',
-          projectId: 'special-project',
-          metadata: { tags: ['unique-tag'], topics: [], summary: '' },
-        })
-      );
-
-      const entries = await storage.list({
-        category: 'pattern',
-        project: 'special-project',
-        tags: ['unique-tag'],
-      });
-
-      expect(entries).toHaveLength(1);
-      expect(entries[0].title).toBe('Combined Filter Target');
     });
 
     it('returns empty array for non-existent directory', async () => {
@@ -346,17 +314,18 @@ describe('FileKnowledgeStorageService', () => {
       expect(entry).toBeNull();
     });
 
-    it('returns complete entry with content', async () => {
+    it('returns complete entry with content and topics', async () => {
       const input = createTestInput({
         title: 'Complete Entry Test',
         content: '# Full Content\n\nWith multiple lines.',
+        topics: ['topic-a', 'topic-b'],
       });
       await storage.save(input);
 
       const entry = await storage.get('complete-entry-test');
 
       expect(entry?.content).toBe(input.content);
-      expect(entry?.classification.tags).toEqual(input.metadata?.tags);
+      expect(entry?.classification.topics).toEqual(input.topics);
     });
   });
 
@@ -532,7 +501,7 @@ describe('FileKnowledgeStorageService', () => {
       const entry = await storage.save(input);
 
       expect(entry.title).toBe(longTitle);
-      expect(entry.slug.length).toBeLessThanOrEqual(250); // Reasonable slug length
+      expect(entry.slug.length).toBeLessThanOrEqual(250);
     });
 
     it('handles unicode in content but ASCII in title', async () => {

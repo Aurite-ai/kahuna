@@ -6,8 +6,7 @@
  */
 
 import { SERVER_NAME, SERVER_VERSION } from '../config.js';
-import type { MCPToolResponse } from './response-utils.js';
-import type { ToolContext } from './types.js';
+import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
  * Tool definition for MCP registration.
@@ -47,43 +46,17 @@ export async function healthCheckToolHandler(
   const action = (args as { action?: string }).action || 'ping';
 
   if (action === 'ping') {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              message: 'Kahuna MCP server is running!',
-              server: SERVER_NAME,
-              version: SERVER_VERSION,
-              timestamp: new Date().toISOString(),
-            },
-            null,
-            2
-          ),
-        },
-      ],
-    };
+    return markdownResponse(
+      `# Kahuna MCP Server
+
+**Status:** Running ✅
+**Server:** ${SERVER_NAME}
+**Version:** ${SERVER_VERSION}
+**Timestamp:** ${new Date().toISOString()}`
+    );
   }
 
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(
-          {
-            success: false,
-            error: `Unknown action: ${action}`,
-            validActions: ['ping'],
-          },
-          null,
-          2
-        ),
-      },
-    ],
-    isError: true,
-  };
+  return markdownResponse(`Unknown action: ${action}\n\nValid actions: ping`, true);
 }
 
 /**

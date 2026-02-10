@@ -215,10 +215,7 @@ export async function collectCommand(options: {
     ) {
       // Skip the hidden metadata file
       if (entry.name.startsWith('.')) continue;
-      fs.copyFileSync(
-        path.join(projectPath, entry.name),
-        path.join(artifactsDir, entry.name)
-      );
+      fs.copyFileSync(path.join(projectPath, entry.name), path.join(artifactsDir, entry.name));
       copiedRootFiles++;
     }
   }

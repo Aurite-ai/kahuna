@@ -4,6 +4,8 @@
 **Date:** 2026-02-05
 **Scope:** Claude Code + LangGraph (initial release)
 
+> **Implementation note:** These documents capture product-level design intent. For current implementation details (architecture, file formats, agent specifics), see [Architecture: Context Management System](../architecture/02-context-management-system.md).
+
 ---
 
 ## Document Index
