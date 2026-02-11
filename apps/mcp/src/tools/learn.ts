@@ -3,6 +3,7 @@
  *
  * Accepts files/folders, classifies each using an LLM categorization agent,
  * and stores them in the knowledge base as .mdc files.
+ * Also detects integrations and sensitive data during ingestion.
  *
  * See: docs/internal/designs/context-management-system.md
  */
@@ -11,6 +12,12 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { MODELS } from '../config.js';
+import {
+  type IntegrationDescriptor,
+  extractIntegrationsFromPatterns,
+  mergeIntegration,
+  mergeSecretsWithIntegrations,
+} from '../integrations/index.js';
 import {
   type AgentResult,
   CATEGORIZATION_PROMPT,
@@ -21,6 +28,7 @@ import {
   categorizationTools,
   runAgent,
 } from '../knowledge/index.js';
+import { redactSensitiveData } from '../vault/index.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -104,6 +112,22 @@ interface FileLearnResult {
   error?: string;
   slug?: string;
   created?: boolean;
+  /** Number of sensitive data items redacted */
+  redactedCount?: number;
+  /** Integrations detected in this file */
+  integrationsDetected?: string[];
+}
+
+/**
+ * Aggregate results for integrations and secrets across all files
+ */
+interface LearnAggregateResults {
+  /** All integrations discovered across files */
+  integrations: IntegrationDescriptor[];
+  /** Total secrets redacted across files */
+  totalSecretsRedacted: number;
+  /** Secrets by type */
+  secretsByType: Map<string, number>;
 }
 
 /**
@@ -211,7 +235,25 @@ function extractCategorizationResult(agentResult: AgentResult): {
 // MARKDOWN RESPONSE BUILDERS
 // =============================================================================
 
-function buildLearnSuccessMarkdown(results: FileLearnResult[]): string {
+function buildLearnNoFilesMarkdown(): string {
+  return `# No Files Found
+
+No accessible files found in the provided paths.
+
+<hints>
+- Check that the paths exist and are accessible
+- Provide at least one file or folder path
+- Folders are searched recursively (hidden files and node_modules are skipped)
+</hints>`;
+}
+
+/**
+ * Enhanced markdown builder that includes integration and secret information
+ */
+function buildLearnSuccessMarkdownWithAggregates(
+  results: FileLearnResult[],
+  aggregates: LearnAggregateResults
+): string {
   const successful = results.filter((r) => r.success);
   const failed = results.filter((r) => !r.success);
   const created = successful.filter((r) => r.created).length;
@@ -261,28 +303,56 @@ function buildLearnSuccessMarkdown(results: FileLearnResult[]): string {
     }
   }
 
+  // Integrations section
+  if (aggregates.integrations.length > 0) {
+    parts.push('\n## 🔌 Integrations Discovered\n');
+    parts.push(
+      'Kahuna detected and stored these integration descriptors in `~/.kahuna/integrations/`:\n'
+    );
+    parts.push('| Integration | Type | Operations | Auth |');
+    parts.push('|-------------|------|------------|------|');
+    for (const integration of aggregates.integrations) {
+      const ops = integration.operations.map((op) => op.name).join(', ');
+      parts.push(
+        `| **${integration.displayName}** | ${integration.type} | ${ops} | ${integration.authentication.method} |`
+      );
+    }
+    parts.push('\nThese integrations are now available for agents to use automatically.');
+  }
+
+  // Secrets redaction section
+  if (aggregates.totalSecretsRedacted > 0) {
+    parts.push('\n## 🔐 Sensitive Data Handled\n');
+    parts.push(
+      `**${aggregates.totalSecretsRedacted} credential(s)** were detected and redacted from stored content:\n`
+    );
+    for (const [secretType, count] of aggregates.secretsByType) {
+      const typeName = secretType.replace(/_/g, ' ');
+      parts.push(`- ${typeName}: ${count} redacted → \`vault://env/...\``);
+    }
+    parts.push(
+      '\n⚠️ **Important:** Configure your vault with the actual credential values before using these integrations.'
+    );
+  }
+
   // Hints
   parts.push('\n<hints>');
   parts.push('- Use `kahuna_prepare_context` to surface this knowledge for a specific task');
   parts.push('- Send more files anytime — Kahuna handles classification automatically');
+  if (aggregates.integrations.length > 0) {
+    parts.push(
+      '- Integrations are ready — agents can now connect to detected services without manual config'
+    );
+  }
+  if (aggregates.totalSecretsRedacted > 0) {
+    parts.push('- Credentials are safely referenced via vault — never stored in plain text');
+  }
   if (failed.length > 0) {
     parts.push('- Large files can be split into smaller, focused documents');
   }
   parts.push('</hints>');
 
   return parts.join('\n');
-}
-
-function buildLearnNoFilesMarkdown(): string {
-  return `# No Files Found
-
-No accessible files found in the provided paths.
-
-<hints>
-- Check that the paths exist and are accessible
-- Provide at least one file or folder path
-- Folders are searched recursively (hidden files and node_modules are skipped)
-</hints>`;
 }
 
 // =============================================================================
@@ -326,6 +396,13 @@ export async function learnToolHandler(
   // Process each file
   const results: FileLearnResult[] = [];
 
+  // Track aggregates for integrations and secrets
+  const aggregates: LearnAggregateResults = {
+    integrations: [],
+    totalSecretsRedacted: 0,
+    secretsByType: new Map(),
+  };
+
   // Add path errors as failed results
   for (const pathError of pathErrors) {
     results.push({
@@ -367,8 +444,42 @@ export async function learnToolHandler(
         continue;
       }
 
-      // Step 3: Run categorization agent
-      const userMessage = buildCategorizationUserMessage(filename, content, description);
+      // Step 2.5: Detect sensitive data and redact before storing
+      const redactionResult = redactSensitiveData(content);
+      const contentToStore = redactionResult.redactedContent;
+      const secretsDetected = redactionResult.matches;
+
+      // Track secrets for aggregates
+      if (secretsDetected.length > 0) {
+        aggregates.totalSecretsRedacted += secretsDetected.length;
+        for (const secret of secretsDetected) {
+          const count = aggregates.secretsByType.get(secret.type) ?? 0;
+          aggregates.secretsByType.set(secret.type, count + 1);
+        }
+      }
+
+      // Step 2.6: Extract integrations from content (using original content for detection)
+      const integrationResult = extractIntegrationsFromPatterns(content, {
+        sourceFile: filePath,
+        detectedSecrets: secretsDetected,
+      });
+
+      // Save detected integrations
+      const fileIntegrations: string[] = [];
+      for (const integration of integrationResult.integrations) {
+        // Merge secrets info with integration
+        const enhancedIntegration = mergeSecretsWithIntegrations([integration], secretsDetected)[0];
+        // Save/merge integration
+        const saved = await mergeIntegration(enhancedIntegration);
+        fileIntegrations.push(saved.displayName);
+        // Track in aggregates (avoid duplicates by id)
+        if (!aggregates.integrations.find((i) => i.id === saved.id)) {
+          aggregates.integrations.push(saved);
+        }
+      }
+
+      // Step 3: Run categorization agent (on redacted content)
+      const userMessage = buildCategorizationUserMessage(filename, contentToStore, description);
       const agentResult = await runAgent(
         {
           model: MODELS.categorization,
@@ -393,11 +504,11 @@ export async function learnToolHandler(
         continue;
       }
 
-      // Step 5: Build save input and store
+      // Step 5: Build save input and store (with redacted content)
       const saveInput: SaveKnowledgeEntryInput = {
         title: catResult.title,
         summary: catResult.summary,
-        content,
+        content: contentToStore, // Store redacted content, not original
         sourceFile: filename,
         sourcePath: filePath,
         category: catResult.category as SaveKnowledgeEntryInput['category'],
@@ -423,6 +534,8 @@ export async function learnToolHandler(
         topics: catResult.topics,
         slug: entry.slug,
         created: wasCreated,
+        redactedCount: secretsDetected.length,
+        integrationsDetected: fileIntegrations,
       });
     } catch (error) {
       let errorMessage: string;
@@ -442,7 +555,7 @@ export async function learnToolHandler(
     }
   }
 
-  return markdownResponse(buildLearnSuccessMarkdown(results));
+  return markdownResponse(buildLearnSuccessMarkdownWithAggregates(results, aggregates));
 }
 
 /**
