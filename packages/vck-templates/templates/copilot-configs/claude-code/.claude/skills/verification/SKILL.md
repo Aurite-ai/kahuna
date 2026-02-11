@@ -103,6 +103,22 @@ Output a structured verification report:
 2. [Additional improvements]
 ```
 
+### Step 5: Export Report (Optional)
+
+After presenting the report, ask the user:
+
+> Would you like to save this verification report to a file?
+
+If the user confirms, save the report to:
+
+```
+reports/verification/YYYY-MM-DD_HH-MM-SS.md
+```
+
+- Use the current date and time for the filename (e.g., `2026-02-10_15-28-32.md`)
+- Create the `reports/verification/` directory if it doesn't exist
+- Confirm the save location to the user after writing
+
 ## Notes
 
 - **Privacy first:** All code analysis happens locally. Nothing is sent to external services.
