@@ -160,8 +160,12 @@ export async function writeContextReadme(
 
 /**
  * Check if a KB entry should be referenced locally instead of copied.
- * Returns true if the source file exists in the current working directory
- * (at the recorded relative path).
+ * Returns true if the source file:
+ * 1. Has a source path recorded
+ * 2. Exists at that path relative to cwd
+ * 3. Is INSIDE the current working directory (not ../external/file.md)
+ *
+ * Files outside the project should be copied to context/, not referenced.
  *
  * @param entry - The knowledge entry to check
  * @returns Promise<boolean> - True if entry should be referenced locally
@@ -172,9 +176,19 @@ export async function shouldReferenceLocally(entry: KnowledgeEntry): Promise<boo
     return false;
   }
 
-  // Check if the source file exists at the relative path from cwd
+  const cwd = process.cwd();
+  const fullPath = path.resolve(cwd, entry.source.path);
+
+  // Ensure the resolved path is inside the current working directory
+  // This prevents referencing files like "../external-project/file.md"
+  const normalizedFull = path.normalize(fullPath);
+  const normalizedCwd = path.normalize(cwd);
+  if (!normalizedFull.startsWith(normalizedCwd + path.sep)) {
+    return false;
+  }
+
+  // Check if the source file exists
   try {
-    const fullPath = path.join(process.cwd(), entry.source.path);
     await fs.access(fullPath);
     return true;
   } catch {

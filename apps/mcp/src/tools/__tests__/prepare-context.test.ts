@@ -19,6 +19,18 @@ vi.mock('../../knowledge/surfacing/context-writer.js', () => ({
   getRelativeLocalPath: vi.fn((path) => path),
 }));
 
+// Mock the framework copier to prevent actual file writes during tests
+vi.mock('../../knowledge/surfacing/framework-copier.js', () => ({
+  copyFrameworkBoilerplate: vi.fn().mockResolvedValue({
+    success: true,
+    framework: 'langgraph',
+    displayName: 'LangGraph',
+    kbDocSlug: 'langgraph-best-practices',
+    copiedFiles: ['.gitignore', 'main.py', 'pyproject.toml', 'src/agent/__init__.py', 'src/agent/graph.py', 'src/agent/state.py', 'src/agent/tools.py'],
+    skippedFiles: ['.env', '.gitignore', 'README.md'],
+  }),
+}));
+
 // Mock generateMdcFile from storage utils
 vi.mock('../../knowledge/storage/utils.js', () => ({
   generateMdcFile: vi.fn().mockReturnValue('---\ntype: knowledge\n---\n# Content'),
@@ -148,7 +160,7 @@ describe('prepareContextToolHandler', () => {
           expect.objectContaining({ slug: 'error-patterns' }),
         ]),
         undefined, // referencedFiles (none since shouldReferenceLocally returns false)
-        undefined // frameworkResult (no framework selected)
+        expect.objectContaining({ framework: 'langgraph' }) // default framework scaffolded
       );
 
       // Verify markdown response

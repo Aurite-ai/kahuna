@@ -374,25 +374,23 @@ export async function prepareContextToolHandler(
       }
     }
 
-    // Copy framework boilerplate if selected and includeBoilerplate is true
+    // Copy framework boilerplate if includeBoilerplate is true
+    // Default to langgraph if agent didn't select a specific framework
     let frameworkResult: FrameworkCopyResult | undefined;
-    if (frameworkSelection) {
+    if (includeBoilerplate) {
       try {
-        // Only copy boilerplate files if includeBoilerplate is true
-        if (includeBoilerplate) {
-          frameworkResult = await copyFrameworkBoilerplate(frameworkSelection.framework);
-        }
+        const framework = frameworkSelection?.framework ?? 'langgraph';
+        frameworkResult = await copyFrameworkBoilerplate(framework);
 
-        // Auto-surface the framework's KB doc regardless of includeBoilerplate setting
-        // (we want the docs even if we skip the boilerplate files)
-        const kbDocSlug = frameworkResult?.kbDocSlug ?? `framework-${frameworkSelection.framework}`;
+        // Auto-surface the framework's KB doc
+        const kbDocSlug = frameworkResult?.kbDocSlug ?? `framework-${framework}`;
         const alreadySelected = selections.some((sel) => sel.slug === kbDocSlug);
         const alreadyReferenced = referencedFiles.some((ref) => ref.slug === kbDocSlug);
 
         if (!alreadySelected && !alreadyReferenced) {
           const kbEntry = await storage.get(kbDocSlug);
           if (kbEntry) {
-            const displayName = frameworkResult?.displayName ?? frameworkSelection.framework;
+            const displayName = frameworkResult?.displayName ?? framework;
             // Add to entriesToCopy for README and response (framework docs should always be copied)
             entriesToCopy.push({
               slug: kbDocSlug,
