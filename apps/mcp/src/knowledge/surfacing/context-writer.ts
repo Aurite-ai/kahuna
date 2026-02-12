@@ -101,7 +101,7 @@ export async function writeContextReadme(
     parts.push('');
     parts.push(`Framework: **${frameworkResult.displayName}**`);
     parts.push(
-      'Boilerplate files added to your project. See [context-guide.md](../context-guide.md) for structure and usage.'
+      'Boilerplate files added to your project. See [README.md](./README.md) for structure and usage.'
     );
     parts.push('');
   }
