@@ -25,7 +25,7 @@ to the specified directory and seeds the knowledge base with starter content. It
 - .claude/rules/ - Project rules and guidelines
 - .claude/skills/ - Skills
 - .claude/agents/ - Subagents
-- .claude/context/, .claude/plans/ - Empty directories for context and plan files
+- .claude/plans/ - Empty directory for plan files
 - .claude/CLAUDE.md - Main copilot instructions
 - Knowledge base seed files (e.g., framework best practices)
 
