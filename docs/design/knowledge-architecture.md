@@ -8,7 +8,7 @@
 
 ## Overview
 
-Kahuna maintains a **global knowledge base** at `~/.kahuna/` that stores classified files from all projects. When a copilot needs context for a task, Kahuna surfaces relevant entries from the knowledge base to the project's `context/` folder.
+Kahuna maintains a **global knowledge base** at `~/.kahuna/` that stores classified files from all projects. When a copilot needs context for a task, Kahuna surfaces relevant entries from the knowledge base to the project's `context-guide.md` file.
 
 ### Two-Stage Architecture
 
@@ -27,19 +27,19 @@ Kahuna maintains a **global knowledge base** at `~/.kahuna/` that stores classif
 │   - Files are classified by type                                             │
 │   - Metadata added (source, date, project)                                   │
 │   - Stored in knowledge base                                                 │
-│   - NOT written to project context/ yet                                      │
+│   - NOT written to project context-guide.md yet                              │
 │                                                                              │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │   STAGE 2: PREPARE                                                           │
 │   ────────────────                                                           │
 │                                                                              │
-│   Task description ────► kahuna_prepare_context ────► project/context/       │
+│   Task description ────► kahuna_prepare_context ────► context-guide.md       │
 │                                                       (task-relevant)        │
 │                                                                              │
 │   - Searches knowledge base for relevant entries                             │
-│   - Surfaces subset to project's context/ folder                             │
-│   - Copilot reads context/ during task                                       │
+│   - Surfaces subset to project's context-guide.md                            │
+│   - Copilot reads context-guide.md during task                               │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -49,7 +49,7 @@ Kahuna maintains a **global knowledge base** at `~/.kahuna/` that stores classif
 | Stage | Tool | What Happens | Output Location |
 |-------|------|--------------|-----------------|
 | **Learn** | `kahuna_learn` | Classify and store | `~/.kahuna/` |
-| **Prepare** | `kahuna_prepare_context` | Search and surface | `project/context/` |
+| **Prepare** | `kahuna_prepare_context` | Search and surface | `project/context-guide.md` |
 
 ---
 
@@ -143,39 +143,24 @@ MVP categories (agents determine during learn):
 
 ---
 
-## Project Context: context/
+## Project Context: context-guide.md
 
-Each project has a `context/` folder that receives surfaced knowledge.
+Each project has a `context-guide.md` file that receives surfaced knowledge.
 
 ### Folder Structure
 
 ```
 project/
-└── context/
-    ├── README.md             # Navigation index (always present)
-    └── [surfaced entries]    # Varies per task
+└── context-guide.md
 ```
 
-### How context/ Gets Populated
+### How context-guide.md Gets Populated
 
-`kahuna_prepare_context` populates `context/` with task-relevant entries:
+`kahuna_prepare_context` populates `context-guide.md` with task-relevant entries:
 
 1. **Receives** task description
 2. **Searches** `~/.kahuna/knowledge/` for relevant entries
-3. **Copies/transforms** relevant content to `project/context/`
-4. **Generates** `README.md` with navigation
-
-### Example: Populated context/
-
-**Task:** "Add rate limiting to the search tool"
-
-```
-project/context/
-├── README.md                 # Navigation for this task
-├── api-guidelines.md         # Surfaced: has rate limiting info
-├── error-handling.md         # Surfaced: error patterns
-└── search-decision.md        # Surfaced: search implementation context
-```
+3. **Generates** `context-guide.md` with navigation
 
 ### README.md Format
 
@@ -212,13 +197,13 @@ Surfaced from Kahuna knowledge base on 2026-02-05.
 | Category | Tools | Data Flow |
 |----------|-------|-----------|
 | **Building KB** | learn, sync | Files → ~/.kahuna |
-| **Environment** | initialize, prepare_context | ~/.kahuna → context/ |
-| **Assistance** | ask | context/ + ~/.kahuna → response |
+| **Environment** | initialize, prepare_context | ~/.kahuna → context-guide.md |
+| **Assistance** | ask | context-guide.md + ~/.kahuna → response |
 
 ### kahuna_initialize (Environment)
 
 **Creates:**
-- `project/context/README.md` (minimal initial version)
+- `project/context-guide.md` (minimal initial version)
 
 **Does not create:** Knowledge base entries (that's `kahuna_learn`)
 
@@ -234,7 +219,7 @@ Surfaced from Kahuna knowledge base on 2026-02-05.
 - YAML frontmatter with classification metadata
 - Markdown content below frontmatter
 
-**Does NOT write to:** `project/context/`
+**Does NOT write to:** `project/context-guide.md`
 
 ### kahuna_prepare_context (Environment)
 
@@ -243,14 +228,13 @@ Surfaced from Kahuna knowledge base on 2026-02-05.
 - `~/.kahuna/knowledge/` entries
 - `~/.kahuna/conversations/` summaries
 
-**Writes to project/context/:**
+**Writes to project/context-guide.md:**
 - Surfaced knowledge entries
-- Generated `README.md`
 
 ### kahuna_ask (Assistance)
 
 **Reads (in order):**
-1. `project/context/` (if exists) - checked first
+1. `project/context-guide.md` (if exists) - checked first
 2. `~/.kahuna/knowledge/` - fallback/additional
 
 **Writes:** Nothing (returns text response)
@@ -334,11 +318,9 @@ For `kahuna_prepare_context`, the MVP surfacing process:
 │   4. SELECT TOP N                                                           │
 │      └── Take most relevant entries (configurable, default: 5-10)           │
 │                                                                             │
-│   5. SURFACE TO context/                                                    │
-│      ├── Clear context/task/ (task-specific, replaced each task)            │
-│      ├── Preserve context/[curated]/ (e.g., langgraph/)                     │
-│      ├── Copy/transform selected entries to context/task/                   │
-│      └── Regenerate README.md with updated navigation                       │
+│   5. SURFACE TO context-guide.md                                            │
+│      ├── Clear context-guide.md (task-specific, replaced each task)         │
+│      ├── Store paths to relevant entries in context-guide.md                │
 │                                                                             │
 │   6. REPORT                                                                 │
 │      └── Return summary of what was surfaced                                │
@@ -362,8 +344,8 @@ The knowledge architecture evolves from simple to sophisticated:
 **kahuna_prepare_context:**
 - Accept task description
 - Simple keyword search on metadata/content
-- Copy relevant files to project's context/
-- Generate README.md
+- Compile relevant entries into context-guide.md
+- Generate navigation and section headers
 
 **Value:** Files are organized and searchable. Context is surfaced per-task.
 
@@ -411,8 +393,8 @@ The knowledge architecture evolves from simple to sophisticated:
 3. **Surfacing (kahuna_prepare_context)**
    - Accept task description
    - Simple keyword search
-   - Copy relevant entries to context/
-   - Generate README.md
+   - Compile relevant entries into context-guide.md
+   - Generate navigation and section headers
 
 4. **Conversation integration**
    - Processed conversation logs (existing format) are searchable
@@ -442,9 +424,9 @@ The knowledge architecture evolves from simple to sophisticated:
 - Knowledge base grows over time
 - Prepare can be smart about what's relevant
 
-### Why Copy to context/ Instead of Links?
+### Why Single File Instead of Multiple Files?
 
-**Decision:** Copy surfaced content to `context/` rather than symlinks.
+**Decision:** Generate single `context-guide.md` file rather than multiple files.
 
 **Rationale:**
 - Copilots read files directly
@@ -522,19 +504,18 @@ confidence: 0.95
 
 ## Resolved Questions
 
-**Context merging (resolved):** When preparing context for a new task:
-- **Clear and replace** `context/task/` - Task-specific context is replaced each time
-- **Preserve** curated content like `context/langgraph/` - Initial patterns from `kahuna_initialize` persist
-- This ensures task context is always fresh while maintaining foundational patterns
+**Context regeneration (resolved):** When preparing context for a new task:
+- **Overwrite** `context-guide.md` - Entire file is regenerated each time
+- This ensures task context is always fresh and relevant
 
 ---
 
 ## Changelog
 
 - v1.0 (2026-02-05): Initial knowledge architecture specification
-- v2.0 (2026-02-05): Revised to two-stage model: learn → ~/.kahuna, prepare → context/
+- v2.0 (2026-02-05): Revised to two-stage model: learn → ~/.kahuna, prepare → context-guide.md
 - v2.1 (2026-02-05): Added evolution path, conversation log format, prepared staging
-- v2.2 (2026-02-05): Tool categories; assistance tools use context/ + KB; learn accepts folders
+- v2.2 (2026-02-05): Tool categories; assistance tools use context-guide.md + KB; learn accepts folders
 - v2.3 (2026-02-05): Changed to .mdc format (YAML frontmatter + markdown) instead of folder+JSON
 - v2.4 (2026-02-05): Fixed Tool Interactions to use .mdc; resolved context merging question
 - v3.0 (2026-02-05): Promoted to docs/design/; updated links and status to Final

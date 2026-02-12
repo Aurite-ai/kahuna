@@ -1,8 +1,7 @@
 /**
- * Context Writer — manages the project's context/ folder
+ * Context Writer — manages the project's context-guide.md
  *
  * References knowledge base files by their KB paths in a context-guide.md.
- * Files are no longer copied to context/, only referenced.
  *
  * See: docs/internal/designs/context-management-system.md
  */
@@ -51,7 +50,7 @@ export function getKBPath(slug: string): string {
 }
 
 /**
- * Ensure the context/ directory exists and is empty.
+ * Ensure the context directory exists and is empty.
  * Creates the directory if it doesn't exist, removes context-guide.md if it does.
  *
  * @param contextDir - Path to the context directory
@@ -72,7 +71,7 @@ export async function clearContextDir(contextDir: string): Promise<void> {
 }
 
 /**
- * Generate and write a context-guide.md index file for the context/ directory.
+ * Generate and write a context-guide.md file
  *
  * @param contextDir - Path to the context directory
  * @param task - The task description that triggered context surfacing

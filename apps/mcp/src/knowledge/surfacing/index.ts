@@ -1,7 +1,7 @@
 /**
  * Context surfacing module
  *
- * Manages the project's context/ directory for copilot access.
+ * Manages the project's context-guide.md file for copilot access.
  */
 
 export {

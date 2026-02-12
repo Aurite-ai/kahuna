@@ -52,7 +52,7 @@ export const readKnowledgeFileTool: Tool = {
 };
 
 /**
- * Tool definition for selecting files to surface in context/.
+ * Tool definition for selecting files to surface in context-guide.md.
  * Structured output: agent returns list of slugs with reasons.
  */
 export const selectFilesForContextTool: Tool = {
@@ -77,7 +77,7 @@ export const selectFilesForContextTool: Tool = {
           },
           required: ['slug', 'reason'],
         },
-        description: 'Files to surface to the project context/ folder',
+        description: 'Files to surface to the project context-guide.md file',
       },
     },
     required: ['selections'],

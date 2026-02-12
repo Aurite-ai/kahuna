@@ -2,7 +2,7 @@
  * Kahuna Prepare Context Tool - Agentic context retrieval
  *
  * Searches the knowledge base for files relevant to a task using an LLM agent,
- * then writes them as clean markdown to the project's context/ folder.
+ * then writes their file paths to the project's context-guide.md.
  * Can also scaffold framework boilerplate when the agent selects a framework.
  *
  * See: docs/internal/designs/context-management-system.md
@@ -34,7 +34,7 @@ import { type MCPToolResponse, type ToolContext, markdownResponse } from './type
  */
 export const prepareContextToolDefinition = {
   name: 'kahuna_prepare_context',
-  description: `Prepare the context/ folder with relevant knowledge for a task.
+  description: `Prepare the context-guide.md with relevant knowledge for a task.
 
 USE THIS TOOL WHEN:
 - Starting any new task or feature
@@ -42,7 +42,7 @@ USE THIS TOOL WHEN:
 - Before beginning implementation work
 - User asks "what do we know about X"
 
-This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from context/ files.
+This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from context-guide.md.
 
 <examples>
 ### Starting a task
@@ -56,9 +56,9 @@ kahuna_prepare_context(task="Understand our API design patterns")
 </examples>
 
 <hints>
-- Call ONCE at task start, then read context/ files directly
+- Call ONCE at task start, then read the files referenced in context-guide.md
 - Natural language task description works best
-- After calling, read context/README.md for navigation
+- After calling, read context-guide.md for navigation
 - If you need more context mid-task, use kahuna_ask instead
 </hints>`,
 
@@ -212,7 +212,7 @@ function buildContextReadyMarkdown(
     stepNum++;
   }
 
-  parts.push(`${stepNum}. **Read context-guide.md** — Full navigation`);
+  parts.push(`${stepNum}. **Read README.md** — Full navigation`);
   stepNum++;
 
   // Include top KB files
@@ -285,7 +285,7 @@ The knowledge base has ${totalFiles} files, but none are relevant to: "${task}"
  * 2. Check if KB is empty → return "no knowledge" markdown
  * 3. Run retrieval agent with list + read + select_files tools
  * 4. Extract selections from agent result
- * 5. Write files to context/ directory
+ * 5. Write file to project directory
  * 6. Return markdown response
  */
 export async function prepareContextToolHandler(
@@ -338,7 +338,7 @@ export async function prepareContextToolHandler(
       return markdownResponse(buildNoRelevantFilesMarkdown(task, allEntries.length));
     }
 
-    // Write to context/ directory
+    // Write to project directory
     const contextDir = process.cwd();
     await clearContextDir(contextDir);
 
