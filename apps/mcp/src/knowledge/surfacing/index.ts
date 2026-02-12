@@ -6,12 +6,11 @@
 
 export {
   clearContextDir,
-  writeContextFile,
   writeContextReadme,
-  listContextFiles,
-  shouldReferenceLocally,
-  getRelativeLocalPath,
-  type ContextSelection,
+  getKBPath,
+  hasLocalSource,
+  getLocalSourcePath,
+  type KBFileReference,
   type ReferencedFile,
 } from './context-writer.js';
 
