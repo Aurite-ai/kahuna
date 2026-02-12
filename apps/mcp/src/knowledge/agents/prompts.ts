@@ -63,7 +63,7 @@ Guidelines:
 
 /**
  * Template for the Q&A agent system prompt (used by kahuna_ask).
- * Use buildQASystemPrompt() to fill in the contextFilesSection.
+ * Use buildQASystemPrompt() to fill in the referencedFilesSection.
  */
 export const QA_PROMPT_TEMPLATE = `You are a knowledge assistant. Answer questions using the knowledge base.
 
@@ -83,7 +83,7 @@ Guidelines:
 - Be concise but complete
 - If the knowledge base doesn't have the answer, say "I couldn't find information about this in the knowledge base"
 
-{contextFilesSection}`;
+{referencedFilesSection}`;
 
 /**
  * Build the user message for the categorization agent.
@@ -137,20 +137,20 @@ export function buildRetrievalUserMessage(
 }
 
 /**
- * Build the full Q&A system prompt with context files section.
+ * Build the full Q&A system prompt with referenced files section.
  *
- * @param contextFiles - List of filenames currently in the project's context/ folder
+ * @param referencedKBFiles - List of KB file paths currently referenced in context-guide.md
  */
-export function buildQASystemPrompt(contextFiles: string[]): string {
-  let contextFilesSection = '';
+export function buildQASystemPrompt(referencedKBFiles: string[]): string {
+  let referencedFilesSection = '';
 
-  if (contextFiles.length > 0) {
-    const fileList = contextFiles.map((f) => `- ${f}`).join('\n');
-    contextFilesSection = `The copilot already has these files available in the project's context/ folder:
+  if (referencedKBFiles.length > 0) {
+    const fileList = referencedKBFiles.map((f) => `- ${f}`).join('\n');
+    referencedFilesSection = `The copilot already has these KB files referenced in their context-guide.md:
 ${fileList}
 
 These files are already accessible to the copilot. Focus on providing information that isn't covered by these files, or that provides additional detail beyond what they contain.`;
   }
 
-  return QA_PROMPT_TEMPLATE.replace('{contextFilesSection}', contextFilesSection);
+  return QA_PROMPT_TEMPLATE.replace('{referencedFilesSection}', referencedFilesSection);
 }

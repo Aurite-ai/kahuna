@@ -1,3 +1,4 @@
+import * as fs from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentResult } from '../../knowledge/index.js';
 import { askToolDefinition, askToolHandler } from '../ask.js';
@@ -9,19 +10,16 @@ vi.mock('../../knowledge/agents/run-agent.js', () => ({
   runAgent: vi.fn(),
 }));
 
-// Mock the context writer (for listContextFiles)
-vi.mock('../../knowledge/surfacing/context-writer.js', () => ({
-  clearContextDir: vi.fn(),
-  writeContextFile: vi.fn(),
-  writeContextReadme: vi.fn(),
-  listContextFiles: vi.fn().mockResolvedValue([]),
+// Mock fs/promises for context-guide.md reading
+vi.mock('node:fs/promises', () => ({
+  readFile: vi.fn(),
 }));
 
 import { runAgent } from '../../knowledge/agents/run-agent.js';
-import { listContextFiles } from '../../knowledge/surfacing/context-writer.js';
+
+const mockReadFile = vi.mocked(fs.readFile);
 
 const mockRunAgent = vi.mocked(runAgent);
-const mockListContextFiles = vi.mocked(listContextFiles);
 
 describe('askToolDefinition', () => {
   it('has the correct name', () => {
@@ -49,7 +47,8 @@ describe('askToolHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ctx = createMockContext();
-    mockListContextFiles.mockResolvedValue([]);
+    // Default: no context-guide.md exists
+    mockReadFile.mockRejectedValue(new Error('ENOENT: no such file or directory'));
   });
 
   describe('input validation', () => {
@@ -113,28 +112,85 @@ describe('askToolHandler', () => {
         ctx.anthropic
       );
     });
-  });
 
-  describe('with context files', () => {
-    it('includes context files info in system prompt', async () => {
-      mockListContextFiles.mockResolvedValue(['api-guidelines.md', 'error-patterns.md']);
+    it('includes referenced KB files in system prompt when context-guide.md exists', async () => {
+      // Mock context-guide.md with KB file references
+      const contextGuideContent = `# Context for: Build authentication system
 
+Surfaced from Kahuna knowledge base on 2026-02-12.
+
+## Knowledge Base Files
+
+| Topic | KB Path | Why Relevant |
+|-------|---------|--------------|
+| Authentication Patterns | [/home/user/.kahuna/knowledge/auth-patterns.mdc](/home/user/.kahuna/knowledge/auth-patterns.mdc) | Contains JWT implementation patterns |
+| Security Best Practices | [/home/user/.kahuna/knowledge/security-guide.mdc](/home/user/.kahuna/knowledge/security-guide.mdc) | Security requirements for auth |
+
+## Start Here
+
+1. Review /home/user/.kahuna/knowledge/auth-patterns.mdc — Contains JWT implementation patterns
+2. Review /home/user/.kahuna/knowledge/security-guide.mdc — Security requirements for auth
+`;
+
+      mockReadFile.mockResolvedValue(contextGuideContent);
       mockRunAgent.mockResolvedValue({
         textResponse: 'Answer based on KB',
         toolResults: [],
       });
 
+      await askToolHandler({ question: 'How should I implement auth?' }, ctx);
+
+      expect(mockRunAgent).toHaveBeenCalledOnce();
+      const systemPrompt = mockRunAgent.mock.calls[0][0].systemPrompt;
+
+      // Verify the system prompt includes the referenced KB files
+      expect(systemPrompt).toContain('/home/user/.kahuna/knowledge/auth-patterns.mdc');
+      expect(systemPrompt).toContain('/home/user/.kahuna/knowledge/security-guide.mdc');
+      expect(systemPrompt).toContain(
+        'already has these KB files referenced in their context-guide.md'
+      );
+    });
+
+    it('handles missing context-guide.md gracefully', async () => {
+      // mockReadFile already rejects by default in beforeEach
+      mockRunAgent.mockResolvedValue({
+        textResponse: 'Answer without context',
+        toolResults: [],
+      });
+
       await askToolHandler({ question: 'Test question' }, ctx);
 
-      // The system prompt should include context file info
-      expect(mockRunAgent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          systemPrompt: expect.stringContaining('api-guidelines.md'),
-        }),
-        expect.any(String),
-        ctx.storage,
-        ctx.anthropic
-      );
+      expect(mockRunAgent).toHaveBeenCalledOnce();
+      const systemPrompt = mockRunAgent.mock.calls[0][0].systemPrompt;
+
+      // Verify the system prompt doesn't include referenced files section
+      expect(systemPrompt).not.toContain('already has these KB files referenced');
+    });
+
+    it('extracts multiple KB file paths from context-guide.md', async () => {
+      const contextGuideContent = `# Context for: Multi-file task
+
+## Knowledge Base Files
+
+| Topic | KB Path | Why Relevant |
+|-------|---------|--------------|
+| File 1 | [/path/to/file1.mdc](/path/to/file1.mdc) | Reason 1 |
+| File 2 | [/path/to/file2.mdc](/path/to/file2.mdc) | Reason 2 |
+| File 3 | [/path/to/file3.mdc](/path/to/file3.mdc) | Reason 3 |
+`;
+
+      mockReadFile.mockResolvedValue(contextGuideContent);
+      mockRunAgent.mockResolvedValue({
+        textResponse: 'Answer',
+        toolResults: [],
+      });
+
+      await askToolHandler({ question: 'Test' }, ctx);
+
+      const systemPrompt = mockRunAgent.mock.calls[0][0].systemPrompt;
+      expect(systemPrompt).toContain('/path/to/file1.mdc');
+      expect(systemPrompt).toContain('/path/to/file2.mdc');
+      expect(systemPrompt).toContain('/path/to/file3.mdc');
     });
   });
 
