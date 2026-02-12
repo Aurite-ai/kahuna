@@ -8,7 +8,6 @@
  * See: docs/internal/designs/context-management-system.md
  */
 
-import * as path from 'node:path';
 import { z } from 'zod';
 import { MODELS } from '../config.js';
 import {
@@ -213,7 +212,7 @@ function buildContextReadyMarkdown(
     stepNum++;
   }
 
-  parts.push(`${stepNum}. **Read context/README.md** — Full navigation`);
+  parts.push(`${stepNum}. **Read context-guide.md** — Full navigation`);
   stepNum++;
 
   // Include top KB files
@@ -235,7 +234,7 @@ function buildContextReadyMarkdown(
   }
 
   parts.push('\n<hints>');
-  parts.push('- Context folder contains README with file references');
+  parts.push('- context-guide.md contains file references');
   parts.push('- KB files are referenced by their knowledge base paths');
   if (referencedFiles && referencedFiles.length > 0) {
     parts.push('- Some entries reference local project files');
@@ -340,7 +339,7 @@ export async function prepareContextToolHandler(
     }
 
     // Write to context/ directory
-    const contextDir = path.join(process.cwd(), 'context');
+    const contextDir = process.cwd();
     await clearContextDir(contextDir);
 
     // Build KB file references and local project file references
@@ -404,7 +403,7 @@ export async function prepareContextToolHandler(
       }
     }
 
-    // Write README.md with KB file references, local file references, and framework result
+    // Write context-guide.md with KB file references, local file references, and framework result
     await writeContextReadme(
       contextDir,
       task,
