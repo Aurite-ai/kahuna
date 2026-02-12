@@ -270,21 +270,36 @@ Follow these rules for API design.`;
   });
 
   describe('shouldReferenceLocally', () => {
-    let tempDir: string;
-    let tempFile: string;
-    let relativePath: string;
+    let inProjectDir: string;
+    let inProjectFile: string;
+    let inProjectRelativePath: string;
+    let externalDir: string;
+    let externalFile: string;
+    let externalRelativePath: string;
 
     beforeEach(async () => {
-      // Create a temp file relative to cwd for testing
-      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kahuna-test-'));
-      relativePath = path.relative(process.cwd(), path.join(tempDir, 'test.md'));
-      tempFile = path.join(tempDir, 'test.md');
-      await fs.writeFile(tempFile, '# Test content');
+      // Create a file inside cwd for testing (should be referenced)
+      inProjectDir = path.join(process.cwd(), 'test-local-ref');
+      await fs.mkdir(inProjectDir, { recursive: true });
+      inProjectFile = path.join(inProjectDir, 'test.md');
+      inProjectRelativePath = path.relative(process.cwd(), inProjectFile);
+      await fs.writeFile(inProjectFile, '# Test content');
+
+      // Create a file outside cwd for testing (should NOT be referenced)
+      externalDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kahuna-external-'));
+      externalFile = path.join(externalDir, 'external.md');
+      externalRelativePath = path.relative(process.cwd(), externalFile);
+      await fs.writeFile(externalFile, '# External content');
     });
 
     afterEach(async () => {
       try {
-        await fs.rm(tempDir, { recursive: true });
+        await fs.rm(inProjectDir, { recursive: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+      try {
+        await fs.rm(externalDir, { recursive: true });
       } catch {
         // Ignore cleanup errors
       }
@@ -325,7 +340,6 @@ Follow these rules for API design.`;
       expect(result).toBe(false);
     });
 
-
     it('returns false when source.path file does not exist', async () => {
       const entry = createMockEntry({
         source: { file: 'nonexistent.md', project: process.cwd(), path: 'nonexistent/file.md' },
@@ -336,14 +350,25 @@ Follow these rules for API design.`;
       expect(result).toBe(false);
     });
 
-    it('returns true when source.path exists relative to cwd', async () => {
+    it('returns true when source.path exists inside cwd', async () => {
       const entry = createMockEntry({
-        source: { file: 'test.md', project: '/some/other/project', path: relativePath },
+        source: { file: 'test.md', project: '/some/other/project', path: inProjectRelativePath },
       });
 
       const result = await shouldReferenceLocally(entry);
 
       expect(result).toBe(true);
+    });
+
+    it('returns false when source.path exists but is outside cwd', async () => {
+      const entry = createMockEntry({
+        source: { file: 'external.md', project: '/external/project', path: externalRelativePath },
+      });
+
+      const result = await shouldReferenceLocally(entry);
+
+      // File exists but is outside the project directory - should NOT be referenced
+      expect(result).toBe(false);
     });
   });
 
