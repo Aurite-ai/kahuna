@@ -28,6 +28,19 @@ export {
 // Environment variable provider
 export { EnvVaultProvider, envVaultProvider } from './env-provider.js';
 
+// 1Password provider
+export type { OnePasswordReference, OnePasswordStatus } from './1password-provider.js';
+export {
+  OnePasswordProvider,
+  onePasswordProvider,
+  parseOpReference,
+  formatOpReference,
+  vaultPathToOpRef,
+  opRefToVaultPath,
+  isOpReference,
+  getOpInstallInstructions,
+} from './1password-provider.js';
+
 // Sensitive data detection
 export type {
   DetectionConfidence,
@@ -41,4 +54,7 @@ export {
   redactSensitiveData,
   hasSensitiveData,
   filterByConfidence,
+  detect1PasswordReferences,
+  has1PasswordReferences,
+  extractVaultReferences,
 } from './sensitive-detection.js';

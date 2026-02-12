@@ -38,7 +38,8 @@ export type SensitiveDataType =
   | 'generic_api_key'
   | 'generic_password'
   | 'generic_secret'
-  | 'bearer_token';
+  | 'bearer_token'
+  | '1password_reference';
 
 /**
  * A pattern for detecting sensitive data
@@ -339,7 +340,95 @@ const SENSITIVE_PATTERNS: SensitivePattern[] = [
     valueGroup: 1,
     vaultPathPrefix: 'database',
   },
+
+  // ============ SPECIAL - 1Password References (not redacted, just recognized) ============
+
+  // 1Password reference (op://vault/item/field)
+  {
+    type: '1password_reference',
+    pattern: /(op:\/\/[^\s"']+)/g,
+    confidence: 'high',
+    description: '1Password secret reference',
+    valueGroup: 1,
+    vaultPathPrefix: '1password',
+  },
 ];
+
+/**
+ * Detect 1Password references in content
+ *
+ * Returns all op:// references found without treating them as secrets to redact.
+ * These are already secure references that should be preserved as-is.
+ */
+export function detect1PasswordReferences(content: string): Array<{
+  reference: string;
+  position: { start: number; end: number };
+}> {
+  const refs: Array<{ reference: string; position: { start: number; end: number } }> = [];
+  const pattern = /(op:\/\/[^\s"']+)/g;
+
+  let match = pattern.exec(content);
+  while (match !== null) {
+    refs.push({
+      reference: match[1],
+      position: { start: match.index, end: match.index + match[0].length },
+    });
+    match = pattern.exec(content);
+  }
+
+  return refs;
+}
+
+/**
+ * Check if content contains 1Password references
+ */
+export function has1PasswordReferences(content: string): boolean {
+  return /op:\/\/[^\s"']+/.test(content);
+}
+
+/**
+ * Extract vault references from content
+ *
+ * Finds both op:// (1Password) and vault:// references in content.
+ * Returns parsed references with their positions.
+ */
+export function extractVaultReferences(content: string): Array<{
+  type: 'op' | 'vault';
+  reference: string;
+  position: { start: number; end: number };
+}> {
+  const refs: Array<{
+    type: 'op' | 'vault';
+    reference: string;
+    position: { start: number; end: number };
+  }> = [];
+
+  // Find op:// references
+  const opPattern = /(op:\/\/[^\s"']+)/g;
+  let match = opPattern.exec(content);
+  while (match !== null) {
+    refs.push({
+      type: 'op',
+      reference: match[1],
+      position: { start: match.index, end: match.index + match[0].length },
+    });
+    match = opPattern.exec(content);
+  }
+
+  // Find vault:// references
+  const vaultPattern = /(vault:\/\/[^\s"']+)/g;
+  match = vaultPattern.exec(content);
+  while (match !== null) {
+    refs.push({
+      type: 'vault',
+      reference: match[1],
+      position: { start: match.index, end: match.index + match[0].length },
+    });
+    match = vaultPattern.exec(content);
+  }
+
+  return refs.sort((a, b) => a.position.start - b.position.start);
+}
 
 /**
  * Mask a sensitive value for safe display
