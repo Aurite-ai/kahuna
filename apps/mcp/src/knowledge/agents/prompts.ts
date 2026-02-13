@@ -28,7 +28,19 @@ export const CATEGORIZATION_PROMPT = `You are a file analyzer. Classify this fil
 - Use **integration** when the primary purpose is describing connections to external systems, APIs, or data sources
 - Use **context** as fallback when no other category clearly fits
 
-Use the 'categorize_file' tool to provide your analysis.`;
+**Contradiction Detection:**
+After categorizing the file, check if it contradicts any existing files in the knowledge base:
+1. Use 'list_knowledge_files' to see what's already in the knowledge base
+2. Read files that might contradict the new file (same topic area, similar category)
+3. If you find contradictions (conflicting information, outdated policies, superseded decisions), use 'report_contradictions' to flag them
+4. A contradiction means the files contain conflicting information that cannot both be true
+5. Don't report files that are simply related or complementary - only report actual conflicts
+
+**Process:**
+1. First, use 'categorize_file' to classify the new file
+2. Then, check for contradictions in the knowledge base
+3. If contradictions exist, use 'report_contradictions' to report them
+4. If no contradictions, you're done`;
 
 /**
  * System prompt for the retrieval agent (used by kahuna_prepare_context).

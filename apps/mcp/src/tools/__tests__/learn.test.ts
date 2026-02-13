@@ -56,6 +56,32 @@ function mockCategorizationResult(overrides?: Record<string, unknown>): AgentRes
   };
 }
 
+/**
+ * Helper: Build a mock AgentResult with contradictions.
+ */
+function mockCategorizationWithContradictions(
+  contradictions: Array<{ slug: string; explanation: string }>
+): AgentResult {
+  return {
+    textResponse: '',
+    toolResults: [
+      {
+        tool: 'categorize_file',
+        category: 'policy',
+        confidence: 0.95,
+        reasoning: 'Updated policy document',
+        title: 'New API Guidelines',
+        summary: 'Updated REST API design standards',
+        topics: ['API Design', 'REST Conventions'],
+      },
+      {
+        tool: 'report_contradictions',
+        contradictions,
+      },
+    ],
+  };
+}
+
 describe('learnToolDefinition', () => {
   it('has the correct name', () => {
     expect(learnToolDefinition.name).toBe('kahuna_learn');
@@ -257,6 +283,81 @@ describe('learnToolHandler', () => {
 
       const text = result.content[0].text;
       expect(text).toContain('API rate limited');
+    });
+  });
+
+  describe('contradiction detection', () => {
+    it('reports contradictions when agent detects them', async () => {
+      const now = new Date().toISOString();
+      vi.mocked(ctx.storage.save).mockResolvedValue(
+        createMockEntry({
+          slug: 'new-api-guidelines',
+          title: 'New API Guidelines',
+          created_at: now,
+          updated_at: now,
+        })
+      );
+
+      mockRunAgent.mockResolvedValue(
+        mockCategorizationWithContradictions([
+          {
+            slug: 'old-api-guidelines',
+            explanation:
+              'The new file specifies JWT authentication while the old file requires OAuth2',
+          },
+        ])
+      );
+
+      const result = await learnToolHandler({ paths: ['docs/new-api.md'] }, ctx);
+
+      const text = result.content[0].text;
+      expect(text).toContain('⚠️ Contradictions Detected');
+      expect(text).toContain('old-api-guidelines');
+      expect(text).toContain('JWT authentication');
+      expect(text).toContain('OAuth2');
+      expect(text).toContain('kahuna_learn');
+    });
+
+    it('reports multiple contradictions', async () => {
+      const now = new Date().toISOString();
+      vi.mocked(ctx.storage.save).mockResolvedValue(
+        createMockEntry({ created_at: now, updated_at: now })
+      );
+
+      mockRunAgent.mockResolvedValue(
+        mockCategorizationWithContradictions([
+          {
+            slug: 'old-policy-1',
+            explanation: 'Conflicting rate limit values',
+          },
+          {
+            slug: 'old-policy-2',
+            explanation: 'Different authentication requirements',
+          },
+        ])
+      );
+
+      const result = await learnToolHandler({ paths: ['docs/new-policy.md'] }, ctx);
+
+      const text = result.content[0].text;
+      expect(text).toContain('old-policy-1');
+      expect(text).toContain('old-policy-2');
+      expect(text).toContain('rate limit');
+      expect(text).toContain('authentication');
+    });
+
+    it('does not show contradiction section when none detected', async () => {
+      const now = new Date().toISOString();
+      vi.mocked(ctx.storage.save).mockResolvedValue(
+        createMockEntry({ created_at: now, updated_at: now })
+      );
+
+      mockRunAgent.mockResolvedValue(mockCategorizationResult());
+
+      const result = await learnToolHandler({ paths: ['docs/api.md'] }, ctx);
+
+      const text = result.content[0].text;
+      expect(text).not.toContain('⚠️ Contradictions Detected');
     });
   });
 });
