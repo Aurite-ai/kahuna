@@ -58,3 +58,9 @@ export {
   saveIntegration,
   updateIntegrationStatus,
 } from './storage.js';
+
+// Execution - Re-export from execution module
+export * from './execution/index.js';
+
+// Verification - Re-export from verification module
+export * from './verification/index.js';
