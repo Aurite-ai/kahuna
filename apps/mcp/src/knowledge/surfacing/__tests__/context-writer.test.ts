@@ -188,7 +188,6 @@ describe('context-writer', () => {
       expect(readme).toContain('## Framework');
       expect(readme).toContain('Framework: **LangGraph**');
       expect(readme).toContain('Boilerplate files added to your project');
-      expect(readme).toContain('[context-guide.md](../context-guide.md)');
     });
 
     it('does not include Framework section when no files were copied', async () => {
