@@ -45,16 +45,16 @@ Sarah works in customer success. She wants to build an AI agent that answers cus
 │   ├── .mcp.json              ← Kahuna MCP connection                         │
 │   ├── .claude/               ← Copilot configuration                         │
 │   │   ├── settings.json      ← Editor settings                               │
-│   │   ├── rules/             ← Behavior rules (use context-guide.md, etc.)   │
+│   │   ├── rules/             ← Behavior rules (use .context-guide.md, etc.)   │
 │   │   └── skills/            ← Sub-agent capabilities                        │
-│   ├── context-guide.md       ← Knowledge guide with curated patterns         │
+│   ├── .context-guide.md       ← Knowledge guide with curated patterns         │
 │   └── src/agent/             ← Boilerplate structure                         │
 │       ├── graph.py                                                           │
 │       ├── state.py                                                           │
 │       └── tools.py                                                           │
 │                                                                              │
-│   Claude Code reads CLAUDE.md, sees instructions to read context-guide.md    │
-│   Reads context-guide.md, finds curated LangGraph patterns                   │
+│   Claude Code reads CLAUDE.md, sees instructions to read .context-guide.md    │
+│   Reads .context-guide.md, finds curated LangGraph patterns                   │
 │   Starts building with guidance - not from scratch!                          │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -106,7 +106,7 @@ Sarah has company API guidelines and wants the agent to follow them.
 │   1. Read and extract content from PDF                                       │
 │   2. Classify as "policy" - API design standards                             │
 │   3. Store in ~/.kahuna/knowledge/uuid-abc.mdc                               │
-│   4. NOT written to context-guide.md yet (that's prepare_context's job)      │
+│   4. NOT written to .context-guide.md yet (that's prepare_context's job)      │
 │                                                                              │
 │   Response:                                                                  │
 │   ┌─────────────────────────────────────────────────────────────┐            │
@@ -171,7 +171,7 @@ Sarah wants to add a search feature to her agent. She's done some work but needs
 │   - LangGraph tool patterns (curated) - matches because adding tool          │
 │   - Previous search decision (if any) - matches by topic                     │
 │                                                                              │
-│   Surfaces to project/context-guide.md                                       │
+│   Surfaces to project/.context-guide.md                                       │
 │                                                                              │
 │   Response:                                                                  │
 │   ┌─────────────────────────────────────────────────────────────┐            │
@@ -184,13 +184,13 @@ Sarah wants to add a search feature to her agent. She's done some work but needs
 │   │ - **LangGraph Tool Patterns** - Tools should be defined...  │            │
 │   │                                                             │            │
 │   │ <hints>                                                     │            │
-│   │ - Read context-guide.md for full navigation                 │            │
+│   │ - Read .context-guide.md for full navigation                 │            │
 │   │ - API standards apply to any endpoints you create           │            │
 │   │ - Use kahuna_ask if you need clarification mid-task         │            │
 │   │ </hints>                                                    │            │
 │   └─────────────────────────────────────────────────────────────┘            │
 │                                                                              │
-│   Claude Code reads context-guide.md, sees what's available                  │
+│   Claude Code reads .context-guide.md, sees what's available                  │
 │   Reads relevant sections based on task needs                                │
 │   Implements search tool following patterns AND API standards                │
 │                                                                              │
@@ -208,7 +208,7 @@ Sarah wants to add a search feature to her agent. She's done some work but needs
 
 - `kahuna_prepare_context` happens automatically at task start
 - Relevant knowledge surfaces based on task description
-- Claude Code reads `context-guide.md` like any other file
+- Claude Code reads `.context-guide.md` like any other file
 - Company policies are followed without Sarah managing them
 
 ---
@@ -240,14 +240,14 @@ Sarah is debugging an error and wants quick guidance without disrupting her flow
 │           ↓                                                                  │
 │                                                                              │
 │   Kahuna searches:                                                           │
-│   1. First: project/context-guide.md (already surfaced)                      │
+│   1. First: project/.context-guide.md (already surfaced)                      │
 │   2. Then: ~/.kahuna/ knowledge base (full search)                           │
 │                                                                              │
 │   Response:                                                                  │
 │   ┌─────────────────────────────────────────────────────────────┐            │
 │   │ # Error Handling Guidelines                                 │            │
 │   │                                                             │            │
-│   │ From **API Design Standards** (context-guide.md):          │            │
+│   │ From **API Design Standards** (.context-guide.md):          │            │
 │   │                                                             │            │
 │   │ ## Standard Error Format                                    │            │
 │   │ ```json                                                     │            │
@@ -259,7 +259,7 @@ Sarah is debugging an error and wants quick guidance without disrupting her flow
 │   │ ```                                                         │            │
 │   │                                                             │            │
 │   │ <hints>                                                     │            │
-│   │ - Full details in context-guide.md (API Standards section)  │            │
+│   │ - Full details in .context-guide.md (API Standards section)  │            │
 │   │ - All errors should use this format                         │            │
 │   │ </hints>                                                    │            │
 │   └─────────────────────────────────────────────────────────────┘            │
@@ -279,7 +279,7 @@ Sarah is debugging an error and wants quick guidance without disrupting her flow
 ### Why This Works
 
 - `kahuna_ask` provides quick answers from existing knowledge
-- Checks `context-guide.md` first (already task-relevant)
+- Checks `.context-guide.md` first (already task-relevant)
 - Falls back to full knowledge base
 - Includes source reference for transparency
 
@@ -305,7 +305,7 @@ Sarah is ready to commit her changes and wants to verify they follow company sta
 │           ↓                                                                  │
 │                                                                              │
 │   The skill checks files against:                                            │
-│   1. context-guide.md patterns and policies (already surfaced)               │
+│   1. .context-guide.md patterns and policies (already surfaced)               │
 │   2. ~/.kahuna/ knowledge base patterns                                      │
 │                                                                              │
 │   Result:                                                                    │

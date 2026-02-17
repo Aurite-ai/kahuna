@@ -2,7 +2,7 @@
  * Kahuna Prepare Context Tool - Agentic context retrieval
  *
  * Searches the knowledge base for files relevant to a task using an LLM agent,
- * then writes their file paths to the project's context-guide.md.
+ * then writes their file paths to the project's .context-guide.md.
  * Can also scaffold framework boilerplate when the agent selects a framework.
  *
  * See: docs/internal/designs/context-management-system.md
@@ -34,7 +34,7 @@ import { type MCPToolResponse, type ToolContext, markdownResponse } from './type
  */
 export const prepareContextToolDefinition = {
   name: 'kahuna_prepare_context',
-  description: `Prepare the context-guide.md with relevant knowledge for a task.
+  description: `Prepare the .context-guide.md with relevant knowledge for a task.
 
 USE THIS TOOL WHEN:
 - Starting any new task or feature
@@ -42,7 +42,7 @@ USE THIS TOOL WHEN:
 - Before beginning implementation work
 - User asks "what do we know about X"
 
-This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from context-guide.md.
+This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from .context-guide.md.
 
 <examples>
 ### Starting a task
@@ -56,9 +56,9 @@ kahuna_prepare_context(task="Understand our API design patterns")
 </examples>
 
 <hints>
-- Call ONCE at task start, then read the files referenced in context-guide.md
+- Call ONCE at task start, then read the files referenced in .context-guide.md
 - Natural language task description works best
-- After calling, read context-guide.md for navigation
+- After calling, read .context-guide.md for navigation
 - If you need more context mid-task, use kahuna_ask instead
 </hints>`,
 
@@ -212,7 +212,7 @@ function buildContextReadyMarkdown(
     stepNum++;
   }
 
-  parts.push(`${stepNum}. **Read context-guide.md** — Full navigation`);
+  parts.push(`${stepNum}. **Read .context-guide.md** — Full navigation`);
   stepNum++;
 
   // Include top KB files
@@ -234,7 +234,7 @@ function buildContextReadyMarkdown(
   }
 
   parts.push('\n<hints>');
-  parts.push('- context-guide.md contains file references');
+  parts.push('- .context-guide.md contains file references');
   parts.push('- KB files are referenced by their knowledge base paths');
   if (referencedFiles && referencedFiles.length > 0) {
     parts.push('- Some entries reference local project files');
@@ -403,7 +403,7 @@ export async function prepareContextToolHandler(
       }
     }
 
-    // Write context-guide.md with KB file references, local file references, and framework result
+    // Write .context-guide.md with KB file references, local file references, and framework result
     await writeContextReadme(
       contextDir,
       task,

@@ -45,9 +45,9 @@ describe('context-writer', () => {
       expect(stat.isDirectory()).toBe(true);
     });
 
-    it('removes context-guide.md from existing directory', async () => {
+    it('removes .context-guide.md from existing directory', async () => {
       await fs.mkdir(contextDir, { recursive: true });
-      await fs.writeFile(path.join(contextDir, 'context-guide.md'), 'readme');
+      await fs.writeFile(path.join(contextDir, '.context-guide.md'), 'readme');
 
       await clearContextDir(contextDir);
 
@@ -55,7 +55,7 @@ describe('context-writer', () => {
       expect(files).toHaveLength(0);
     });
 
-    it('handles directory without context-guide.md without error', async () => {
+    it('handles directory without .context-guide.md without error', async () => {
       await fs.mkdir(contextDir, { recursive: true });
 
       await expect(clearContextDir(contextDir)).resolves.not.toThrow();
@@ -93,7 +93,7 @@ describe('context-writer', () => {
       await fs.mkdir(contextDir, { recursive: true });
     });
 
-    it('generates context-guide.md with KB file references', async () => {
+    it('generates .context-guide.md with KB file references', async () => {
       const kbFiles = [
         {
           slug: 'api-guidelines',
@@ -111,7 +111,7 @@ describe('context-writer', () => {
 
       await writeContextReadme(contextDir, 'Add rate limiting to search', kbFiles);
 
-      const readme = await fs.readFile(path.join(contextDir, 'context-guide.md'), 'utf-8');
+      const readme = await fs.readFile(path.join(contextDir, '.context-guide.md'), 'utf-8');
 
       expect(readme).toContain('# Context for: Add rate limiting to search');
       expect(readme).toContain('## Knowledge Base Files');
@@ -131,7 +131,7 @@ describe('context-writer', () => {
 
       await writeContextReadme(contextDir, 'Test task', kbFiles);
 
-      const readme = await fs.readFile(path.join(contextDir, 'context-guide.md'), 'utf-8');
+      const readme = await fs.readFile(path.join(contextDir, '.context-guide.md'), 'utf-8');
 
       expect(readme).toContain('## Start Here');
       expect(readme).toContain('1. Review /kb/file-a.mdc');
@@ -146,7 +146,7 @@ describe('context-writer', () => {
         { slug: 'test', reason: 'Test reason', kbPath: '/kb/test.mdc' },
       ]);
 
-      const readme = await fs.readFile(path.join(contextDir, 'context-guide.md'), 'utf-8');
+      const readme = await fs.readFile(path.join(contextDir, '.context-guide.md'), 'utf-8');
 
       expect(readme).toContain('Surfaced from Kahuna knowledge base on');
       expect(readme).toContain('Prepared by Kahuna');
@@ -161,7 +161,7 @@ describe('context-writer', () => {
 
       await writeContextReadme(contextDir, 'Test with local files', kbFiles, referencedFiles);
 
-      const readme = await fs.readFile(path.join(contextDir, 'context-guide.md'), 'utf-8');
+      const readme = await fs.readFile(path.join(contextDir, '.context-guide.md'), 'utf-8');
 
       expect(readme).toContain('## Local Project Files');
       expect(readme).toContain('These files are in your project');
@@ -183,7 +183,7 @@ describe('context-writer', () => {
 
       await writeContextReadme(contextDir, 'Build agent', kbFiles, undefined, frameworkResult);
 
-      const readme = await fs.readFile(path.join(contextDir, 'context-guide.md'), 'utf-8');
+      const readme = await fs.readFile(path.join(contextDir, '.context-guide.md'), 'utf-8');
 
       expect(readme).toContain('## Framework');
       expect(readme).toContain('Framework: **LangGraph**');
@@ -203,7 +203,7 @@ describe('context-writer', () => {
 
       await writeContextReadme(contextDir, 'Build agent', kbFiles, undefined, frameworkResult);
 
-      const readme = await fs.readFile(path.join(contextDir, 'context-guide.md'), 'utf-8');
+      const readme = await fs.readFile(path.join(contextDir, '.context-guide.md'), 'utf-8');
 
       expect(readme).not.toContain('## Framework');
     });

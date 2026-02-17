@@ -1,7 +1,7 @@
 /**
- * Context Writer — manages the project's context-guide.md
+ * Context Writer — manages the project's .context-guide.md
  *
- * References knowledge base files by their KB paths in a context-guide.md.
+ * References knowledge base files by their KB paths in a .context-guide.md.
  *
  * See: docs/internal/designs/context-management-system.md
  */
@@ -51,7 +51,7 @@ export function getKBPath(slug: string): string {
 
 /**
  * Ensure the context directory exists and is empty.
- * Creates the directory if it doesn't exist, removes context-guide.md if it does.
+ * Creates the directory if it doesn't exist, removes .context-guide.md if it does.
  *
  * @param contextDir - Path to the context directory
  */
@@ -59,9 +59,9 @@ export async function clearContextDir(contextDir: string): Promise<void> {
   // Ensure directory exists
   await fs.mkdir(contextDir, { recursive: true });
 
-  // Remove context-guide.md if it exists (we only write context-guide now, no other files)
+  // Remove .context-guide.md if it exists (we only write .context-guide now, no other files)
   try {
-    await fs.unlink(path.join(contextDir, 'context-guide.md'));
+    await fs.unlink(path.join(contextDir, '.context-guide.md'));
   } catch (error) {
     // Ignore if file doesn't exist
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
@@ -71,7 +71,7 @@ export async function clearContextDir(contextDir: string): Promise<void> {
 }
 
 /**
- * Generate and write a context-guide.md file
+ * Generate and write a .context-guide.md file
  *
  * @param contextDir - Path to the context directory
  * @param task - The task description that triggered context surfacing
@@ -165,7 +165,7 @@ export async function writeContextReadme(
   parts.push('*Prepared by Kahuna | Use `kahuna_ask` for additional questions*');
   parts.push('');
 
-  await fs.writeFile(path.join(contextDir, 'context-guide.md'), parts.join('\n'), 'utf-8');
+  await fs.writeFile(path.join(contextDir, '.context-guide.md'), parts.join('\n'), 'utf-8');
 }
 
 /**
@@ -209,7 +209,7 @@ export async function hasLocalSource(entry: KnowledgeEntry): Promise<boolean> {
  * Prefers source.path (relative path) over source.file (filename only).
  *
  * @param entry - The knowledge entry with source info
- * @returns Relative path suitable for markdown links from context-guide.md
+ * @returns Relative path suitable for markdown links from .context-guide.md
  */
 export function getLocalSourcePath(entry: KnowledgeEntry): string {
   if (!entry.source) {
