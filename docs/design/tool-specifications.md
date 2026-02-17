@@ -12,7 +12,7 @@
 |------|---------|
 | `kahuna_initialize` | Initialize new project |
 | `kahuna_learn` | Send files for Kahuna to learn from |
-| `kahuna_prepare_context` | Prepare context/ for a task |
+| `kahuna_prepare_context` | Prepare .context-guide.md for a task |
 | `kahuna_ask` | Quick Q&A |
 | `kahuna_sync` | Sync all changes (deferred) |
 
@@ -92,8 +92,7 @@ Created LangGraph agent project structure with Kahuna integration.
 - **.claude/** - Copilot settings, rules, and skills
 
 ### Knowledge Base
-- **context/** - Knowledge folder (starts with LangGraph patterns)
-  - `README.md` - Navigation guide
+- **.context-guide.md** - Knowledge guide (starts with LangGraph patterns)
 
 ### Project Structure
 - **src/agent/** - LangGraph boilerplate (graph.py, state.py, tools.py)
@@ -124,8 +123,7 @@ project-name/
 │   ├── settings.local.json   # Local overrides (gitignored)
 │   ├── rules/                # Copilot behavior rules
 │   └── skills/               # Sub-agent capabilities
-├── context/
-│   └── README.md             # Knowledge navigation guide
+├── .context-guide.md          # Knowledge navigation guide
 └── src/agent/
     ├── graph.py              # LangGraph graph definition
     ├── state.py              # State schema
@@ -140,11 +138,11 @@ project-name/
 - Create project structure (all folders and files above)
 - Write CLAUDE.md with Kahuna tool instructions
 - Copy static copilot config files (.mcp.json, .claude/)
-- Initialize context/ with README.md
+- Initialize .context-guide.md with starter content
 
 **Future enhancements:**
 - Template selection (basic, rag, multi-agent)
-- Pre-populated LangGraph patterns in context/
+- Pre-populated LangGraph patterns in .context-guide.md
 - Detect existing project and offer to add Kahuna
 - Project-specific customization of copilot config
 
@@ -191,7 +189,7 @@ kahuna_learn(
 <hints>
 - Accepts both files AND folders - folders are processed recursively
 - Description helps classification but isn't required
-- Files go to ~/.kahuna knowledge base, NOT directly to context/
+- Files go to ~/.kahuna knowledge base, NOT directly to .context-guide.md
 - Use kahuna_prepare_context to surface learned knowledge
 </hints>
 ```
@@ -227,7 +225,7 @@ Processed **2 files**:
 *Stored in ~/.kahuna knowledge base*
 
 <hints>
-- Review context/ to verify accuracy
+- Review .context-guide.md to verify accuracy
 - The API standards will be used in future recommendations
 - Send more files anytime with this tool
 </hints>
@@ -238,8 +236,8 @@ Processed **2 files**:
 **Build first:**
 - Accept files and description
 - Basic classification (policy vs code vs config)
-- Write raw content to context/ with metadata
-- Update context/README.md
+- Write raw content to .context-guide.md with metadata
+- Update .context-guide.md
 
 **Future enhancements:**
 - LLM-powered knowledge extraction
@@ -277,7 +275,7 @@ kahuna_sync(since="HEAD~5")
 <hints>
 - Run at end of session to capture learnings
 - Conversations are automatically included
-- Context folder will be updated with extracted knowledge
+- Context guide will be updated with extracted knowledge
 </hints>
 ```
 
@@ -312,8 +310,8 @@ Chose keyword-based search over embeddings because simpler infrastructure, suffi
 *Extracted from conversation + code*
 
 <hints>
-- Review context/ for accuracy
-- Commit context/ to preserve team knowledge
+- Review .context-guide.md for accuracy
+- Commit .context-guide.md to preserve team knowledge
 - Next sync will capture new changes
 </hints>
 ```
@@ -339,7 +337,7 @@ Chose keyword-based search over embeddings because simpler infrastructure, suffi
 ### Tool Description
 
 ```
-Prepare the context/ folder with relevant knowledge for a task.
+Prepare the .context-guide.md file with relevant knowledge for a task.
 
 USE THIS TOOL WHEN:
 - Starting any new task or feature
@@ -347,7 +345,7 @@ USE THIS TOOL WHEN:
 - Before beginning implementation work
 - User asks "what do we know about X"
 
-This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from context/ files.
+This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from .context-guide.md.
 
 <examples>
 ### Starting a task
@@ -368,9 +366,9 @@ kahuna_prepare_context(
 </examples>
 
 <hints>
-- Call ONCE at task start, then work from context/ files
+- Call ONCE at task start, then work from .context-guide.md
 - Natural language task description works best
-- After calling, read context/README.md for navigation
+- After calling, read .context-guide.md for navigation
 - If you need more context mid-task, use kahuna_ask instead
 </hints>
 ```
@@ -393,20 +391,20 @@ kahuna_prepare_context(
 
 ## Relevant Context Surfaced
 
-| Topic | File | Why Relevant |
-|-------|------|--------------|
-| API Guidelines | context/api-standards.md | Rate limiting requirements |
-| Error Handling | context/error-patterns.md | How to handle rate limit errors |
-| Search Tool | context/search-decision.md | Current implementation context |
+| Topic | Section | Why Relevant |
+|-------|---------|--------------|
+| API Guidelines | API Standards | Rate limiting requirements |
+| Error Handling | Error Patterns | How to handle rate limit errors |
+| Search Tool | Search Decision | Current implementation context |
 
 ## Start Here
 
-1. **Read context/README.md** - Full navigation
-2. **Check api-standards.md** - Has rate limiting requirements
-3. **Review error-patterns.md** - Follow existing patterns
+1. **Read .context-guide.md** - Full navigation and content
+2. **Check API Standards section** - Has rate limiting requirements
+3. **Review Error Patterns section** - Follow existing patterns
 
 <hints>
-- Context folder is ready - read files directly
+- Context guide is ready - read it directly
 - If you need more context mid-task, use kahuna_ask
 - After completing work, use kahuna_learn to capture learnings
 </hints>
@@ -416,9 +414,9 @@ kahuna_prepare_context(
 
 **Build first:**
 - Accept task description
-- Search existing context/ files for relevant content
-- Return list of relevant files with summaries
-- Update context/README.md with task-specific navigation
+- Search existing knowledge base for relevant content
+- Return list of relevant sections with summaries
+- Generate .context-guide.md with task-specific content
 
 **Future enhancements:**
 - LLM-powered relevance scoring
@@ -439,9 +437,9 @@ USE THIS TOOL WHEN:
 - Mid-task and need specific information
 - User asks a direct question about the project
 - Need clarification on a decision or pattern
-- Context folder doesn't have what you need
+- Context guide doesn't have what you need
 
-Searches context/ first (if exists), then falls back to ~/.kahuna knowledge base.
+Searches .context-guide.md first (if exists), then falls back to ~/.kahuna knowledge base.
 
 <examples>
 ### Direct question
@@ -455,10 +453,10 @@ kahuna_ask(question="Do we have rate limiting requirements documented?")
 </examples>
 
 <hints>
-- Searches project context/ first, then knowledge base
+- Searches project .context-guide.md first, then knowledge base
 - Use for quick questions mid-task
 - For comprehensive context setup, use kahuna_prepare_context instead
-- Returns text directly, doesn't modify context/
+- Returns text directly, doesn't modify .context-guide.md
 </hints>
 ```
 
@@ -484,10 +482,10 @@ The project uses keyword-based search for these reasons:
 3. **Cost** - No embedding API costs
 4. **Sufficient** - Corpus is small enough for keyword matching
 
-**Source:** context/search-decision.md
+**Source:** .context-guide.md (Search Decision section)
 
 <hints>
-- Full details in context/search-decision.md
+- Full details in .context-guide.md
 - Related: "What would trigger switching to embeddings?"
 - If you need broader context, use kahuna_prepare
 </hints>
@@ -497,7 +495,7 @@ The project uses keyword-based search for these reasons:
 
 **Build first:**
 - Accept question
-- Search context/ files for relevant content
+- Search .context-guide.md for relevant content
 - Return synthesized answer with source citations
 
 **Future enhancements:**

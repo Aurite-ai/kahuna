@@ -121,7 +121,7 @@ apps/
         ├── knowledge/      # Knowledge base domain logic
         │   ├── agents/     # Agent prompts, tools, shared runner
         │   ├── storage/    # KB storage service, types, utilities
-        │   └── surfacing/  # Context writer (project context/ dir)
+        │   └── surfacing/  # Context writer
         ├── tools/          # MCP tool handlers (learn, ask, prepare-context, health-check, initialize)
         ├── config.ts       # Centralized configuration (models, server constants)
         └── index.ts        # Server entry point

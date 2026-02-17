@@ -2,31 +2,29 @@
  * Kahuna Prepare Context Tool - Agentic context retrieval
  *
  * Searches the knowledge base for files relevant to a task using an LLM agent,
- * then writes them as clean markdown to the project's context/ folder.
+ * then writes their file paths to the project's .context-guide.md.
  * Can also scaffold framework boilerplate when the agent selects a framework.
  *
  * See: docs/internal/designs/context-management-system.md
  */
 
-import * as path from 'node:path';
 import { z } from 'zod';
 import { MODELS } from '../config.js';
 import {
   type AgentResult,
   type FrameworkCopyResult,
-  type KnowledgeEntry,
+  type KBFileReference,
   RETRIEVAL_PROMPT,
   type ReferencedFile,
   buildRetrievalUserMessage,
   clearContextDir,
   copyFrameworkBoilerplate,
   generateFileTree,
-  generateMdcFile,
-  getRelativeLocalPath,
+  getKBPath,
+  getLocalSourcePath,
+  hasLocalSource,
   retrievalTools,
   runAgent,
-  shouldReferenceLocally,
-  writeContextFile,
   writeContextReadme,
 } from '../knowledge/index.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
@@ -36,7 +34,7 @@ import { type MCPToolResponse, type ToolContext, markdownResponse } from './type
  */
 export const prepareContextToolDefinition = {
   name: 'kahuna_prepare_context',
-  description: `Prepare the context/ folder with relevant knowledge for a task.
+  description: `Prepare the .context-guide.md with relevant knowledge for a task.
 
 USE THIS TOOL WHEN:
 - Starting any new task or feature
@@ -44,7 +42,7 @@ USE THIS TOOL WHEN:
 - Before beginning implementation work
 - User asks "what do we know about X"
 
-This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from context/ files.
+This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from .context-guide.md.
 
 <examples>
 ### Starting a task
@@ -58,9 +56,9 @@ kahuna_prepare_context(task="Understand our API design patterns")
 </examples>
 
 <hints>
-- Call ONCE at task start, then read context/ files directly
+- Call ONCE at task start, then read the files referenced in .context-guide.md
 - Natural language task description works best
-- After calling, read context/README.md for navigation
+- After calling, read .context-guide.md for navigation
 - If you need more context mid-task, use kahuna_ask instead
 </hints>`,
 
@@ -150,8 +148,7 @@ function extractFrameworkSelection(agentResult: AgentResult): FrameworkSelection
 
 function buildContextReadyMarkdown(
   task: string,
-  selections: FileSelection[],
-  entries: Map<string, KnowledgeEntry>,
+  kbFiles: KBFileReference[],
   referencedFiles?: ReferencedFile[],
   frameworkResult?: FrameworkCopyResult
 ): string {
@@ -179,16 +176,15 @@ function buildContextReadyMarkdown(
     parts.push('All framework files already exist in your project. No files copied.\n');
   }
 
-  // Relevant context surfaced (copied to context/)
-  if (selections.length > 0) {
-    parts.push('## Relevant Context Surfaced\n');
-    parts.push('| Topic | File | Why Relevant |');
-    parts.push('|-------|------|--------------|');
+  // KB files (referenced by path, not copied)
+  if (kbFiles.length > 0) {
+    parts.push('## Knowledge Base Files\n');
+    parts.push('| Topic | KB Path | Why Relevant |');
+    parts.push('|-------|---------|--------------|');
 
-    for (const sel of selections) {
-      const entry = entries.get(sel.slug);
-      const title = entry?.title || sel.slug;
-      parts.push(`| ${title} | context/${sel.slug}.md | ${sel.reason} |`);
+    for (const file of kbFiles) {
+      const title = file.title || file.slug;
+      parts.push(`| ${title} | ${file.kbPath} | ${file.reason} |`);
     }
     parts.push('');
   }
@@ -196,7 +192,7 @@ function buildContextReadyMarkdown(
   // Local project files (referenced, not copied)
   if (referencedFiles && referencedFiles.length > 0) {
     parts.push('## Local Project Files\n');
-    parts.push('These KB entries originated from files in your project. Read them directly:\n');
+    parts.push('These files are in your project:\n');
     parts.push('| Topic | Location | Why Relevant |');
     parts.push('|-------|----------|--------------|');
 
@@ -216,15 +212,14 @@ function buildContextReadyMarkdown(
     stepNum++;
   }
 
-  parts.push(`${stepNum}. **Read context/README.md** — Full navigation`);
+  parts.push(`${stepNum}. **Read .context-guide.md** — Full navigation`);
   stepNum++;
 
-  // Include top selections from copied files
-  const topSelections = selections.slice(0, 2);
-  for (const sel of topSelections) {
-    const entry = entries.get(sel.slug);
-    const title = entry?.title || sel.slug;
-    parts.push(`${stepNum}. **Check ${sel.slug}.md** — ${title}`);
+  // Include top KB files
+  const topKBFiles = kbFiles.slice(0, 2);
+  for (const file of topKBFiles) {
+    const title = file.title || file.slug;
+    parts.push(`${stepNum}. **Review ${file.kbPath}** — ${title}`);
     stepNum++;
   }
 
@@ -233,15 +228,16 @@ function buildContextReadyMarkdown(
     const remaining = Math.min(4 - stepNum + 1, referencedFiles.length);
     for (let i = 0; i < remaining; i++) {
       const ref = referencedFiles[i];
-      parts.push(`${stepNum}. **Check ${ref.localPath}** — ${ref.slug}`);
+      parts.push(`${stepNum}. **Review ${ref.localPath}** — ${ref.slug}`);
       stepNum++;
     }
   }
 
   parts.push('\n<hints>');
-  parts.push('- Context folder is ready — read files directly');
+  parts.push('- .context-guide.md contains file references');
+  parts.push('- KB files are referenced by their knowledge base paths');
   if (referencedFiles && referencedFiles.length > 0) {
-    parts.push('- Some KB entries reference local project files — no need to copy');
+    parts.push('- Some entries reference local project files');
   }
   if (frameworkResult?.copiedFiles.length) {
     parts.push('- Framework boilerplate is in src/ — start from there');
@@ -289,7 +285,7 @@ The knowledge base has ${totalFiles} files, but none are relevant to: "${task}"
  * 2. Check if KB is empty → return "no knowledge" markdown
  * 3. Run retrieval agent with list + read + select_files tools
  * 4. Extract selections from agent result
- * 5. Write files to context/ directory
+ * 5. Write file to project directory
  * 6. Return markdown response
  */
 export async function prepareContextToolHandler(
@@ -342,34 +338,34 @@ export async function prepareContextToolHandler(
       return markdownResponse(buildNoRelevantFilesMarkdown(task, allEntries.length));
     }
 
-    // Write to context/ directory
-    const contextDir = path.join(process.cwd(), 'context');
+    // Write to project directory
+    const contextDir = process.cwd();
     await clearContextDir(contextDir);
 
-    // Build entry lookup and partition into copy vs reference
-    const entryMap = new Map<string, KnowledgeEntry>();
-    const entriesToCopy: FileSelection[] = [];
+    // Build KB file references and local project file references
+    const kbFiles: KBFileReference[] = [];
     const referencedFiles: ReferencedFile[] = [];
 
     for (const sel of selections) {
       const entry = await storage.get(sel.slug);
       if (entry) {
-        entryMap.set(sel.slug, entry);
-
-        // Check if this entry should be referenced locally instead of copied
-        const shouldReference = await shouldReferenceLocally(entry);
-        if (shouldReference) {
-          const localPath = getRelativeLocalPath(entry);
+        // Check if this entry has a local source file in the project
+        const hasLocal = await hasLocalSource(entry);
+        if (hasLocal) {
+          const localPath = getLocalSourcePath(entry);
           referencedFiles.push({
             slug: sel.slug,
             reason: sel.reason,
             localPath,
           });
         } else {
-          entriesToCopy.push(sel);
-          // Generate .mdc content and write stripped version to context/
-          const mdcContent = generateMdcFile(entry, entry.content);
-          await writeContextFile(contextDir, sel.slug, mdcContent);
+          // Reference by KB path
+          kbFiles.push({
+            slug: sel.slug,
+            reason: sel.reason,
+            kbPath: getKBPath(sel.slug),
+            title: entry.title,
+          });
         }
       }
     }
@@ -384,22 +380,20 @@ export async function prepareContextToolHandler(
 
         // Auto-surface the framework's KB doc
         const kbDocSlug = frameworkResult?.kbDocSlug ?? `framework-${framework}`;
-        const alreadySelected = selections.some((sel) => sel.slug === kbDocSlug);
+        const alreadyInKB = kbFiles.some((f) => f.slug === kbDocSlug);
         const alreadyReferenced = referencedFiles.some((ref) => ref.slug === kbDocSlug);
 
-        if (!alreadySelected && !alreadyReferenced) {
+        if (!alreadyInKB && !alreadyReferenced) {
           const kbEntry = await storage.get(kbDocSlug);
           if (kbEntry) {
             const displayName = frameworkResult?.displayName ?? framework;
-            // Add to entriesToCopy for README and response (framework docs should always be copied)
-            entriesToCopy.push({
+            // Add to kbFiles for README and response
+            kbFiles.push({
               slug: kbDocSlug,
               reason: `Framework best practices for ${displayName}`,
+              kbPath: getKBPath(kbDocSlug),
+              title: kbEntry.title,
             });
-            entryMap.set(kbDocSlug, kbEntry);
-            // Write to context/
-            const mdcContent = generateMdcFile(kbEntry, kbEntry.content);
-            await writeContextFile(contextDir, kbDocSlug, mdcContent);
           }
         }
       } catch (error) {
@@ -409,11 +403,11 @@ export async function prepareContextToolHandler(
       }
     }
 
-    // Write README.md with copied entries, referenced files, and framework result
+    // Write .context-guide.md with KB file references, local file references, and framework result
     await writeContextReadme(
       contextDir,
       task,
-      entriesToCopy,
+      kbFiles,
       referencedFiles.length > 0 ? referencedFiles : undefined,
       frameworkResult
     );
@@ -421,8 +415,7 @@ export async function prepareContextToolHandler(
     return markdownResponse(
       buildContextReadyMarkdown(
         task,
-        entriesToCopy,
-        entryMap,
+        kbFiles,
         referencedFiles.length > 0 ? referencedFiles : undefined,
         frameworkResult
       )

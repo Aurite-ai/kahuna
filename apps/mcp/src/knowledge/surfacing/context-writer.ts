@@ -1,28 +1,29 @@
 /**
- * Context Writer — manages the project's context/ folder
+ * Context Writer — manages the project's .context-guide.md
  *
- * Writes knowledge base files as clean markdown (frontmatter stripped)
- * to the project's context/ directory for direct copilot access.
+ * References knowledge base files by their KB paths in a .context-guide.md.
  *
  * See: docs/internal/designs/context-management-system.md
  */
 
 import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import type { KnowledgeEntry } from '../storage/types.js';
-import { stripFrontmatter } from '../storage/utils.js';
 import type { FrameworkCopyResult } from './framework-copier.js';
 
 /**
- * Selection entry from the retrieval agent.
+ * A KB file reference with its knowledge base path.
  */
-export interface ContextSelection {
+export interface KBFileReference {
   slug: string;
   reason: string;
+  kbPath: string;
+  title?: string;
 }
 
 /**
- * A KB entry that should be referenced locally (not copied to context/).
+ * A local project file reference (not in KB, not copied).
  */
 export interface ReferencedFile {
   slug: string;
@@ -31,8 +32,26 @@ export interface ReferencedFile {
 }
 
 /**
- * Clear all files from the context/ directory.
- * Creates the directory if it doesn't exist.
+ * Get the default KB directory path.
+ * Uses KAHUNA_KNOWLEDGE_DIR env var if set, otherwise defaults to ~/.kahuna/knowledge/
+ */
+function getKBDir(): string {
+  return process.env.KAHUNA_KNOWLEDGE_DIR || path.join(os.homedir(), '.kahuna', 'knowledge');
+}
+
+/**
+ * Get the full KB path for a given slug.
+ *
+ * @param slug - The knowledge entry slug
+ * @returns Full path to the .mdc file in the KB
+ */
+export function getKBPath(slug: string): string {
+  return path.join(getKBDir(), `${slug}.mdc`);
+}
+
+/**
+ * Ensure the context directory exists and is empty.
+ * Creates the directory if it doesn't exist, removes .context-guide.md if it does.
  *
  * @param contextDir - Path to the context directory
  */
@@ -40,42 +59,30 @@ export async function clearContextDir(contextDir: string): Promise<void> {
   // Ensure directory exists
   await fs.mkdir(contextDir, { recursive: true });
 
-  // Remove all files in the directory
-  const files = await fs.readdir(contextDir);
-  await Promise.all(files.map((file) => fs.unlink(path.join(contextDir, file))));
+  // Remove .context-guide.md if it exists (we only write .context-guide now, no other files)
+  try {
+    await fs.unlink(path.join(contextDir, '.context-guide.md'));
+  } catch (error) {
+    // Ignore if file doesn't exist
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
 }
 
 /**
- * Write a knowledge base file to context/ as clean markdown.
- * Strips YAML frontmatter from .mdc content.
- *
- * @param contextDir - Path to the context directory
- * @param slug - File slug (used as filename without extension)
- * @param mdcContent - Raw .mdc file content (with frontmatter)
- */
-export async function writeContextFile(
-  contextDir: string,
-  slug: string,
-  mdcContent: string
-): Promise<void> {
-  const cleanContent = stripFrontmatter(mdcContent);
-  const filepath = path.join(contextDir, `${slug}.md`);
-  await fs.writeFile(filepath, cleanContent, 'utf-8');
-}
-
-/**
- * Generate and write a README.md index file for the context/ directory.
+ * Generate and write a .context-guide.md file
  *
  * @param contextDir - Path to the context directory
  * @param task - The task description that triggered context surfacing
- * @param selections - Files selected by the retrieval agent with reasons
- * @param referencedFiles - Optional: Local project files to reference instead of copy
+ * @param kbFiles - KB files to reference with their paths
+ * @param referencedFiles - Optional: Local project files to reference
  * @param frameworkResult - Optional: Framework boilerplate copy result
  */
 export async function writeContextReadme(
   contextDir: string,
   task: string,
-  selections: ContextSelection[],
+  kbFiles: KBFileReference[],
   referencedFiles?: ReferencedFile[],
   frameworkResult?: FrameworkCopyResult
 ): Promise<void> {
@@ -93,20 +100,22 @@ export async function writeContextReadme(
     parts.push('');
     parts.push(`Framework: **${frameworkResult.displayName}**`);
     parts.push(
-      'Boilerplate files added to your project. See [README.md](../README.md) for structure and usage.'
+      'Boilerplate files added to your project. See [README.md](./README.md) for structure and usage.'
     );
     parts.push('');
   }
 
-  // Build file table for copied files
-  if (selections.length > 0) {
-    const tableRows = selections
-      .map((s) => `| [${s.slug}.md](./${s.slug}.md) | ${s.reason} |`)
-      .join('\n');
+  // Build file table for KB files (referenced by path, not copied)
+  if (kbFiles.length > 0) {
+    parts.push('## Knowledge Base Files');
+    parts.push('');
+    parts.push('| Topic | KB Path | Why Relevant |');
+    parts.push('|-------|---------|--------------|');
 
-    parts.push('| File | Why Relevant |');
-    parts.push('|------|--------------|');
-    parts.push(tableRows);
+    for (const file of kbFiles) {
+      const title = file.title || file.slug;
+      parts.push(`| ${title} | [${file.kbPath}](${file.kbPath}) | ${file.reason} |`);
+    }
     parts.push('');
   }
 
@@ -114,25 +123,29 @@ export async function writeContextReadme(
   if (referencedFiles && referencedFiles.length > 0) {
     parts.push('## Local Project Files');
     parts.push('');
-    parts.push('These KB entries originated from files in your project. Read them directly:');
+    parts.push('These files are in your project:');
     parts.push('');
-    parts.push('| Topic | Location |');
-    parts.push('|-------|----------|');
+    parts.push('| Topic | Location | Why Relevant |');
+    parts.push('|-------|----------|--------------|');
     for (const ref of referencedFiles) {
-      parts.push(`| ${ref.slug} | [${ref.localPath}](../${ref.localPath}) |`);
+      parts.push(`| ${ref.slug} | [${ref.localPath}](./${ref.localPath}) | ${ref.reason} |`);
     }
     parts.push('');
   }
 
   // Build "Start Here" section
-  // Combine selections and referenced files for start here
   const allItems = [
-    ...selections.map((s) => ({ slug: s.slug, reason: s.reason, isLocal: false })),
+    ...kbFiles.map((f) => ({
+      slug: f.slug,
+      reason: f.reason,
+      path: f.kbPath,
+      isKB: true,
+    })),
     ...(referencedFiles || []).map((r) => ({
       slug: r.slug,
       reason: r.reason,
-      isLocal: true,
-      localPath: r.localPath,
+      path: r.localPath,
+      isKB: false,
     })),
   ];
 
@@ -141,10 +154,7 @@ export async function writeContextReadme(
     parts.push('');
 
     const startHere = allItems.slice(0, 3).map((item, i) => {
-      if ('localPath' in item && item.localPath) {
-        return `${i + 1}. Review ${item.localPath} — ${item.reason}`;
-      }
-      return `${i + 1}. Review ${item.slug}.md — ${item.reason}`;
+      return `${i + 1}. Review ${item.path} — ${item.reason}`;
     });
     parts.push(startHere.join('\n'));
     parts.push('');
@@ -155,22 +165,20 @@ export async function writeContextReadme(
   parts.push('*Prepared by Kahuna | Use `kahuna_ask` for additional questions*');
   parts.push('');
 
-  await fs.writeFile(path.join(contextDir, 'README.md'), parts.join('\n'), 'utf-8');
+  await fs.writeFile(path.join(contextDir, '.context-guide.md'), parts.join('\n'), 'utf-8');
 }
 
 /**
- * Check if a KB entry should be referenced locally instead of copied.
+ * Check if a KB entry has a local source file in the project.
  * Returns true if the source file:
  * 1. Has a source path recorded
  * 2. Exists at that path relative to cwd
  * 3. Is INSIDE the current working directory (not ../external/file.md)
  *
- * Files outside the project should be copied to context/, not referenced.
- *
  * @param entry - The knowledge entry to check
- * @returns Promise<boolean> - True if entry should be referenced locally
+ * @returns Promise<boolean> - True if entry has a local source file
  */
-export async function shouldReferenceLocally(entry: KnowledgeEntry): Promise<boolean> {
+export async function hasLocalSource(entry: KnowledgeEntry): Promise<boolean> {
   // Check if entry has source path info
   if (!entry.source?.path) {
     return false;
@@ -197,13 +205,13 @@ export async function shouldReferenceLocally(entry: KnowledgeEntry): Promise<boo
 }
 
 /**
- * Get the relative path from context/ to the source file.
+ * Get the relative path to a local source file.
  * Prefers source.path (relative path) over source.file (filename only).
  *
  * @param entry - The knowledge entry with source info
- * @returns Relative path suitable for markdown links from context/README.md
+ * @returns Relative path suitable for markdown links from .context-guide.md
  */
-export function getRelativeLocalPath(entry: KnowledgeEntry): string {
+export function getLocalSourcePath(entry: KnowledgeEntry): string {
   if (!entry.source) {
     return '';
   }
@@ -219,23 +227,4 @@ export function getRelativeLocalPath(entry: KnowledgeEntry): string {
   // Get path relative to cwd
   const relativeToCwd = path.relative(process.cwd(), sourcePath);
   return relativeToCwd;
-}
-
-/**
- * List .md filenames in the context/ directory.
- * Returns empty array if the directory doesn't exist.
- *
- * @param contextDir - Path to the context directory
- * @returns Array of .md filenames (e.g., ["api-guidelines.md", "README.md"])
- */
-export async function listContextFiles(contextDir: string): Promise<string[]> {
-  try {
-    const files = await fs.readdir(contextDir);
-    return files.filter((f) => f.endsWith('.md'));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return [];
-    }
-    throw error;
-  }
 }

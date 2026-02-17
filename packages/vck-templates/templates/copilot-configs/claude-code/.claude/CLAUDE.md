@@ -50,11 +50,11 @@ You manage the agent development lifecycle:
 
 ### Phase 0: Prepare Context
 
-**Call kahuna_prepare_context to prepare the context folder**
+**Call kahuna_prepare_context to prepare the context guide**
 
 Kahuna Prepare Context Tool - Smart context retrieval
 
-This tool intelligently selects and prepares relevant context files
+This tool intelligently selects and references relevant context files
 before the copilot starts working on a task.
 
 The "prepare" terminology emphasizes:
@@ -175,7 +175,7 @@ Assume the entire agent development will be completed within this conversation u
 
 ### Context and Documentation
 
-All context and existing documentation should be stored as markdown files within `context/`. Reference these files when creating subtasks to provide necessary background information.
+All context and existing documentation will be referenced by file path in `.context-guide.md`. Reference these files when creating subtasks to provide necessary background information.
 
 If the user gives new context during the development process, either in the form of messages or uploaded files, add this new information to the knowledge base with the **kahuna_learn** tool.
 
