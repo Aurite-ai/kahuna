@@ -167,7 +167,7 @@ describe('context-writer', () => {
       expect(readme).toContain('These files are in your project');
       expect(readme).toContain('local-doc');
       expect(readme).toContain('docs/api-design.md');
-      expect(readme).toContain('../docs/api-design.md'); // Link format
+      expect(readme).toContain('./docs/api-design.md'); // Link format
     });
 
     it('includes Framework section when frameworkResult provided with copied files', async () => {
