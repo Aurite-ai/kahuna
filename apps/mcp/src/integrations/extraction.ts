@@ -10,6 +10,7 @@
  * - extraction.ts: Finds capabilities → knowledge base
  */
 
+import { type OnePasswordReference, parseOpReference } from '../vault/1password-provider.js';
 import type { SensitiveDataMatch } from '../vault/sensitive-detection.js';
 import type {
   AuthMethod,
@@ -383,6 +384,277 @@ const KNOWN_PATTERNS: KnownIntegrationPattern[] = [
     ],
   },
 ];
+
+// =============================================================================
+// 1PASSWORD REFERENCE EXTRACTION
+// =============================================================================
+
+/**
+ * Mapping from 1Password item name keywords to integration patterns
+ *
+ * When we see op://vault/postgres/... we infer it's a PostgreSQL integration
+ */
+const OP_ITEM_TO_INTEGRATION: Array<{
+  keywords: string[];
+  patternId: string;
+}> = [
+  // Databases
+  { keywords: ['postgres', 'postgresql', 'pg', 'pgsql'], patternId: 'postgresql' },
+  { keywords: ['mongo', 'mongodb'], patternId: 'mongodb' },
+  { keywords: ['mysql', 'mariadb'], patternId: 'mysql' },
+  { keywords: ['redis'], patternId: 'redis' },
+  { keywords: ['database', 'db'], patternId: 'postgresql' }, // Default to PostgreSQL for generic "database"
+
+  // Messaging
+  { keywords: ['slack'], patternId: 'slack' },
+  { keywords: ['gmail', 'google-mail', 'googlemail'], patternId: 'gmail' },
+  { keywords: ['sendgrid'], patternId: 'sendgrid' },
+  { keywords: ['twilio'], patternId: 'twilio' },
+
+  // CRM
+  { keywords: ['salesforce', 'sfdc'], patternId: 'salesforce' },
+  { keywords: ['hubspot'], patternId: 'hubspot' },
+
+  // AI
+  { keywords: ['openai', 'gpt'], patternId: 'openai' },
+  { keywords: ['anthropic', 'claude'], patternId: 'anthropic' },
+
+  // Payment
+  { keywords: ['stripe'], patternId: 'stripe' },
+
+  // Storage
+  { keywords: ['aws', 's3', 'amazon'], patternId: 'aws-s3' },
+
+  // Generic API
+  { keywords: ['api'], patternId: 'custom-api' },
+];
+
+/**
+ * Result of parsing a 1Password reference for integration inference
+ */
+export interface OnePasswordIntegrationRef {
+  /** The original op:// reference */
+  opReference: string;
+  /** Parsed reference components */
+  parsed: OnePasswordReference;
+  /** Inferred integration ID (e.g., 'postgresql', 'gmail') */
+  integrationId: string | null;
+  /** Which field this credential represents */
+  credentialField: string;
+  /** Confidence in the inference (based on keyword matching) */
+  confidence: 'high' | 'medium' | 'low';
+}
+
+/**
+ * Find all op:// references in content
+ */
+export function find1PasswordReferences(content: string): string[] {
+  const pattern = /op:\/\/[^\s"'<>]+/g;
+  const matches = content.match(pattern) || [];
+  return [...new Set(matches)]; // Dedupe
+}
+
+/**
+ * Infer integration ID from a 1Password item name
+ *
+ * @param itemName - The item name from the op:// reference (e.g., "postgres", "database", "gmail-creds")
+ * @returns The integration ID or null if no match
+ */
+export function inferIntegrationFromOpItem(itemName: string): {
+  id: string | null;
+  confidence: 'high' | 'medium' | 'low';
+} {
+  const lowerName = itemName.toLowerCase();
+
+  // Try exact or partial matches
+  for (const mapping of OP_ITEM_TO_INTEGRATION) {
+    for (const keyword of mapping.keywords) {
+      // Exact match = high confidence
+      if (lowerName === keyword) {
+        return { id: mapping.patternId, confidence: 'high' };
+      }
+      // Contains keyword = medium confidence
+      if (lowerName.includes(keyword)) {
+        return { id: mapping.patternId, confidence: 'medium' };
+      }
+    }
+  }
+
+  return { id: null, confidence: 'low' };
+}
+
+/**
+ * Parse and analyze a 1Password reference to infer what integration it's for
+ */
+export function analyze1PasswordReference(opRef: string): OnePasswordIntegrationRef | null {
+  const parsed = parseOpReference(opRef);
+  if (!parsed) return null;
+
+  // Try to infer from item name first, then vault name as fallback
+  let inference = inferIntegrationFromOpItem(parsed.item);
+  if (!inference.id) {
+    inference = inferIntegrationFromOpItem(parsed.vault);
+  }
+
+  // The field name becomes the credential key
+  const credentialField = parsed.field
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+
+  return {
+    opReference: opRef,
+    parsed,
+    integrationId: inference.id,
+    credentialField: credentialField || 'credential',
+    confidence: inference.confidence,
+  };
+}
+
+/**
+ * Extract integrations from 1Password references found in content
+ *
+ * This is the key function that bridges 1Password references to integration descriptors.
+ * It:
+ * 1. Finds all op:// references in content
+ * 2. Parses and infers integration types from item/vault names
+ * 3. Groups references by integration
+ * 4. Creates integration descriptors with vault references
+ */
+export function extractIntegrationsFrom1PasswordRefs(
+  content: string,
+  options: {
+    sourceFile: string;
+    project?: string;
+  }
+): {
+  integrations: IntegrationDescriptor[];
+  refs: OnePasswordIntegrationRef[];
+  unmatched: string[];
+} {
+  const opRefs = find1PasswordReferences(content);
+  const analyzedRefs: OnePasswordIntegrationRef[] = [];
+  const unmatched: string[] = [];
+
+  // Analyze each reference
+  for (const ref of opRefs) {
+    const analyzed = analyze1PasswordReference(ref);
+    if (analyzed) {
+      if (analyzed.integrationId) {
+        analyzedRefs.push(analyzed);
+      } else {
+        unmatched.push(ref);
+      }
+    }
+  }
+
+  // Group by integration ID
+  const byIntegration = new Map<string, OnePasswordIntegrationRef[]>();
+  for (const ref of analyzedRefs) {
+    const id = ref.integrationId;
+    if (id) {
+      const existing = byIntegration.get(id);
+      if (existing) {
+        existing.push(ref);
+      } else {
+        byIntegration.set(id, [ref]);
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
+  const integrations: IntegrationDescriptor[] = [];
+
+  // Create integration descriptors
+  for (const [integrationId, refs] of byIntegration) {
+    // Find the known pattern for this integration
+    const knownPattern = KNOWN_PATTERNS.find((p) => p.id === integrationId);
+
+    // Build vault references from the op:// refs
+    const vaultRefs: Record<string, string> = {};
+    for (const ref of refs) {
+      vaultRefs[ref.credentialField] = ref.opReference;
+    }
+
+    // Determine the best confidence from all refs
+    const bestConfidence = refs.some((r) => r.confidence === 'high')
+      ? 0.9
+      : refs.some((r) => r.confidence === 'medium')
+        ? 0.7
+        : 0.5;
+
+    if (knownPattern) {
+      // Use known pattern as base
+      const descriptor: IntegrationDescriptor = {
+        id: knownPattern.id,
+        displayName: knownPattern.displayName,
+        type: knownPattern.type,
+        description: `${knownPattern.displayName} integration (credentials in 1Password)`,
+        operations: knownPattern.defaultOperations,
+        authentication: {
+          method: knownPattern.authMethod,
+          requiredCredentials: Object.keys(vaultRefs),
+          vaultRefs,
+        },
+        examples: [],
+        notes: [
+          'Auto-detected from 1Password references',
+          `Credentials: ${refs.map((r) => r.opReference).join(', ')}`,
+        ],
+        source: {
+          learnedFrom: options.sourceFile,
+          learnedAt: now,
+          project: options.project,
+          confidence: bestConfidence,
+          extractionMethod: '1password',
+        },
+        status: 'discovered',
+        createdAt: now,
+        updatedAt: now,
+      };
+      integrations.push(descriptor);
+    } else {
+      // Create a custom integration
+      const descriptor: IntegrationDescriptor = {
+        id: integrationId,
+        displayName: integrationId
+          .split('-')
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' '),
+        type: 'custom',
+        description: 'Custom integration (credentials in 1Password)',
+        operations: [],
+        authentication: {
+          method: 'api_key',
+          requiredCredentials: Object.keys(vaultRefs),
+          vaultRefs,
+        },
+        examples: [],
+        notes: [
+          'Auto-detected from 1Password references',
+          `Credentials: ${refs.map((r) => r.opReference).join(', ')}`,
+        ],
+        source: {
+          learnedFrom: options.sourceFile,
+          learnedAt: now,
+          project: options.project,
+          confidence: bestConfidence,
+          extractionMethod: '1password',
+        },
+        status: 'discovered',
+        createdAt: now,
+        updatedAt: now,
+      };
+      integrations.push(descriptor);
+    }
+  }
+
+  return { integrations, refs: analyzedRefs, unmatched };
+}
+
+// =============================================================================
+// PATTERN-BASED EXTRACTION
+// =============================================================================
 
 /**
  * Extract integrations from content using pattern matching

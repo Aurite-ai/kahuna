@@ -47,14 +47,25 @@ export type {
   SensitiveDataType,
   SensitiveDataMatch,
   RedactionResult,
+  DetectionOptions,
+  LLMVerificationOptions,
+  LLMVerificationResult,
 } from './sensitive-detection.js';
 
 export {
   detectSensitiveData,
+  detectSensitiveDataWithLLM,
   redactSensitiveData,
   hasSensitiveData,
   filterByConfidence,
   detect1PasswordReferences,
   has1PasswordReferences,
   extractVaultReferences,
+  // Entropy filtering helpers
+  calculateEntropy,
+  isPlaceholder,
+  isLikelyRealSecret,
+  // LLM verification helpers
+  verifySecretWithLLM,
+  verifySecretsWithLLM,
 } from './sensitive-detection.js';

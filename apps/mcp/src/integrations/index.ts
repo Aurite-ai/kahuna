@@ -34,12 +34,19 @@ export type {
 
 // Extraction
 export {
+  analyze1PasswordReference,
   createCustomIntegration,
+  extractIntegrationsFrom1PasswordRefs,
   extractIntegrationsFromPatterns,
+  find1PasswordReferences,
   generateIntegrationId,
+  inferIntegrationFromOpItem,
   INTEGRATION_EXTRACTION_PROMPT,
   mergeSecretsWithIntegrations,
 } from './extraction.js';
+
+// Re-export the 1Password integration ref type
+export type { OnePasswordIntegrationRef } from './extraction.js';
 
 // Storage
 export {

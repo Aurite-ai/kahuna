@@ -132,7 +132,7 @@ export interface IntegrationSource {
   confidence: number;
 
   /** How it was extracted */
-  extractionMethod: 'pattern' | 'llm' | 'manual';
+  extractionMethod: 'pattern' | 'llm' | 'manual' | '1password';
 }
 
 /**

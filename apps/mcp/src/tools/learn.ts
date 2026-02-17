@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { MODELS } from '../config.js';
 import {
   type IntegrationDescriptor,
+  extractIntegrationsFrom1PasswordRefs,
   extractIntegrationsFromPatterns,
   mergeIntegration,
   mergeSecretsWithIntegrations,
@@ -28,7 +29,7 @@ import {
   categorizationTools,
   runAgent,
 } from '../knowledge/index.js';
-import { redactSensitiveData } from '../vault/index.js';
+import { envVaultProvider, redactSensitiveData } from '../vault/index.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -324,14 +325,16 @@ function buildLearnSuccessMarkdownWithAggregates(
   if (aggregates.totalSecretsRedacted > 0) {
     parts.push('\n## 🔐 Sensitive Data Handled\n');
     parts.push(
-      `**${aggregates.totalSecretsRedacted} credential(s)** were detected and redacted from stored content:\n`
+      `**${aggregates.totalSecretsRedacted} credential(s)** were detected, stored in vault, and redacted from knowledge base:\n`
     );
     for (const [secretType, count] of aggregates.secretsByType) {
       const typeName = secretType.replace(/_/g, ' ');
-      parts.push(`- ${typeName}: ${count} redacted → \`vault://env/...\``);
+      parts.push(
+        `- ${typeName}: ${count} → stored in \`~/.kahuna/.env\` and referenced via \`vault://env/...\``
+      );
     }
     parts.push(
-      '\n⚠️ **Important:** Configure your vault with the actual credential values before using these integrations.'
+      '\n✅ **Secrets are now stored in your vault** at `~/.kahuna/.env` and can be retrieved by integrations.'
     );
   }
 
@@ -449,12 +452,26 @@ export async function learnToolHandler(
       const contentToStore = redactionResult.redactedContent;
       const secretsDetected = redactionResult.matches;
 
-      // Track secrets for aggregates
+      // Track secrets for aggregates and store them in the vault
       if (secretsDetected.length > 0) {
         aggregates.totalSecretsRedacted += secretsDetected.length;
         for (const secret of secretsDetected) {
           const count = aggregates.secretsByType.get(secret.type) ?? 0;
           aggregates.secretsByType.set(secret.type, count + 1);
+
+          // Store the detected secret in the vault
+          // Skip 1Password references - they're already secure references
+          if (secret.type !== '1password_reference') {
+            try {
+              await envVaultProvider.setSecret(secret.suggestedVaultPath, secret.value);
+            } catch (vaultError) {
+              // Log but don't fail the learning process if vault storage fails
+              console.warn(
+                `Warning: Failed to store secret ${secret.suggestedVaultPath} in vault:`,
+                vaultError instanceof Error ? vaultError.message : 'Unknown error'
+              );
+            }
+          }
         }
       }
 
@@ -464,7 +481,7 @@ export async function learnToolHandler(
         detectedSecrets: secretsDetected,
       });
 
-      // Save detected integrations
+      // Save detected integrations from pattern matching
       const fileIntegrations: string[] = [];
       for (const integration of integrationResult.integrations) {
         // Merge secrets info with integration
@@ -476,6 +493,33 @@ export async function learnToolHandler(
         if (!aggregates.integrations.find((i) => i.id === saved.id)) {
           aggregates.integrations.push(saved);
         }
+      }
+
+      // Step 2.7: Extract integrations from 1Password references (op:// URLs)
+      // This enables "zero copy-paste" enterprise workflow where users mention
+      // credentials stored in 1Password and Kahuna automatically understands
+      // what integrations are needed
+      const opIntegrationResult = extractIntegrationsFrom1PasswordRefs(content, {
+        sourceFile: filePath,
+      });
+
+      // Save integrations detected from 1Password references
+      for (const integration of opIntegrationResult.integrations) {
+        // Check if we already found this integration via pattern matching
+        if (!aggregates.integrations.find((i) => i.id === integration.id)) {
+          // Save/merge integration
+          const saved = await mergeIntegration(integration);
+          fileIntegrations.push(saved.displayName);
+          aggregates.integrations.push(saved);
+        }
+      }
+
+      // Log unmatched 1Password references for debugging
+      if (opIntegrationResult.unmatched.length > 0) {
+        console.warn(
+          `Note: Found ${opIntegrationResult.unmatched.length} 1Password reference(s) that couldn't be mapped to known integrations:`,
+          opIntegrationResult.unmatched
+        );
       }
 
       // Step 3: Run categorization agent (on redacted content)
