@@ -1,5 +1,8 @@
 /**
  * Tests for the framework boilerplate copier
+ *
+ * Tests the embedded template approach where templates are strings,
+ * not filesystem reads.
  */
 
 import * as fs from 'node:fs/promises';
@@ -9,16 +12,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock fs/promises before importing the module
 vi.mock('node:fs/promises');
 
-// Mock node:module to control require.resolve behavior
-vi.mock('node:module', () => ({
-  createRequire: () => ({
-    resolve: (specifier: string) => {
-      if (specifier === '@kahuna/vck-templates/package.json') {
-        return '/mocked/vck-templates/package.json';
-      }
-      throw new Error(`Cannot resolve ${specifier}`);
-    },
-  }),
+// Mock @kahuna/vck-templates
+vi.mock('@kahuna/vck-templates', () => ({
+  getProjectFiles: () => [
+    { path: '.env', content: '# Anthropic API Key\nANTHROPIC_API_KEY=' },
+    { path: '.gitignore', content: '# Python\n__pycache__/' },
+  ],
+  getFrameworkFiles: (frameworkId: string) => {
+    if (frameworkId === 'langgraph') {
+      return [
+        { path: 'main.py', content: '# Main entry point' },
+        { path: 'pyproject.toml', content: '[project]\nname = "kahuna-agent"' },
+        { path: 'README.md', content: '# LangGraph Agent' },
+        { path: 'src/agent/__init__.py', content: '# Agent init' },
+        { path: 'src/agent/graph.py', content: '# Graph definition' },
+        { path: 'src/agent/state.py', content: '# State schema' },
+        { path: 'src/agent/tools.py', content: '# Tool implementations' },
+      ];
+    }
+    throw new Error(`Unknown framework: ${frameworkId}`);
+  },
 }));
 
 // Mock the config
@@ -40,12 +53,9 @@ import {
   resolveFrameworkTemplateDir,
 } from '../framework-copier.js';
 
-// Constants for test paths
-const MOCK_VCK_DIR = '/mocked/vck-templates';
-const MOCK_TEMPLATES_DIR = `${MOCK_VCK_DIR}/templates`;
-const MOCK_FRAMEWORK_DIR = `${MOCK_TEMPLATES_DIR}/frameworks/langgraph`;
-
 describe('framework-copier', () => {
+  const mockProjectDir = '/test/project';
+
   beforeEach(() => {
     vi.resetAllMocks();
   });
@@ -55,10 +65,10 @@ describe('framework-copier', () => {
   });
 
   describe('resolveFrameworkTemplateDir', () => {
-    it('returns path for valid framework', () => {
+    it('returns embedded marker for valid framework', () => {
       const result = resolveFrameworkTemplateDir('langgraph');
-      expect(result).toContain('templates');
-      expect(result).toContain('frameworks');
+      // Now returns an embedded marker since templates are no longer read from filesystem
+      expect(result).toContain('embedded');
       expect(result).toContain('langgraph');
     });
 
@@ -69,189 +79,111 @@ describe('framework-copier', () => {
   });
 
   describe('copyFrameworkBoilerplate', () => {
-    const mockProjectDir = '/test/project';
-
-    it('copies all files from template directory', async () => {
-      // Mock fs.access to succeed for template dir and shared files, fail for dest files
-      vi.mocked(fs.access).mockImplementation(async (pathArg) => {
-        const pathStr = String(pathArg);
-        if (pathStr === MOCK_FRAMEWORK_DIR) {
-          return; // Template dir exists
-        }
-        // Shared project files exist
-        if (pathStr === `${MOCK_TEMPLATES_DIR}/project-env`) {
-          return;
-        }
-        if (pathStr === `${MOCK_TEMPLATES_DIR}/project-gitignore`) {
-          return;
-        }
-        if (pathStr.startsWith('/test/project/')) {
-          // Destination files don't exist
-          throw new Error('ENOENT');
-        }
-        return;
-      });
-
-      // Mock fs.readdir to return template structure
-      vi.mocked(fs.readdir).mockImplementation(async (dir) => {
-        const dirStr = String(dir);
-        if (dirStr === MOCK_FRAMEWORK_DIR) {
-          return [
-            { name: 'src', isDirectory: () => true, isFile: () => false },
-            { name: 'main.py', isDirectory: () => false, isFile: () => true },
-          ] as unknown as Awaited<ReturnType<typeof fs.readdir>>;
-        }
-        if (dirStr === path.join(MOCK_FRAMEWORK_DIR, 'src')) {
-          return [
-            { name: 'agent', isDirectory: () => true, isFile: () => false },
-          ] as unknown as Awaited<ReturnType<typeof fs.readdir>>;
-        }
-        if (dirStr === path.join(MOCK_FRAMEWORK_DIR, 'src', 'agent')) {
-          return [
-            { name: 'graph.py', isDirectory: () => false, isFile: () => true },
-          ] as unknown as Awaited<ReturnType<typeof fs.readdir>>;
-        }
-        return [];
-      });
-
-      // Mock mkdir and copyFile
+    it('writes all embedded template files to project directory', async () => {
+      // Mock fs.access to fail for all destination files (they don't exist)
+      vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-      vi.mocked(fs.copyFile).mockResolvedValue(undefined);
+      vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
       const result = await copyFrameworkBoilerplate('langgraph', mockProjectDir);
 
       expect(result.framework).toBe('langgraph');
       expect(result.displayName).toBe('LangGraph');
-      // Framework files
-      expect(result.copiedFiles).toContain('main.py');
-      expect(result.copiedFiles).toContain(path.join('src', 'agent', 'graph.py'));
-      // Shared project files (renamed)
+      expect(result.kbDocSlug).toBe('langgraph-best-practices');
+      expect(result.success).toBe(true);
+
+      // Should include both project files and framework files
       expect(result.copiedFiles).toContain('.env');
       expect(result.copiedFiles).toContain('.gitignore');
+      expect(result.copiedFiles).toContain('main.py');
+      expect(result.copiedFiles).toContain('pyproject.toml');
+      expect(result.copiedFiles).toContain('README.md');
+      expect(result.copiedFiles).toContain('src/agent/__init__.py');
+      expect(result.copiedFiles).toContain('src/agent/graph.py');
+      expect(result.copiedFiles).toContain('src/agent/state.py');
+      expect(result.copiedFiles).toContain('src/agent/tools.py');
+
       expect(result.skippedFiles).toHaveLength(0);
+    });
+
+    it('writes files with correct content using fs.writeFile', async () => {
+      vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+      vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+
+      await copyFrameworkBoilerplate('langgraph', mockProjectDir);
+
+      // Verify writeFile was called with correct paths and content
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        path.join(mockProjectDir, '.env'),
+        '# Anthropic API Key\nANTHROPIC_API_KEY=',
+        'utf-8'
+      );
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        path.join(mockProjectDir, '.gitignore'),
+        '# Python\n__pycache__/',
+        'utf-8'
+      );
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        path.join(mockProjectDir, 'main.py'),
+        '# Main entry point',
+        'utf-8'
+      );
+    });
+
+    it('creates parent directories for nested files', async () => {
+      vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+      vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+
+      await copyFrameworkBoilerplate('langgraph', mockProjectDir);
+
+      // Should create src/agent directory for nested files
+      expect(fs.mkdir).toHaveBeenCalledWith(
+        path.join(mockProjectDir, 'src/agent'),
+        { recursive: true }
+      );
+    });
+
+    it('skips files that already exist in project', async () => {
+      // Mock: .env and main.py already exist, others don't
+      vi.mocked(fs.access).mockImplementation(async (pathArg) => {
+        const pathStr = String(pathArg);
+        if (pathStr === path.join(mockProjectDir, '.env')) return;
+        if (pathStr === path.join(mockProjectDir, 'main.py')) return;
+        throw new Error('ENOENT');
+      });
+
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+      vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+
+      const result = await copyFrameworkBoilerplate('langgraph', mockProjectDir);
+
+      // These should be skipped
+      expect(result.skippedFiles).toContain('.env');
+      expect(result.skippedFiles).toContain('main.py');
+
+      // These should be copied
+      expect(result.copiedFiles).toContain('.gitignore');
+      expect(result.copiedFiles).toContain('pyproject.toml');
+      expect(result.copiedFiles).toContain('README.md');
+
       expect(result.success).toBe(true);
     });
 
-    it('copies shared project files with renaming (project-env → .env, project-gitignore → .gitignore)', async () => {
-      // Mock fs.access
-      vi.mocked(fs.access).mockImplementation(async (pathArg) => {
-        const pathStr = String(pathArg);
-        if (pathStr === MOCK_FRAMEWORK_DIR) {
-          return; // Template dir exists
-        }
-        // Shared project files exist
-        if (pathStr === `${MOCK_TEMPLATES_DIR}/project-env`) {
-          return;
-        }
-        if (pathStr === `${MOCK_TEMPLATES_DIR}/project-gitignore`) {
-          return;
-        }
-        if (pathStr.startsWith('/test/project/')) {
-          // Destination files don't exist
-          throw new Error('ENOENT');
-        }
-        return;
-      });
-
-      // Mock fs.readdir - empty framework directory
-      vi.mocked(fs.readdir).mockResolvedValue([]);
-
+    it('returns success even when all files skipped', async () => {
+      // All files already exist
+      vi.mocked(fs.access).mockResolvedValue(undefined);
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-      vi.mocked(fs.copyFile).mockResolvedValue(undefined);
+      vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
       const result = await copyFrameworkBoilerplate('langgraph', mockProjectDir);
 
-      // Verify copyFile was called with correct source and destination
-      expect(fs.copyFile).toHaveBeenCalledWith(
-        `${MOCK_TEMPLATES_DIR}/project-env`,
-        `${mockProjectDir}/.env`
-      );
-      expect(fs.copyFile).toHaveBeenCalledWith(
-        `${MOCK_TEMPLATES_DIR}/project-gitignore`,
-        `${mockProjectDir}/.gitignore`
-      );
-
-      expect(result.copiedFiles).toContain('.env');
-      expect(result.copiedFiles).toContain('.gitignore');
-    });
-
-    it('skips shared project files if they already exist', async () => {
-      vi.mocked(fs.access).mockImplementation(async (pathArg) => {
-        const pathStr = String(pathArg);
-        if (pathStr === MOCK_FRAMEWORK_DIR) {
-          return; // Template dir exists
-        }
-        // Shared project files exist in template
-        if (pathStr === `${MOCK_TEMPLATES_DIR}/project-env`) {
-          return;
-        }
-        if (pathStr === `${MOCK_TEMPLATES_DIR}/project-gitignore`) {
-          return;
-        }
-        // .env already exists in project, .gitignore doesn't
-        if (pathStr === `${mockProjectDir}/.env`) {
-          return;
-        }
-        if (pathStr.startsWith('/test/project/')) {
-          throw new Error('ENOENT');
-        }
-        return;
-      });
-
-      vi.mocked(fs.readdir).mockResolvedValue([]);
-      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-      vi.mocked(fs.copyFile).mockResolvedValue(undefined);
-
-      const result = await copyFrameworkBoilerplate('langgraph', mockProjectDir);
-
+      // All files should be skipped
+      expect(result.copiedFiles).toHaveLength(0);
+      expect(result.skippedFiles.length).toBeGreaterThan(0);
       expect(result.skippedFiles).toContain('.env');
-      expect(result.copiedFiles).toContain('.gitignore');
-    });
-
-    it('skips existing framework files', async () => {
-      // Mock fs.access to succeed for both template and some dest files
-      vi.mocked(fs.access).mockImplementation(async (pathArg) => {
-        const pathStr = String(pathArg);
-        if (pathStr === MOCK_FRAMEWORK_DIR) {
-          return; // Template dir exists
-        }
-        // Shared project files don't exist in template (for this test)
-        if (pathStr === `${MOCK_TEMPLATES_DIR}/project-env`) {
-          throw new Error('ENOENT');
-        }
-        if (pathStr === `${MOCK_TEMPLATES_DIR}/project-gitignore`) {
-          throw new Error('ENOENT');
-        }
-        // main.py already exists in project
-        if (pathStr === path.join(mockProjectDir, 'main.py')) {
-          return; // File exists
-        }
-        if (pathStr.startsWith('/test/project/')) {
-          // Other files don't exist
-          throw new Error('ENOENT');
-        }
-        return;
-      });
-
-      // Mock fs.readdir
-      vi.mocked(fs.readdir).mockImplementation(async (dir) => {
-        const dirStr = String(dir);
-        if (dirStr === MOCK_FRAMEWORK_DIR) {
-          return [
-            { name: 'main.py', isDirectory: () => false, isFile: () => true },
-            { name: 'README.md', isDirectory: () => false, isFile: () => true },
-          ] as unknown as Awaited<ReturnType<typeof fs.readdir>>;
-        }
-        return [];
-      });
-
-      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-      vi.mocked(fs.copyFile).mockResolvedValue(undefined);
-
-      const result = await copyFrameworkBoilerplate('langgraph', mockProjectDir);
-
       expect(result.skippedFiles).toContain('main.py');
-      expect(result.copiedFiles).toContain('README.md');
       expect(result.success).toBe(true);
     });
 
@@ -259,38 +191,38 @@ describe('framework-copier', () => {
       await expect(copyFrameworkBoilerplate('nonexistent', mockProjectDir)).rejects.toThrow(
         FrameworkError
       );
+      await expect(copyFrameworkBoilerplate('nonexistent', mockProjectDir)).rejects.toThrow(
+        /Unknown framework/
+      );
     });
 
-    it('throws FrameworkError when template directory not found', async () => {
+    it('throws FrameworkError when write fails', async () => {
       vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+      vi.mocked(fs.writeFile).mockRejectedValue(new Error('EACCES: permission denied'));
 
       await expect(copyFrameworkBoilerplate('langgraph', mockProjectDir)).rejects.toThrow(
         FrameworkError
       );
       await expect(copyFrameworkBoilerplate('langgraph', mockProjectDir)).rejects.toThrow(
-        /template directory not found/
+        /Failed to write/
       );
     });
 
-    it('returns success even when all files skipped', async () => {
-      // Template dir exists, all dest files also exist
-      vi.mocked(fs.access).mockResolvedValue(undefined);
+    it('uses current working directory as default project dir', async () => {
+      vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+      vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
-      vi.mocked(fs.readdir).mockImplementation(async (dir) => {
-        const dirStr = String(dir);
-        if (dirStr === MOCK_FRAMEWORK_DIR) {
-          return [
-            { name: 'existing.py', isDirectory: () => false, isFile: () => true },
-          ] as unknown as Awaited<ReturnType<typeof fs.readdir>>;
-        }
-        return [];
-      });
+      const result = await copyFrameworkBoilerplate('langgraph');
 
-      const result = await copyFrameworkBoilerplate('langgraph', mockProjectDir);
-
-      // All files skipped (including shared project files which exist due to mockResolvedValue)
-      expect(result.skippedFiles).toContain('existing.py');
       expect(result.success).toBe(true);
+      // Files should be written relative to cwd
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        path.join(process.cwd(), '.env'),
+        expect.any(String),
+        'utf-8'
+      );
     });
   });
 });
