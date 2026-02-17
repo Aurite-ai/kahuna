@@ -185,7 +185,7 @@ describe('learnToolHandler', () => {
         expect.objectContaining({
           model: expect.any(String),
           systemPrompt: expect.any(String),
-          maxIterations: 5,
+          maxIterations: 10,
         }),
         expect.stringContaining('API Guidelines'),
         ctx.storage,
