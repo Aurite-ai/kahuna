@@ -212,7 +212,7 @@ function buildContextReadyMarkdown(
     stepNum++;
   }
 
-  parts.push(`${stepNum}. **Read README.md** — Full navigation`);
+  parts.push(`${stepNum}. **Read context-guide.md** — Full navigation`);
   stepNum++;
 
   // Include top KB files

@@ -128,7 +128,7 @@ export async function writeContextReadme(
     parts.push('| Topic | Location | Why Relevant |');
     parts.push('|-------|----------|--------------|');
     for (const ref of referencedFiles) {
-      parts.push(`| ${ref.slug} | [${ref.localPath}](../${ref.localPath}) | ${ref.reason} |`);
+      parts.push(`| ${ref.slug} | [${ref.localPath}](./${ref.localPath}) | ${ref.reason} |`);
     }
     parts.push('');
   }
