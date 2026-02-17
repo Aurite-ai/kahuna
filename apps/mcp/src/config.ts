@@ -218,9 +218,9 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
  */
 export const MODELS = {
   /** Model used for file categorization (fast, cheap) */
-  categorization: 'claude-3-haiku-20240307',
+  categorization: 'claude-sonnet-4-20250514',
   /** Model used for KB retrieval agent (prepare_context tool) */
-  retrieval: 'claude-3-haiku-20240307',
+  retrieval: 'claude-sonnet-4-20250514',
   /** Model used for the ask tool's agentic Q&A loop */
   ask: 'claude-sonnet-4-20250514',
 } as const satisfies Record<string, keyof typeof MODEL_REGISTRY>;

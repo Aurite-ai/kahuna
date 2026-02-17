@@ -23,11 +23,13 @@ import {
   type AgentResult,
   type AgentUsageStats,
   CATEGORIZATION_PROMPT,
+  CONTRADICTION_CHECK_PROMPT,
   FILE_SIZE_LIMIT,
   KnowledgeStorageError,
   type SaveKnowledgeEntryInput,
   buildCategorizationUserMessage,
   categorizationTools,
+  contradictionCheckTools,
   runAgent,
 } from '../knowledge/index.js';
 import { formatCost, formatTokens } from '../usage/index.js';
@@ -248,6 +250,32 @@ function extractContradictionsResult(agentResult: AgentResult): {
   return {
     contradictions: r.contradictions as Array<{ slug: string; explanation: string }>,
   };
+}
+
+/**
+ * Build the user message for the contradiction checking agent.
+ *
+ * @param filename - Name of the file being checked
+ * @param catResult - Categorization result from the first agent
+ */
+function buildContradictionCheckUserMessage(
+  filename: string,
+  catResult: {
+    category: string;
+    title: string;
+    summary: string;
+    topics: string[];
+  }
+): string {
+  return `**New file to check for contradictions:**
+
+Filename: ${filename}
+Category: ${catResult.category}
+Title: ${catResult.title}
+Summary: ${catResult.summary}
+Topics: ${catResult.topics.join(', ')}
+
+Check if this file contradicts any existing files in the knowledge base. Use 'report_contradictions' to report any conflicts found (or an empty array if none).`;
 }
 
 // =============================================================================
@@ -575,7 +603,7 @@ export async function learnToolHandler(
           model: MODELS.categorization,
           systemPrompt: CATEGORIZATION_PROMPT,
           tools: categorizationTools,
-          maxIterations: 3,
+          maxIterations: 1,
         },
         userMessage,
         storage,
@@ -598,13 +626,27 @@ export async function learnToolHandler(
           filename,
           filepath: filePath,
           success: false,
-          error: 'Agent did not produce categorization result',
+          error: 'Categorization agent did not produce result',
         });
         continue;
       }
 
-      // Step 4.5: Check for contradictions
-      const contradictionsResult = extractContradictionsResult(agentResult);
+      // Step 5: Run contradiction checking agent
+      const contradictionCheckUserMessage = buildContradictionCheckUserMessage(filename, catResult);
+      const contradictionCheckResult = await runAgent(
+        {
+          model: MODELS.categorization,
+          systemPrompt: CONTRADICTION_CHECK_PROMPT,
+          tools: contradictionCheckTools,
+          maxIterations: 10,
+        },
+        contradictionCheckUserMessage,
+        storage,
+        anthropic
+      );
+
+      // Step 6: Extract contradiction results
+      const contradictionsResult = extractContradictionsResult(contradictionCheckResult);
       if (contradictionsResult && contradictionsResult.contradictions.length > 0) {
         for (const contradiction of contradictionsResult.contradictions) {
           allContradictions.push({
@@ -615,7 +657,7 @@ export async function learnToolHandler(
         }
       }
 
-      // Step 5: Build save input and store (with redacted content)
+      // Step 7: Build save input and store
       const saveInput: SaveKnowledgeEntryInput = {
         title: catResult.title,
         summary: catResult.summary,

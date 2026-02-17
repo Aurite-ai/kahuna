@@ -200,11 +200,13 @@ export const retrievalTools: Tool[] = [
 /** Tools for the Q&A agent (ask): list + read */
 export const qaTools: Tool[] = [listKnowledgeFilesTool, readKnowledgeFileTool];
 
-/** Tools for the categorization agent (learn): list + read + categorize_file + report_contradictions */
-export const categorizationTools: Tool[] = [
+/** Tools for the categorization agent (learn): categorize_file only */
+export const categorizationTools: Tool[] = [categorizeFileTool];
+
+/** Tools for the contradiction checking agent (learn): list + read + report_contradictions */
+export const contradictionCheckTools: Tool[] = [
   listKnowledgeFilesTool,
   readKnowledgeFileTool,
-  categorizeFileTool,
   reportContradictionsTool,
 ];
 
