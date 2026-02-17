@@ -2,6 +2,104 @@
 
 MCP server providing context management tools for coding copilots. Runs locally via stdio transport — copilots call Kahuna tools to learn from files, surface relevant context, and get answers from the knowledge base.
 
+## Installation
+
+### Option 1: npm (Recommended)
+
+```bash
+npm install -g @kahuna/mcp
+```
+
+Then configure your MCP client to use `kahuna-mcp` as the command.
+
+### Option 2: npx (No Install)
+
+Use directly without installing:
+
+```bash
+npx @kahuna/mcp
+```
+
+### Option 3: Docker
+
+```bash
+docker pull kahuna/mcp
+docker run -i kahuna/mcp
+```
+
+### Option 4: From Source
+
+```bash
+git clone https://github.com/kahuna-ai/kahuna.git
+cd kahuna
+pnpm install
+pnpm --filter @kahuna/mcp build
+pnpm --filter @kahuna/mcp bundle
+```
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file or set these environment variables:
+
+```bash
+# Required for LLM-powered tools (learn, ask, prepare-context)
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Optional: Custom knowledge base location (default: ~/.kahuna/knowledge/)
+KAHUNA_KNOWLEDGE_DIR=/path/to/custom/knowledge
+```
+
+### Connecting to MCP Clients
+
+**Claude Code / Roo Code:**
+
+```json
+{
+  "mcpServers": {
+    "kahuna": {
+      "command": "kahuna-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
+    }
+  }
+}
+```
+
+**Using npx:**
+
+```json
+{
+  "mcpServers": {
+    "kahuna": {
+      "command": "npx",
+      "args": ["@kahuna/mcp"],
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
+    }
+  }
+}
+```
+
+**Using Docker:**
+
+```json
+{
+  "mcpServers": {
+    "kahuna": {
+      "command": "docker",
+      "args": ["run", "-i", "-e", "ANTHROPIC_API_KEY", "kahuna/mcp"],
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
+    }
+  }
+}
+```
+
 ## Overview
 
 ```
@@ -21,50 +119,6 @@ MCP server providing context management tools for coding copilots. Runs locally 
                                             │  knowledge/         │
                                             │  (flat .mdc files)  │
                                             └────────────────────┘
-```
-
-## Quick Start
-
-### 1. Install Dependencies
-
-From the monorepo root:
-
-```bash
-pnpm install
-```
-
-### 2. Set Up Environment
-
-```bash
-cp .env.example .env
-# Add your ANTHROPIC_API_KEY to .env
-```
-
-### 3. Build
-
-```bash
-pnpm --filter @kahuna/mcp build
-```
-
-### 4. Connect a Copilot
-
-**Using Claude MCP CLI:**
-
-```bash
-claude mcp add kahuna --transport stdio -- node /path/to/kahuna/apps/mcp/dist/index.js
-```
-
-**Manual configuration** (`.mcp.json` in your project):
-
-```json
-{
-  "mcpServers": {
-    "kahuna": {
-      "command": "node",
-      "args": ["/path/to/kahuna/apps/mcp/dist/index.js"]
-    }
-  }
-}
 ```
 
 ## Available Tools
@@ -149,12 +203,13 @@ pnpm --filter @kahuna/mcp test:watch
 
 # Type-check
 pnpm --filter @kahuna/mcp typecheck
+
+# Create production bundle
+pnpm --filter @kahuna/mcp bundle
 ```
 
 The MCP server uses **stdio** transport — it reads/writes JSON-RPC over stdin/stdout. Use `dev` for local development; connect via an MCP client.
 
-## Related Documentation
+## License
 
-- [Architecture: Context Management System](../../docs/architecture/02-context-management-system.md)
-- [Design: Tool Specifications](../../docs/design/tool-specifications.md)
-- [Design: Knowledge Architecture](../../docs/design/knowledge-architecture.md)
+MIT

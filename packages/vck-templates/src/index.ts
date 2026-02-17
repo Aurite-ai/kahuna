@@ -5,6 +5,8 @@
  * - Template access functions for frameworks and copilot configs
  * - VCK generator function
  * - Template type definitions
+ *
+ * All templates are embedded as strings for bundler compatibility.
  */
 
 // Types
@@ -20,6 +22,11 @@ export {
   listCopilotConfigs,
   getFrameworkFiles,
   getCopilotConfigFiles,
+  // Embedded template getters
+  getProjectFiles,
+  getLangGraphFiles,
+  getClaudeCodeFiles,
+  getKnowledgeBaseFiles,
 } from './templates.js';
 
 // Generator

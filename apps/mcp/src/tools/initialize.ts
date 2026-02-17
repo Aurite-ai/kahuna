@@ -1,15 +1,20 @@
 /**
  * Initialize Tool - Copy copilot configuration and seed knowledge base
  *
- * This tool copies the Claude Code copilot configuration from the VCK templates
+ * This tool writes the Claude Code copilot configuration from the VCK templates
  * to the directory where the user is running Claude Code, and seeds the knowledge
  * base with starter content from the VCK templates.
+ *
+ * All templates are embedded as strings for bundler compatibility.
  */
 
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {
+  getClaudeCodeFiles,
+  getKnowledgeBaseFiles,
+} from '@kahuna/vck-templates';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -19,7 +24,7 @@ export const initializeToolDefinition = {
   name: 'kahuna_initialize',
   description: `Initialize a new project with Kahuna copilot configuration and seed the knowledge base.
 
-This tool copies the Claude Code copilot configuration from Kahuna's VCK templates
+This tool writes the Claude Code copilot configuration from Kahuna's VCK templates
 to the specified directory and seeds the knowledge base with starter content. It sets up:
 - .claude/settings.json - Permissions and default mode
 - .claude/rules/ - Project rules and guidelines
@@ -84,49 +89,6 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 /**
- * Get the absolute path to the VCK copilot config templates directory.
- */
-function getTemplatesPath(): string {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-
-  // Navigate from apps/mcp/src/tools/ to packages/vck-templates/templates/copilot-configs/claude-code/
-  return path.resolve(
-    __dirname,
-    '..',
-    '..',
-    '..',
-    '..',
-    'packages',
-    'vck-templates',
-    'templates',
-    'copilot-configs',
-    'claude-code'
-  );
-}
-
-/**
- * Get the absolute path to the KB seed templates directory.
- */
-function getSeedTemplatesPath(): string {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-
-  // Navigate from apps/mcp/src/tools/ to packages/vck-templates/templates/knowledge-base/
-  return path.resolve(
-    __dirname,
-    '..',
-    '..',
-    '..',
-    '..',
-    'packages',
-    'vck-templates',
-    'templates',
-    'knowledge-base'
-  );
-}
-
-/**
  * Get the knowledge base directory path.
  * Uses KAHUNA_KNOWLEDGE_DIR env var if set, otherwise defaults to ~/.kahuna/knowledge/
  */
@@ -135,48 +97,27 @@ function getKnowledgeBaseDir(): string {
 }
 
 /**
- * Recursively copy a directory.
+ * Write a file from embedded template content.
+ * Creates parent directories if needed.
  */
-async function copyDirectoryRecursive(
-  source: string,
-  target: string,
+async function writeTemplateFile(
+  targetPath: string,
+  content: string,
   overwrite: boolean,
   copiedFiles: string[],
   skippedFiles: string[]
 ): Promise<void> {
-  // Create target directory if it doesn't exist
-  if (!(await pathExists(target))) {
-    await fs.mkdir(target, { recursive: true });
-  }
-
-  // Read all items in source directory
-  const items = await fs.readdir(source);
-
-  for (const item of items) {
-    const sourcePath = path.join(source, item);
-    const targetPath = path.join(target, item);
-    const stat = await fs.stat(sourcePath);
-
-    if (stat.isDirectory()) {
-      // Recursively copy subdirectories
-      await copyDirectoryRecursive(sourcePath, targetPath, overwrite, copiedFiles, skippedFiles);
-    } else {
-      // Copy file
-      if ((await pathExists(targetPath)) && !overwrite) {
-        skippedFiles.push(targetPath);
-      } else {
-        await fs.copyFile(sourcePath, targetPath);
-        copiedFiles.push(targetPath);
-      }
-    }
+  if ((await pathExists(targetPath)) && !overwrite) {
+    skippedFiles.push(targetPath);
+  } else {
+    await fs.mkdir(path.dirname(targetPath), { recursive: true });
+    await fs.writeFile(targetPath, content, 'utf-8');
+    copiedFiles.push(targetPath);
   }
 }
 
 /**
- * Seed the knowledge base with .mdc files from the seed templates directory.
- *
- * Scans the seed templates directory for .mdc files and copies them to the
- * KB directory. Skips files that already exist unless overwrite is true.
+ * Seed the knowledge base with .mdc files from embedded templates.
  *
  * @returns Object with arrays of seeded and skipped file names
  */
@@ -187,31 +128,21 @@ async function seedKnowledgeBase(
   const skipped: string[] = [];
 
   const kbDir = getKnowledgeBaseDir();
-  const seedDir = getSeedTemplatesPath();
-
-  // If seed templates directory doesn't exist, return empty results
-  if (!(await pathExists(seedDir))) {
-    return { seeded, skipped, kbDir };
-  }
+  const kbFiles = getKnowledgeBaseFiles();
 
   // Create KB directory if it doesn't exist
   if (!(await pathExists(kbDir))) {
     await fs.mkdir(kbDir, { recursive: true });
   }
 
-  // Read seed directory for .mdc files (flat scan, no recursion)
-  const items = await fs.readdir(seedDir);
-  const mdcFiles = items.filter((item) => item.endsWith('.mdc'));
-
-  for (const file of mdcFiles) {
-    const sourcePath = path.join(seedDir, file);
-    const targetPath = path.join(kbDir, file);
+  for (const file of kbFiles) {
+    const targetPath = path.join(kbDir, file.path);
 
     if ((await pathExists(targetPath)) && !overwrite) {
-      skipped.push(file);
+      skipped.push(file.path);
     } else {
-      await fs.copyFile(sourcePath, targetPath);
-      seeded.push(file);
+      await fs.writeFile(targetPath, file.content, 'utf-8');
+      seeded.push(file.path);
     }
   }
 
@@ -247,45 +178,27 @@ export async function initializeToolHandler(
       return markdownResponse(`Target path is not a directory: ${absoluteTargetPath}`, true);
     }
 
-    // Get source template path
-    const sourcePath = getTemplatesPath();
-
-    // Verify source exists
-    if (!(await pathExists(sourcePath))) {
-      return markdownResponse(
-        `VCK templates not found at: ${sourcePath}\n\n<hints>\n- Make sure you are running this from the Kahuna monorepo\n</hints>`,
-        true
-      );
-    }
-
     // Track copied and skipped files
     const copiedFiles: string[] = [];
     const skippedFiles: string[] = [];
 
-    // Copy .claude directory
-    const claudeSourcePath = path.join(sourcePath, '.claude');
-    const claudeTargetPath = path.join(absoluteTargetPath, '.claude');
+    // Get embedded Claude Code templates
+    const claudeCodeFiles = getClaudeCodeFiles();
 
-    if (await pathExists(claudeSourcePath)) {
-      await copyDirectoryRecursive(
-        claudeSourcePath,
-        claudeTargetPath,
-        overwrite,
-        copiedFiles,
-        skippedFiles
-      );
+    // Write all template files
+    for (const file of claudeCodeFiles) {
+      const filePath = path.join(absoluteTargetPath, file.path);
+      await writeTemplateFile(filePath, file.content, overwrite, copiedFiles, skippedFiles);
     }
 
-    // Copy CLAUDE.md
-    const claudeMdSource = path.join(sourcePath, 'CLAUDE.md');
-    const claudeMdTarget = path.join(absoluteTargetPath, 'CLAUDE.md');
-
-    if (await pathExists(claudeMdSource)) {
-      if ((await pathExists(claudeMdTarget)) && !overwrite) {
-        skippedFiles.push(claudeMdTarget);
-      } else {
-        await fs.copyFile(claudeMdSource, claudeMdTarget);
-        copiedFiles.push(claudeMdTarget);
+    // Create empty directories for context and plans
+    const emptyDirs = [
+      path.join(absoluteTargetPath, '.claude', 'context'),
+      path.join(absoluteTargetPath, '.claude', 'plans'),
+    ];
+    for (const dir of emptyDirs) {
+      if (!(await pathExists(dir))) {
+        await fs.mkdir(dir, { recursive: true });
       }
     }
 
