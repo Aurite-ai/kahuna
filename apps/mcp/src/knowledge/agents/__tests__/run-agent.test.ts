@@ -27,6 +27,14 @@ function createMockStorage(entries: KnowledgeEntry[] = []): KnowledgeStorageServ
 }
 
 /**
+ * Default usage object for mock responses.
+ */
+const defaultUsage = {
+  input_tokens: 100,
+  output_tokens: 50,
+};
+
+/**
  * Create a mock Anthropic client.
  */
 function createMockAnthropic(responses: Array<Record<string, unknown>>) {
@@ -36,7 +44,8 @@ function createMockAnthropic(responses: Array<Record<string, unknown>>) {
       create: vi.fn().mockImplementation(async () => {
         const response = responses[callIndex];
         callIndex++;
-        return response;
+        // Add default usage if not provided
+        return { usage: defaultUsage, ...response };
       }),
     },
   } as unknown as import('@anthropic-ai/sdk').default;

@@ -6,6 +6,7 @@
 
 import { vi } from 'vitest';
 import type { KnowledgeEntry, KnowledgeStorageService } from '../../knowledge/index.js';
+import { UsageTracker } from '../../usage/index.js';
 import type { ToolContext } from '../types.js';
 
 /**
@@ -75,5 +76,6 @@ export function createMockContext(
   return {
     storage: createMockStorage(storageOverrides),
     anthropic: createMockAnthropic(),
+    usageTracker: new UsageTracker({ includeInResponses: false }),
   };
 }

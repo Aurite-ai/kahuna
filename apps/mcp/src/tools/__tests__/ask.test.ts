@@ -1,9 +1,20 @@
 import * as fs from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AgentResult } from '../../knowledge/index.js';
+import type { AgentResult, AgentUsageStats } from '../../knowledge/index.js';
 import { askToolDefinition, askToolHandler } from '../ask.js';
 import type { ToolContext } from '../types.js';
 import { createMockContext } from './test-utils.js';
+
+/**
+ * Default usage stats for mock agent results.
+ */
+const defaultUsage: AgentUsageStats = {
+  totalInputTokens: 100,
+  totalOutputTokens: 50,
+  totalCost: 0.001,
+  llmCallCount: 1,
+  totalLatencyMs: 500,
+};
 
 // Mock the agent runner
 vi.mock('../../knowledge/agents/run-agent.js', () => ({
@@ -80,6 +91,7 @@ describe('askToolHandler', () => {
         textResponse:
           'Based on the knowledge base, the answer is: We use Vitest for testing.\n\n**Source:** testing-guide.mdc',
         toolResults: [],
+        usage: defaultUsage,
       });
 
       const result = await askToolHandler({ question: 'What testing framework do we use?' }, ctx);
@@ -96,6 +108,7 @@ describe('askToolHandler', () => {
       mockRunAgent.mockResolvedValue({
         textResponse: 'Some answer',
         toolResults: [],
+        usage: defaultUsage,
       });
 
       await askToolHandler({ question: 'Why did we choose X?' }, ctx);
@@ -109,7 +122,9 @@ describe('askToolHandler', () => {
         }),
         'Why did we choose X?',
         ctx.storage,
-        ctx.anthropic
+        ctx.anthropic,
+        ctx.usageTracker,
+        'kahuna_ask'
       );
     });
 
@@ -136,6 +151,7 @@ Surfaced from Kahuna knowledge base on 2026-02-12.
       mockRunAgent.mockResolvedValue({
         textResponse: 'Answer based on KB',
         toolResults: [],
+        usage: defaultUsage,
       });
 
       await askToolHandler({ question: 'How should I implement auth?' }, ctx);
@@ -156,6 +172,7 @@ Surfaced from Kahuna knowledge base on 2026-02-12.
       mockRunAgent.mockResolvedValue({
         textResponse: 'Answer without context',
         toolResults: [],
+        usage: defaultUsage,
       });
 
       await askToolHandler({ question: 'Test question' }, ctx);
@@ -183,6 +200,7 @@ Surfaced from Kahuna knowledge base on 2026-02-12.
       mockRunAgent.mockResolvedValue({
         textResponse: 'Answer',
         toolResults: [],
+        usage: defaultUsage,
       });
 
       await askToolHandler({ question: 'Test' }, ctx);

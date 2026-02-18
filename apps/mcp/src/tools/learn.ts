@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { MODELS } from '../config.js';
 import {
   type AgentResult,
+  type AgentUsageStats,
   CATEGORIZATION_PROMPT,
   FILE_SIZE_LIMIT,
   KnowledgeStorageError,
@@ -21,6 +22,7 @@ import {
   categorizationTools,
   runAgent,
 } from '../knowledge/index.js';
+import { formatCost, formatTokens } from '../usage/index.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -302,7 +304,7 @@ export async function learnToolHandler(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<MCPToolResponse> {
-  const { storage, anthropic } = ctx;
+  const { storage, anthropic, usageTracker } = ctx;
 
   // Validate input with Zod
   const parseResult = learnInputSchema.safeParse(args);
@@ -325,6 +327,15 @@ export async function learnToolHandler(
 
   // Process each file
   const results: FileLearnResult[] = [];
+
+  // Track total usage across all files
+  const totalUsage: AgentUsageStats = {
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    totalCost: 0,
+    llmCallCount: 0,
+    totalLatencyMs: 0,
+  };
 
   // Add path errors as failed results
   for (const pathError of pathErrors) {
@@ -367,7 +378,7 @@ export async function learnToolHandler(
         continue;
       }
 
-      // Step 3: Run categorization agent
+      // Step 3: Run categorization agent with usage tracking
       const userMessage = buildCategorizationUserMessage(filename, content, description);
       const agentResult = await runAgent(
         {
@@ -378,8 +389,17 @@ export async function learnToolHandler(
         },
         userMessage,
         storage,
-        anthropic
+        anthropic,
+        usageTracker,
+        'kahuna_learn'
       );
+
+      // Accumulate usage stats
+      totalUsage.totalInputTokens += agentResult.usage.totalInputTokens;
+      totalUsage.totalOutputTokens += agentResult.usage.totalOutputTokens;
+      totalUsage.totalCost += agentResult.usage.totalCost;
+      totalUsage.llmCallCount += agentResult.usage.llmCallCount;
+      totalUsage.totalLatencyMs += agentResult.usage.totalLatencyMs;
 
       // Step 4: Extract categorization result from agent tool call
       const catResult = extractCategorizationResult(agentResult);
@@ -442,7 +462,18 @@ export async function learnToolHandler(
     }
   }
 
-  return markdownResponse(buildLearnSuccessMarkdown(results));
+  // Build markdown with usage summary
+  let markdown = buildLearnSuccessMarkdown(results);
+
+  // Add usage summary if tracking is enabled
+  if (usageTracker.shouldIncludeInResponses() && totalUsage.llmCallCount > 0) {
+    markdown += `
+
+---
+📊 **Usage:** ${MODELS.categorization} | ${formatTokens(totalUsage.totalInputTokens)} in + ${formatTokens(totalUsage.totalOutputTokens)} out | ${formatCost(totalUsage.totalCost)} | ${totalUsage.llmCallCount} call(s)`;
+  }
+
+  return markdownResponse(markdown);
 }
 
 /**

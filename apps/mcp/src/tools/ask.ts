@@ -12,6 +12,7 @@ import * as path from 'node:path';
 import { z } from 'zod';
 import { MODELS } from '../config.js';
 import { buildQASystemPrompt, qaTools, runAgent } from '../knowledge/index.js';
+import { formatCost, formatTokens } from '../usage/index.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -120,7 +121,7 @@ export async function askToolHandler(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<MCPToolResponse> {
-  const { storage, anthropic } = ctx;
+  const { storage, anthropic, usageTracker } = ctx;
 
   // Validate input
   const parseResult = askInputSchema.safeParse(args);
@@ -141,7 +142,7 @@ export async function askToolHandler(
     // Build system prompt with referenced files
     const systemPrompt = buildQASystemPrompt(referencedKBFiles);
 
-    // Run Q&A agent
+    // Run Q&A agent with usage tracking
     const agentResult = await runAgent(
       {
         model: MODELS.ask,
@@ -151,12 +152,23 @@ export async function askToolHandler(
       },
       question,
       storage,
-      anthropic
+      anthropic,
+      usageTracker,
+      'kahuna_ask'
     );
 
     // Build markdown response
     const answer =
       agentResult.textResponse || "I couldn't find information about this in the knowledge base.";
+
+    // Build usage summary
+    const { usage } = agentResult;
+    const usageSummary = usageTracker.shouldIncludeInResponses()
+      ? `
+
+---
+📊 **Usage:** ${MODELS.ask} | ${formatTokens(usage.totalInputTokens)} in + ${formatTokens(usage.totalOutputTokens)} out | ${formatCost(usage.totalCost)} | ${usage.llmCallCount} call(s)`
+      : '';
 
     const markdown = `# Answer
 
@@ -168,7 +180,7 @@ ${answer}
 - Full details may be in the cited knowledge base entries
 - Use kahuna_prepare_context if you need broader context for a task
 - Use kahuna_learn to add new information to the knowledge base
-</hints>`;
+</hints>${usageSummary}`;
 
     return markdownResponse(markdown);
   } catch (error) {
