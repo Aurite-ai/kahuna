@@ -27,6 +27,7 @@ import {
   runAgent,
   writeContextReadme,
 } from '../knowledge/index.js';
+import { formatCost, formatTokens } from '../usage/index.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -292,7 +293,7 @@ export async function prepareContextToolHandler(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<MCPToolResponse> {
-  const { storage, anthropic } = ctx;
+  const { storage, anthropic, usageTracker } = ctx;
 
   // Validate input
   const parseResult = prepareContextInputSchema.safeParse(args);
@@ -317,7 +318,7 @@ export async function prepareContextToolHandler(
     // Generate project file tree for the retrieval agent
     const fileTree = await generateFileTree({ maxDepth: 4, maxEntries: 200 });
 
-    // Run retrieval agent
+    // Run retrieval agent with usage tracking
     const userMessage = buildRetrievalUserMessage(task, files, fileTree);
     const agentResult = await runAgent(
       {
@@ -327,7 +328,9 @@ export async function prepareContextToolHandler(
       },
       userMessage,
       storage,
-      anthropic
+      anthropic,
+      usageTracker,
+      'kahuna_prepare_context'
     );
 
     // Extract file selections and framework selection
@@ -412,14 +415,24 @@ export async function prepareContextToolHandler(
       frameworkResult
     );
 
-    return markdownResponse(
-      buildContextReadyMarkdown(
-        task,
-        kbFiles,
-        referencedFiles.length > 0 ? referencedFiles : undefined,
-        frameworkResult
-      )
+    // Build response markdown
+    let markdown = buildContextReadyMarkdown(
+      task,
+      kbFiles,
+      referencedFiles.length > 0 ? referencedFiles : undefined,
+      frameworkResult
     );
+
+    // Add usage summary if tracking is enabled
+    const { usage } = agentResult;
+    if (usageTracker.shouldIncludeInResponses() && usage.llmCallCount > 0) {
+      markdown += `
+
+---
+📊 **Usage:** ${MODELS.retrieval} | ${formatTokens(usage.totalInputTokens)} in + ${formatTokens(usage.totalOutputTokens)} out | ${formatCost(usage.totalCost)} | ${usage.llmCallCount} call(s)`;
+    }
+
+    return markdownResponse(markdown);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return markdownResponse(

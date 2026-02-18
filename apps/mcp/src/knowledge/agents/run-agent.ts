@@ -9,6 +9,8 @@
 
 import type Anthropic from '@anthropic-ai/sdk';
 import type { Tool, ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages';
+import type { UsageTracker } from '../../usage/index.js';
+import { extractTokenUsage } from '../../usage/index.js';
 import type { KnowledgeStorageService } from '../storage/types.js';
 import { executeKnowledgeTool } from './knowledge-tools.js';
 
@@ -29,6 +31,22 @@ export interface AgentConfig {
 }
 
 /**
+ * Usage statistics for an agent run.
+ */
+export interface AgentUsageStats {
+  /** Total input tokens across all LLM calls */
+  totalInputTokens: number;
+  /** Total output tokens across all LLM calls */
+  totalOutputTokens: number;
+  /** Total estimated cost in USD */
+  totalCost: number;
+  /** Number of LLM API calls made */
+  llmCallCount: number;
+  /** Total latency across all LLM calls in ms */
+  totalLatencyMs: number;
+}
+
+/**
  * Result from an agent run.
  */
 export interface AgentResult {
@@ -36,6 +54,8 @@ export interface AgentResult {
   textResponse: string;
   /** Accumulated structured results from specific tool calls (select_files, categorize_file) */
   toolResults: Record<string, unknown>[];
+  /** Usage statistics for this agent run */
+  usage: AgentUsageStats;
 }
 
 /** Tool names whose results we capture as structured data */
@@ -54,18 +74,23 @@ const STRUCTURED_TOOL_NAMES = new Set([
  * - Iteration counting
  * - Stop condition detection (end_turn or no tool_use blocks)
  * - Structured result accumulation for select_files_for_context and categorize_file
+ * - Usage tracking for cost calculation
  *
  * @param config - Agent configuration (model, prompt, tools, limits)
  * @param userMessage - The user's message to the agent
  * @param storage - Knowledge storage service for tool execution
  * @param anthropic - Shared Anthropic client instance
- * @returns Agent result with text response and structured tool results
+ * @param usageTracker - Optional usage tracker for cost tracking
+ * @param toolName - Name of the tool calling this agent (for usage attribution)
+ * @returns Agent result with text response, structured tool results, and usage stats
  */
 export async function runAgent(
   config: AgentConfig,
   userMessage: string,
   storage: KnowledgeStorageService,
-  anthropic: Anthropic
+  anthropic: Anthropic,
+  usageTracker?: UsageTracker,
+  toolName = 'unknown'
 ): Promise<AgentResult> {
   const maxIterations = config.maxIterations ?? 10;
   const maxTokens = config.maxTokens ?? 2000;
@@ -79,7 +104,18 @@ export async function runAgent(
 
   const structuredResults: Record<string, unknown>[] = [];
 
+  // Track usage for this agent run
+  const agentUsage: AgentUsageStats = {
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    totalCost: 0,
+    llmCallCount: 0,
+    totalLatencyMs: 0,
+  };
+
   for (let i = 0; i < maxIterations; i++) {
+    const startTime = Date.now();
+
     const response = await anthropic.messages.create({
       model: config.model,
       max_tokens: maxTokens,
@@ -88,12 +124,33 @@ export async function runAgent(
       messages,
     });
 
+    const latencyMs = Date.now() - startTime;
+
+    // Extract and track usage
+    const tokenUsage = extractTokenUsage(response);
+    agentUsage.totalInputTokens += tokenUsage.inputTokens;
+    agentUsage.totalOutputTokens += tokenUsage.outputTokens;
+    agentUsage.llmCallCount += 1;
+    agentUsage.totalLatencyMs += latencyMs;
+
+    // Record to usage tracker if provided
+    if (usageTracker) {
+      const call = usageTracker.record({
+        model: config.model,
+        toolName,
+        usage: tokenUsage,
+        latencyMs,
+      });
+      agentUsage.totalCost += call.cost.totalCost;
+    }
+
     // Check if we're done (no more tool use)
     if (response.stop_reason === 'end_turn') {
       const textBlock = response.content.find((block) => block.type === 'text');
       return {
         textResponse: textBlock?.type === 'text' ? textBlock.text : '',
         toolResults: structuredResults,
+        usage: agentUsage,
       };
     }
 
@@ -106,6 +163,7 @@ export async function runAgent(
       return {
         textResponse: textBlock?.type === 'text' ? textBlock.text : '',
         toolResults: structuredResults,
+        usage: agentUsage,
       };
     }
 
@@ -153,5 +211,6 @@ export async function runAgent(
   return {
     textResponse: 'Agent reached maximum iterations without completing.',
     toolResults: structuredResults,
+    usage: agentUsage,
   };
 }

@@ -34,6 +34,7 @@ import { learnTool } from './tools/learn.js';
 import { listIntegrationsTool } from './tools/list-integrations.js';
 import { prepareContextTool } from './tools/prepare-context.js';
 import type { ToolContext } from './tools/types.js';
+import { createUsageTrackerFromEnv } from './usage/index.js';
 import { useIntegrationTool } from './tools/use-integration.js';
 import { verifyIntegrationTool } from './tools/verify-integration.js';
 
@@ -116,8 +117,21 @@ async function main() {
   // Create shared Anthropic client (used by agent-based tools)
   const anthropic = new Anthropic();
 
+  // Create usage tracker for cost tracking
+  const usageTracker = createUsageTrackerFromEnv();
+
   // Build the shared tool context
-  const ctx: ToolContext = { storage, anthropic };
+  const ctx: ToolContext = { storage, anthropic, usageTracker };
+
+  // Log usage tracking status
+  const userIdentity = usageTracker.getUserIdentity();
+  if (userIdentity) {
+    console.error(
+      `[${SERVER_NAME}] Usage tracking enabled for user: ${userIdentity.userId}, org: ${userIdentity.organizationId}`
+    );
+  } else {
+    console.error(`[${SERVER_NAME}] Usage tracking enabled (local session only)`);
+  }
 
   // Create MCP server
   const server = new Server(

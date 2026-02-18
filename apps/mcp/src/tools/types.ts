@@ -8,6 +8,7 @@
 
 import type Anthropic from '@anthropic-ai/sdk';
 import type { KnowledgeStorageService } from '../knowledge/index.js';
+import type { UsageTracker } from '../usage/index.js';
 
 /**
  * MCP tool response format.
@@ -44,6 +45,8 @@ export function markdownResponse(markdown: string, isError?: boolean): MCPToolRe
 export interface ToolContext {
   storage: KnowledgeStorageService;
   anthropic: Anthropic;
+  /** Usage tracker for cost and token tracking */
+  usageTracker: UsageTracker;
 }
 
 /**

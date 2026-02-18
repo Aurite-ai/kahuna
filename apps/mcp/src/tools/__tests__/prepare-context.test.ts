@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AgentResult } from '../../knowledge/index.js';
+import type { AgentResult, AgentUsageStats } from '../../knowledge/index.js';
 import { prepareContextToolDefinition, prepareContextToolHandler } from '../prepare-context.js';
 import type { ToolContext } from '../types.js';
 import { createMockContext, createMockEntry } from './test-utils.js';
@@ -55,6 +55,17 @@ const mockClearContextDir = vi.mocked(clearContextDir);
 const mockWriteContextReadme = vi.mocked(writeContextReadme);
 
 /**
+ * Default usage stats for mock agent results.
+ */
+const defaultUsage: AgentUsageStats = {
+  totalInputTokens: 100,
+  totalOutputTokens: 50,
+  totalCost: 0.001,
+  llmCallCount: 1,
+  totalLatencyMs: 500,
+};
+
+/**
  * Helper: Build a mock AgentResult with select_files_for_context.
  */
 function mockRetrievalResult(selections: Array<{ slug: string; reason: string }>): AgentResult {
@@ -66,6 +77,7 @@ function mockRetrievalResult(selections: Array<{ slug: string; reason: string }>
         selections,
       },
     ],
+    usage: defaultUsage,
   };
 }
 
