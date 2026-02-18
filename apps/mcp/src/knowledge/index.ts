@@ -55,6 +55,7 @@ export {
   runAgent,
   type AgentConfig,
   type AgentResult,
+  type AgentUsageStats,
 } from './agents/index.js';
 
 // Surfacing

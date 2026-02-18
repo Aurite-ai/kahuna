@@ -28,4 +28,4 @@ export {
 } from './knowledge-tools.js';
 
 // Agent runner
-export { runAgent, type AgentConfig, type AgentResult } from './run-agent.js';
+export { runAgent, type AgentConfig, type AgentResult, type AgentUsageStats } from './run-agent.js';

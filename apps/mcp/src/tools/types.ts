@@ -8,6 +8,7 @@
 
 import type Anthropic from '@anthropic-ai/sdk';
 import type { KnowledgeStorageService } from '../knowledge/index.js';
+import type { UsageTracker } from '../usage/index.js';
 
 /**
  * MCP tool response format.
@@ -44,6 +45,8 @@ export function markdownResponse(markdown: string, isError?: boolean): MCPToolRe
 export interface ToolContext {
   storage: KnowledgeStorageService;
   anthropic: Anthropic;
+  /** Usage tracker for cost and token tracking */
+  usageTracker: UsageTracker;
 }
 
 /**
@@ -54,3 +57,31 @@ export type ToolHandler = (
   args: Record<string, unknown>,
   ctx: ToolContext
 ) => Promise<MCPToolResponse>;
+
+/**
+ * Build an MCP tool response with usage information appended.
+ * Use this for tools that make LLM calls and want to show usage stats.
+ *
+ * @param markdown - Markdown text to return to the copilot
+ * @param usageTracker - Usage tracker with recorded calls
+ * @param isError - Whether this response represents an error state
+ * @returns Formatted MCP tool response with usage summary
+ */
+export function markdownResponseWithUsage(
+  markdown: string,
+  usageTracker: UsageTracker,
+  isError?: boolean
+): MCPToolResponse {
+  const display = usageTracker.getLastCallDisplay();
+
+  // Append usage summary if available and tracking is enabled
+  const finalMarkdown =
+    display && usageTracker.shouldIncludeInResponses()
+      ? `${markdown}\n\n${display.markdown}`
+      : markdown;
+
+  return {
+    content: [{ type: 'text', text: finalMarkdown }],
+    ...(isError && { isError: true }),
+  };
+}
