@@ -83,11 +83,11 @@ If they provide corrections → update the relevant field and confirm again.
 **Step 5a: Generate the filename:**
 1. Get the current working directory path (e.g., `/Users/dev/projects/my-app`)
 2. Generate a short hash (6 characters) from the path - use the first 6 hex characters of an MD5 or similar hash
-3. Filename: `/tmp/project-context-{hash}.md` (e.g., `/tmp/project-context-a1b2c3.md`)
+3. Filename: `/tmp/kahuna/project-context-{hash}.md` (e.g., `/tmp/kahuna/project-context-a1b2c3.md`)
 
 This ensures each project gets its own context file without collisions.
 
-**Step 5b: Create the file** at the path above. The document should:
+**Step 5b: Create the file** at the path above (create the `/tmp/kahuna/` directory if it doesn't exist). The document should:
 
 1. **Synthesize, don't transcribe** - Capture the essence in clear, structured prose
 2. **Preserve their language** - Use their terminology and phrasing where it adds clarity
@@ -125,12 +125,14 @@ Use this template:
 
 ```
 kahuna_learn(
-  paths=["/tmp/project-context-{hash}.md"],
+  paths=["/tmp/kahuna/project-context-{hash}.md"],
   description="Project business context and success criteria"
 )
 ```
 
 Replace `{hash}` with the actual hash generated in Step 5a.
+
+**Step 6b:** After `kahuna_learn` succeeds, delete the temporary file `/tmp/kahuna/project-context-{hash}.md`.
 
 ### Step 7: Confirm
 

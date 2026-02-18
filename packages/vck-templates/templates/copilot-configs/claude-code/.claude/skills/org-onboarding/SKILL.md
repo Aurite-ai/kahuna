@@ -69,7 +69,7 @@ If they provide corrections → update the relevant field and confirm again.
 
 ### Step 6: Synthesize and Store
 
-**Step 6a:** Create a file at `/tmp/org-context.md` with this content:
+**Step 6a:** Create a file at `/tmp/kahuna/org-context.md` with this content (create the `/tmp/kahuna/` directory if it doesn't exist):
 
 ```markdown
 # Organization Context
@@ -103,10 +103,12 @@ If they provide corrections → update the relevant field and confirm again.
 
 ```
 kahuna_learn(
-  paths=["/tmp/org-context.md"],
+  paths=["/tmp/kahuna/org-context.md"],
   description="Organization-wide context: industry, team, constraints, priorities"
 )
 ```
+
+**Step 6c:** After `kahuna_learn` succeeds, delete the temporary file `/tmp/kahuna/org-context.md`.
 
 ### Step 7: Confirm and Continue
 
