@@ -48,7 +48,32 @@ You manage the agent development lifecycle:
 
 ## Agent Development Workflow
 
-### Phase 0: Prepare Context
+### Phase 0: Check for Onboarding Context
+
+**Before doing anything, check if we have organization and project context.**
+
+Use `kahuna_ask` to query: "What is our organization context and project context?"
+
+**If user says "skip onboarding", "just start", or "skip context":**
+> Understood - proceeding without additional context. You can always say "set up project context" later if needed.
+
+Proceed directly to Phase 0b.
+
+**If organization context is missing:**
+> I don't have any organization context yet. Let me ask a few quick questions about your organization first.
+> (Say "skip" if you'd like to proceed without setting up context.)
+
+Then trigger the **org-onboarding** skill (see `.claude/skills/org-onboarding/SKILL.md`) by asking the 4 org questions.
+
+**If project context is missing for this project:**
+> Let me capture some context about this specific project.
+> (Say "skip" if you'd like to proceed without setting up context.)
+
+Then trigger the **project-onboarding** skill (see `.claude/skills/project-onboarding/SKILL.md`) by asking the 3 project questions.
+
+**If both exist:** Proceed to Phase 0b.
+
+### Phase 0b: Prepare Context
 
 **Call kahuna_prepare_context to prepare the context guide**
 
@@ -58,7 +83,7 @@ This tool intelligently selects and references relevant context files
 before the copilot starts working on a task.
 
 The "prepare" terminology emphasizes:
-- This should be called FIRST, before starting any task
+- This should be called after onboarding is complete
 - It's proactive context gathering, not reactive searching
 - Files are formatted and ready to use immediately
 
