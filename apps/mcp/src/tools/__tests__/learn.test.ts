@@ -1,10 +1,21 @@
 import * as fs from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AgentResult } from '../../knowledge/index.js';
+import type { AgentResult, AgentUsageStats } from '../../knowledge/index.js';
 import { KnowledgeStorageError } from '../../knowledge/index.js';
 import { learnToolDefinition, learnToolHandler } from '../learn.js';
 import type { ToolContext } from '../types.js';
 import { createMockContext, createMockEntry } from './test-utils.js';
+
+/**
+ * Default usage stats for mock agent results.
+ */
+const defaultUsage: AgentUsageStats = {
+  totalInputTokens: 100,
+  totalOutputTokens: 50,
+  totalCost: 0.001,
+  llmCallCount: 1,
+  totalLatencyMs: 500,
+};
 
 // Mock the agent runner
 vi.mock('../../knowledge/agents/run-agent.js', () => ({
@@ -41,6 +52,7 @@ function mockCategorizationResult(overrides?: Record<string, unknown>): AgentRes
         ...overrides,
       },
     ],
+    usage: defaultUsage,
   };
 }
 
@@ -136,7 +148,9 @@ describe('learnToolHandler', () => {
         }),
         expect.stringContaining('api-guidelines.md'),
         ctx.storage,
-        ctx.anthropic
+        ctx.anthropic,
+        ctx.usageTracker,
+        'kahuna_learn'
       );
 
       // Verify storage.save called with flat fields from agent result
@@ -227,6 +241,7 @@ describe('learnToolHandler', () => {
       mockRunAgent.mockResolvedValue({
         textResponse: 'I could not categorize this file.',
         toolResults: [],
+        usage: defaultUsage,
       });
 
       const result = await learnToolHandler({ paths: ['test.md'] }, ctx);

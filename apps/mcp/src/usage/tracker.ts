@@ -331,12 +331,13 @@ export function createUsageTrackerFromEnv(): UsageTracker {
 
 /**
  * Helper function to extract token usage from Anthropic API response.
+ * Handles missing usage gracefully by returning zeros.
  *
  * @param response - Anthropic API response object
  * @returns TokenUsage object
  */
 export function extractTokenUsage(response: {
-  usage: {
+  usage?: {
     input_tokens: number;
     output_tokens: number;
     cache_read_input_tokens?: number;
@@ -344,9 +345,9 @@ export function extractTokenUsage(response: {
   };
 }): TokenUsage {
   return {
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-    cacheReadTokens: response.usage.cache_read_input_tokens,
-    cacheCreationTokens: response.usage.cache_creation_input_tokens,
+    inputTokens: response.usage?.input_tokens ?? 0,
+    outputTokens: response.usage?.output_tokens ?? 0,
+    cacheReadTokens: response.usage?.cache_read_input_tokens,
+    cacheCreationTokens: response.usage?.cache_creation_input_tokens,
   };
 }
