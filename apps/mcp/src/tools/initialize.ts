@@ -25,7 +25,7 @@ to the specified directory and seeds the knowledge base with starter content. It
 - .claude/rules/ - Project rules and guidelines
 - .claude/skills/ - Skills
 - .claude/agents/ - Subagents
-- .claude/context/, .claude/plans/ - Empty directories for context and plan files
+- .claude/plans/ - Empty directory for plan files
 - .claude/CLAUDE.md - Main copilot instructions
 - Knowledge base seed files (e.g., framework best practices)
 
@@ -328,7 +328,13 @@ Kahuna copilot configuration copied to: \`${absoluteTargetPath}\`
       markdown += `\n\nSeeded files:\n${seedResult.seeded.map((f) => `- ${f}`).join('\n')}`;
     }
 
+    // Next Steps section with onboarding hint
+    markdown += `\n\n## Next Steps
+
+To help me understand your project goals, say **"set up project context"** or just describe what you're building.`;
+
     markdown += `\n\n<hints>
+- Setting up project context helps me make better recommendations
 - Stop the current Claude Code instance with Ctrl+C and restart to pick up new config
 ${skippedFiles.length > 0 || seedResult.skipped.length > 0 ? `- To overwrite existing files: kahuna_initialize(targetPath="${targetPath}", overwrite=true)\n` : ''}</hints>`;
 

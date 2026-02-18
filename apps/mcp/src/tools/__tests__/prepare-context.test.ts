@@ -12,11 +12,30 @@ vi.mock('../../knowledge/agents/run-agent.js', () => ({
 // Mock the context writer
 vi.mock('../../knowledge/surfacing/context-writer.js', () => ({
   clearContextDir: vi.fn(),
-  writeContextFile: vi.fn(),
   writeContextReadme: vi.fn(),
-  listContextFiles: vi.fn(),
-  shouldReferenceLocally: vi.fn().mockResolvedValue(false), // Default: copy files to context/
-  getRelativeLocalPath: vi.fn((path) => path),
+  getKBPath: vi.fn((slug) => `/home/user/.kahuna/knowledge/${slug}.mdc`),
+  hasLocalSource: vi.fn().mockResolvedValue(false), // Default: no local source
+  getLocalSourcePath: vi.fn((entry) => entry.source?.path || ''),
+}));
+
+// Mock the framework copier to prevent actual file writes during tests
+vi.mock('../../knowledge/surfacing/framework-copier.js', () => ({
+  copyFrameworkBoilerplate: vi.fn().mockResolvedValue({
+    success: true,
+    framework: 'langgraph',
+    displayName: 'LangGraph',
+    kbDocSlug: 'langgraph-best-practices',
+    copiedFiles: [
+      '.gitignore',
+      'main.py',
+      'pyproject.toml',
+      'src/agent/__init__.py',
+      'src/agent/graph.py',
+      'src/agent/state.py',
+      'src/agent/tools.py',
+    ],
+    skippedFiles: ['.env', '.gitignore', 'README.md'],
+  }),
 }));
 
 // Mock generateMdcFile from storage utils
@@ -29,15 +48,10 @@ vi.mock('../../knowledge/storage/utils.js', () => ({
 }));
 
 import { runAgent } from '../../knowledge/agents/run-agent.js';
-import {
-  clearContextDir,
-  writeContextFile,
-  writeContextReadme,
-} from '../../knowledge/surfacing/context-writer.js';
+import { clearContextDir, writeContextReadme } from '../../knowledge/surfacing/context-writer.js';
 
 const mockRunAgent = vi.mocked(runAgent);
 const mockClearContextDir = vi.mocked(clearContextDir);
-const mockWriteContextFile = vi.mocked(writeContextFile);
 const mockWriteContextReadme = vi.mocked(writeContextReadme);
 
 /**
@@ -83,7 +97,6 @@ describe('prepareContextToolHandler', () => {
 
     // Default: context writer mocks resolve
     mockClearContextDir.mockResolvedValue(undefined);
-    mockWriteContextFile.mockResolvedValue(undefined);
     mockWriteContextReadme.mockResolvedValue(undefined);
   });
 
@@ -114,7 +127,7 @@ describe('prepareContextToolHandler', () => {
   });
 
   describe('successful retrieval', () => {
-    it('runs agent, writes to context/, returns markdown', async () => {
+    it('runs agent, writes README with KB references, returns markdown', async () => {
       const entries = [
         createMockEntry({ slug: 'api-guidelines', title: 'API Guidelines' }),
         createMockEntry({ slug: 'error-patterns', title: 'Error Handling Patterns' }),
@@ -138,17 +151,22 @@ describe('prepareContextToolHandler', () => {
 
       // Verify context writer was called
       expect(mockClearContextDir).toHaveBeenCalledOnce();
-      expect(mockWriteContextFile).toHaveBeenCalledTimes(2);
       expect(mockWriteContextReadme).toHaveBeenCalledOnce();
       expect(mockWriteContextReadme).toHaveBeenCalledWith(
         expect.any(String),
         'Add rate limiting',
         expect.arrayContaining([
-          expect.objectContaining({ slug: 'api-guidelines' }),
-          expect.objectContaining({ slug: 'error-patterns' }),
+          expect.objectContaining({
+            slug: 'api-guidelines',
+            kbPath: expect.stringContaining('api-guidelines.mdc'),
+          }),
+          expect.objectContaining({
+            slug: 'error-patterns',
+            kbPath: expect.stringContaining('error-patterns.mdc'),
+          }),
         ]),
-        undefined, // referencedFiles (none since shouldReferenceLocally returns false)
-        undefined // frameworkResult (no framework selected)
+        undefined, // referencedFiles (none since hasLocalSource returns false)
+        expect.objectContaining({ framework: 'langgraph' }) // default framework scaffolded
       );
 
       // Verify markdown response
@@ -156,7 +174,7 @@ describe('prepareContextToolHandler', () => {
       const text = result.content[0].text;
       expect(text).toContain('# Context Ready');
       expect(text).toContain('API Guidelines');
-      expect(text).toContain('context/api-guidelines.md');
+      expect(text).toContain('.kahuna/knowledge');
       expect(text).toContain('<hints>');
     });
   });

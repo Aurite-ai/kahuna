@@ -1,17 +1,16 @@
 /**
  * Context surfacing module
  *
- * Manages the project's context/ directory for copilot access.
+ * Manages the project's .context-guide.md file for copilot access.
  */
 
 export {
   clearContextDir,
-  writeContextFile,
   writeContextReadme,
-  listContextFiles,
-  shouldReferenceLocally,
-  getRelativeLocalPath,
-  type ContextSelection,
+  getKBPath,
+  hasLocalSource,
+  getLocalSourcePath,
+  type KBFileReference,
   type ReferencedFile,
 } from './context-writer.js';
 

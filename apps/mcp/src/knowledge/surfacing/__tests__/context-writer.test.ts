@@ -1,8 +1,8 @@
 /**
  * Tests for context writer
  *
- * Tests clearContextDir, writeContextFile, writeContextReadme, listContextFiles,
- * shouldReferenceLocally, and getRelativeLocalPath.
+ * Tests clearContextDir, writeContextReadme, getKBPath,
+ * hasLocalSource, and getLocalSourcePath.
  * Uses real temp directories for filesystem tests.
  */
 
@@ -13,10 +13,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KnowledgeEntry } from '../../storage/types.js';
 import {
   clearContextDir,
-  getRelativeLocalPath,
-  listContextFiles,
-  shouldReferenceLocally,
-  writeContextFile,
+  getKBPath,
+  getLocalSourcePath,
+  hasLocalSource,
   writeContextReadme,
 } from '../context-writer.js';
 
@@ -46,11 +45,9 @@ describe('context-writer', () => {
       expect(stat.isDirectory()).toBe(true);
     });
 
-    it('removes all files from existing directory', async () => {
+    it('removes .context-guide.md from existing directory', async () => {
       await fs.mkdir(contextDir, { recursive: true });
-      await fs.writeFile(path.join(contextDir, 'file1.md'), 'content1');
-      await fs.writeFile(path.join(contextDir, 'file2.md'), 'content2');
-      await fs.writeFile(path.join(contextDir, 'README.md'), 'readme');
+      await fs.writeFile(path.join(contextDir, '.context-guide.md'), 'readme');
 
       await clearContextDir(contextDir);
 
@@ -58,61 +55,36 @@ describe('context-writer', () => {
       expect(files).toHaveLength(0);
     });
 
-    it('handles empty directory without error', async () => {
+    it('handles directory without .context-guide.md without error', async () => {
       await fs.mkdir(contextDir, { recursive: true });
 
       await expect(clearContextDir(contextDir)).resolves.not.toThrow();
     });
   });
 
-  describe('writeContextFile', () => {
-    beforeEach(async () => {
-      await fs.mkdir(contextDir, { recursive: true });
+  describe('getKBPath', () => {
+    it('returns KB path for a slug', () => {
+      const kbPath = getKBPath('api-guidelines');
+
+      expect(kbPath).toContain('.kahuna');
+      expect(kbPath).toContain('knowledge');
+      expect(kbPath).toContain('api-guidelines.mdc');
     });
 
-    it('strips frontmatter and writes .md file', async () => {
-      const mdcContent = `---
-type: knowledge
-title: API Guidelines
-summary: API standards.
-created_at: "2026-02-10T00:00:00.000Z"
-updated_at: "2026-02-10T00:00:00.000Z"
-source:
-  file: api.md
-  project: /test
-  path: /test/api.md
-classification:
-  category: policy
-  confidence: 0.9
-  reasoning: Contains rules
-  topics:
-    - API
-status: active
----
+    it('uses KAHUNA_KNOWLEDGE_DIR env var if set', () => {
+      const originalEnv = process.env.KAHUNA_KNOWLEDGE_DIR;
+      process.env.KAHUNA_KNOWLEDGE_DIR = '/custom/kb/path';
 
-# API Design Guidelines
+      const kbPath = getKBPath('test-slug');
 
-Follow these rules for API design.`;
+      expect(kbPath).toBe('/custom/kb/path/test-slug.mdc');
 
-      await writeContextFile(contextDir, 'api-guidelines', mdcContent);
-
-      const filepath = path.join(contextDir, 'api-guidelines.md');
-      const content = await fs.readFile(filepath, 'utf-8');
-
-      expect(content).toBe('# API Design Guidelines\n\nFollow these rules for API design.');
-      expect(content).not.toContain('---');
-      expect(content).not.toContain('type: knowledge');
-    });
-
-    it('handles content without frontmatter', async () => {
-      const plainContent = '# Just Markdown\n\nNo frontmatter here.';
-
-      await writeContextFile(contextDir, 'plain-file', plainContent);
-
-      const filepath = path.join(contextDir, 'plain-file.md');
-      const content = await fs.readFile(filepath, 'utf-8');
-
-      expect(content).toBe(plainContent);
+      // Restore original env
+      if (originalEnv) {
+        process.env.KAHUNA_KNOWLEDGE_DIR = originalEnv;
+      } else {
+        process.env.KAHUNA_KNOWLEDGE_DIR = undefined;
+      }
     });
   });
 
@@ -121,48 +93,60 @@ Follow these rules for API design.`;
       await fs.mkdir(contextDir, { recursive: true });
     });
 
-    it('generates README.md with file table', async () => {
-      const selections = [
-        { slug: 'api-guidelines', reason: 'Contains rate limiting rules' },
-        { slug: 'error-patterns', reason: 'Error handling for rate limits' },
+    it('generates .context-guide.md with KB file references', async () => {
+      const kbFiles = [
+        {
+          slug: 'api-guidelines',
+          reason: 'Contains rate limiting rules',
+          kbPath: '/home/user/.kahuna/knowledge/api-guidelines.mdc',
+          title: 'API Guidelines',
+        },
+        {
+          slug: 'error-patterns',
+          reason: 'Error handling for rate limits',
+          kbPath: '/home/user/.kahuna/knowledge/error-patterns.mdc',
+          title: 'Error Patterns',
+        },
       ];
 
-      await writeContextReadme(contextDir, 'Add rate limiting to search', selections);
+      await writeContextReadme(contextDir, 'Add rate limiting to search', kbFiles);
 
-      const readme = await fs.readFile(path.join(contextDir, 'README.md'), 'utf-8');
+      const readme = await fs.readFile(path.join(contextDir, '.context-guide.md'), 'utf-8');
 
       expect(readme).toContain('# Context for: Add rate limiting to search');
-      expect(readme).toContain('| File | Why Relevant |');
-      expect(readme).toContain('api-guidelines.md');
+      expect(readme).toContain('## Knowledge Base Files');
+      expect(readme).toContain('| Topic | KB Path | Why Relevant |');
+      expect(readme).toContain('API Guidelines');
+      expect(readme).toContain('/home/user/.kahuna/knowledge/api-guidelines.mdc');
       expect(readme).toContain('Contains rate limiting rules');
-      expect(readme).toContain('error-patterns.md');
-      expect(readme).toContain('Error handling for rate limits');
     });
 
     it('includes Start Here section with first 3 items', async () => {
-      const selections = [
-        { slug: 'file-a', reason: 'Reason A' },
-        { slug: 'file-b', reason: 'Reason B' },
-        { slug: 'file-c', reason: 'Reason C' },
-        { slug: 'file-d', reason: 'Reason D' },
+      const kbFiles = [
+        { slug: 'file-a', reason: 'Reason A', kbPath: '/kb/file-a.mdc' },
+        { slug: 'file-b', reason: 'Reason B', kbPath: '/kb/file-b.mdc' },
+        { slug: 'file-c', reason: 'Reason C', kbPath: '/kb/file-c.mdc' },
+        { slug: 'file-d', reason: 'Reason D', kbPath: '/kb/file-d.mdc' },
       ];
 
-      await writeContextReadme(contextDir, 'Test task', selections);
+      await writeContextReadme(contextDir, 'Test task', kbFiles);
 
-      const readme = await fs.readFile(path.join(contextDir, 'README.md'), 'utf-8');
+      const readme = await fs.readFile(path.join(contextDir, '.context-guide.md'), 'utf-8');
 
       expect(readme).toContain('## Start Here');
-      expect(readme).toContain('1. Review file-a.md');
-      expect(readme).toContain('2. Review file-b.md');
-      expect(readme).toContain('3. Review file-c.md');
+      expect(readme).toContain('1. Review /kb/file-a.mdc');
+      expect(readme).toContain('2. Review /kb/file-b.mdc');
+      expect(readme).toContain('3. Review /kb/file-c.mdc');
       // 4th item should not be in Start Here
-      expect(readme).not.toContain('4. Review file-d.md');
+      expect(readme).not.toContain('Review /kb/file-d.mdc');
     });
 
     it('includes date and Kahuna attribution', async () => {
-      await writeContextReadme(contextDir, 'Test', [{ slug: 'test', reason: 'Test reason' }]);
+      await writeContextReadme(contextDir, 'Test', [
+        { slug: 'test', reason: 'Test reason', kbPath: '/kb/test.mdc' },
+      ]);
 
-      const readme = await fs.readFile(path.join(contextDir, 'README.md'), 'utf-8');
+      const readme = await fs.readFile(path.join(contextDir, '.context-guide.md'), 'utf-8');
 
       expect(readme).toContain('Surfaced from Kahuna knowledge base on');
       expect(readme).toContain('Prepared by Kahuna');
@@ -170,24 +154,24 @@ Follow these rules for API design.`;
     });
 
     it('includes Local Project Files section when referencedFiles provided', async () => {
-      const selections = [{ slug: 'copied-file', reason: 'Copied to context' }];
+      const kbFiles = [{ slug: 'kb-file', reason: 'From KB', kbPath: '/kb/file.mdc' }];
       const referencedFiles = [
         { slug: 'local-doc', reason: 'From local project', localPath: 'docs/api-design.md' },
       ];
 
-      await writeContextReadme(contextDir, 'Test with local files', selections, referencedFiles);
+      await writeContextReadme(contextDir, 'Test with local files', kbFiles, referencedFiles);
 
-      const readme = await fs.readFile(path.join(contextDir, 'README.md'), 'utf-8');
+      const readme = await fs.readFile(path.join(contextDir, '.context-guide.md'), 'utf-8');
 
       expect(readme).toContain('## Local Project Files');
-      expect(readme).toContain('These KB entries originated from files in your project');
+      expect(readme).toContain('These files are in your project');
       expect(readme).toContain('local-doc');
       expect(readme).toContain('docs/api-design.md');
-      expect(readme).toContain('../docs/api-design.md'); // Link format
+      expect(readme).toContain('./docs/api-design.md'); // Link format
     });
 
     it('includes Framework section when frameworkResult provided with copied files', async () => {
-      const selections = [{ slug: 'test-file', reason: 'Test' }];
+      const kbFiles = [{ slug: 'test-file', reason: 'Test', kbPath: '/kb/test.mdc' }];
       const frameworkResult = {
         framework: 'langgraph',
         displayName: 'LangGraph',
@@ -197,18 +181,17 @@ Follow these rules for API design.`;
         kbDocSlug: 'langgraph-best-practices',
       };
 
-      await writeContextReadme(contextDir, 'Build agent', selections, undefined, frameworkResult);
+      await writeContextReadme(contextDir, 'Build agent', kbFiles, undefined, frameworkResult);
 
-      const readme = await fs.readFile(path.join(contextDir, 'README.md'), 'utf-8');
+      const readme = await fs.readFile(path.join(contextDir, '.context-guide.md'), 'utf-8');
 
       expect(readme).toContain('## Framework');
       expect(readme).toContain('Framework: **LangGraph**');
       expect(readme).toContain('Boilerplate files added to your project');
-      expect(readme).toContain('[README.md](../README.md)');
     });
 
     it('does not include Framework section when no files were copied', async () => {
-      const selections = [{ slug: 'test-file', reason: 'Test' }];
+      const kbFiles = [{ slug: 'test-file', reason: 'Test', kbPath: '/kb/test.mdc' }];
       const frameworkResult = {
         framework: 'langgraph',
         displayName: 'LangGraph',
@@ -218,73 +201,45 @@ Follow these rules for API design.`;
         kbDocSlug: 'langgraph-best-practices',
       };
 
-      await writeContextReadme(contextDir, 'Build agent', selections, undefined, frameworkResult);
+      await writeContextReadme(contextDir, 'Build agent', kbFiles, undefined, frameworkResult);
 
-      const readme = await fs.readFile(path.join(contextDir, 'README.md'), 'utf-8');
+      const readme = await fs.readFile(path.join(contextDir, '.context-guide.md'), 'utf-8');
 
       expect(readme).not.toContain('## Framework');
     });
   });
 
-  describe('listContextFiles', () => {
-    it('returns .md filenames from context directory', async () => {
-      await fs.mkdir(contextDir, { recursive: true });
-      await fs.writeFile(path.join(contextDir, 'api-guidelines.md'), 'content');
-      await fs.writeFile(path.join(contextDir, 'error-patterns.md'), 'content');
-      await fs.writeFile(path.join(contextDir, 'README.md'), 'readme');
-
-      const files = await listContextFiles(contextDir);
-
-      expect(files).toHaveLength(3);
-      expect(files).toContain('api-guidelines.md');
-      expect(files).toContain('error-patterns.md');
-      expect(files).toContain('README.md');
-    });
-
-    it('returns empty array if directory does not exist', async () => {
-      const nonExistent = path.join(os.tmpdir(), `nonexistent-${Date.now()}`);
-
-      const files = await listContextFiles(nonExistent);
-
-      expect(files).toEqual([]);
-    });
-
-    it('excludes non-.md files', async () => {
-      await fs.mkdir(contextDir, { recursive: true });
-      await fs.writeFile(path.join(contextDir, 'file.md'), 'md content');
-      await fs.writeFile(path.join(contextDir, 'file.txt'), 'txt content');
-      await fs.writeFile(path.join(contextDir, 'file.json'), 'json content');
-
-      const files = await listContextFiles(contextDir);
-
-      expect(files).toEqual(['file.md']);
-    });
-
-    it('returns empty array for empty directory', async () => {
-      await fs.mkdir(contextDir, { recursive: true });
-
-      const files = await listContextFiles(contextDir);
-
-      expect(files).toEqual([]);
-    });
-  });
-
-  describe('shouldReferenceLocally', () => {
-    let tempDir: string;
-    let tempFile: string;
-    let relativePath: string;
+  describe('hasLocalSource', () => {
+    let inProjectDir: string;
+    let inProjectFile: string;
+    let inProjectRelativePath: string;
+    let externalDir: string;
+    let externalFile: string;
+    let externalRelativePath: string;
 
     beforeEach(async () => {
-      // Create a temp file relative to cwd for testing
-      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kahuna-test-'));
-      relativePath = path.relative(process.cwd(), path.join(tempDir, 'test.md'));
-      tempFile = path.join(tempDir, 'test.md');
-      await fs.writeFile(tempFile, '# Test content');
+      // Create a file inside cwd for testing (should have local source)
+      inProjectDir = path.join(process.cwd(), 'test-local-ref');
+      await fs.mkdir(inProjectDir, { recursive: true });
+      inProjectFile = path.join(inProjectDir, 'test.md');
+      inProjectRelativePath = path.relative(process.cwd(), inProjectFile);
+      await fs.writeFile(inProjectFile, '# Test content');
+
+      // Create a file outside cwd for testing (should NOT have local source)
+      externalDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kahuna-external-'));
+      externalFile = path.join(externalDir, 'external.md');
+      externalRelativePath = path.relative(process.cwd(), externalFile);
+      await fs.writeFile(externalFile, '# External content');
     });
 
     afterEach(async () => {
       try {
-        await fs.rm(tempDir, { recursive: true });
+        await fs.rm(inProjectDir, { recursive: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+      try {
+        await fs.rm(externalDir, { recursive: true });
       } catch {
         // Ignore cleanup errors
       }
@@ -320,34 +275,44 @@ Follow these rules for API design.`;
         source: { file: 'test.md', project: process.cwd(), path: null },
       });
 
-      const result = await shouldReferenceLocally(entry);
+      const result = await hasLocalSource(entry);
 
       expect(result).toBe(false);
     });
-
 
     it('returns false when source.path file does not exist', async () => {
       const entry = createMockEntry({
         source: { file: 'nonexistent.md', project: process.cwd(), path: 'nonexistent/file.md' },
       });
 
-      const result = await shouldReferenceLocally(entry);
+      const result = await hasLocalSource(entry);
 
       expect(result).toBe(false);
     });
 
-    it('returns true when source.path exists relative to cwd', async () => {
+    it('returns true when source.path exists inside cwd', async () => {
       const entry = createMockEntry({
-        source: { file: 'test.md', project: '/some/other/project', path: relativePath },
+        source: { file: 'test.md', project: '/some/other/project', path: inProjectRelativePath },
       });
 
-      const result = await shouldReferenceLocally(entry);
+      const result = await hasLocalSource(entry);
 
       expect(result).toBe(true);
     });
+
+    it('returns false when source.path exists but is outside cwd', async () => {
+      const entry = createMockEntry({
+        source: { file: 'external.md', project: '/external/project', path: externalRelativePath },
+      });
+
+      const result = await hasLocalSource(entry);
+
+      // File exists but is outside the project directory - should NOT have local source
+      expect(result).toBe(false);
+    });
   });
 
-  describe('getRelativeLocalPath', () => {
+  describe('getLocalSourcePath', () => {
     it('returns source.path when available', () => {
       const entry = {
         slug: 'test',
@@ -361,7 +326,7 @@ Follow these rules for API design.`;
         },
       } as KnowledgeEntry;
 
-      const result = getRelativeLocalPath(entry);
+      const result = getLocalSourcePath(entry);
 
       expect(result).toBe('docs/api-design.md');
     });
@@ -378,7 +343,7 @@ Follow these rules for API design.`;
         },
       } as KnowledgeEntry;
 
-      const result = getRelativeLocalPath(entry);
+      const result = getLocalSourcePath(entry);
 
       expect(result).toBe('api-design.md');
     });
@@ -397,7 +362,7 @@ Follow these rules for API design.`;
         },
       } as KnowledgeEntry;
 
-      const result = getRelativeLocalPath(entry);
+      const result = getLocalSourcePath(entry);
 
       expect(result).toBe(path.join('docs', 'api-design.md'));
     });
@@ -410,7 +375,7 @@ Follow these rules for API design.`;
         content: 'content',
       } as KnowledgeEntry;
 
-      const result = getRelativeLocalPath(entry);
+      const result = getLocalSourcePath(entry);
 
       expect(result).toBe('');
     });
