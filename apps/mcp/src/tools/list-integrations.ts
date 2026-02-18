@@ -78,8 +78,20 @@ Use \`kahuna_learn\` on files that describe your external services, APIs, or dat
         filtered = filtered.filter((i) => i.status === statusFilter);
       }
 
-      // Generate detailed markdown
-      return markdownResponse(await generateIntegrationsSummaryMarkdown());
+      if (filtered.length === 0) {
+        return markdownResponse(`# Discovered Integrations
+
+*No integrations match the specified filters.*
+
+**Filters applied:**
+- Type: ${typeFilter ?? 'all'}
+- Status: ${statusFilter ?? 'all'}
+
+Try removing filters or use \`kahuna_learn\` to discover more integrations.`);
+      }
+
+      // Generate detailed markdown using the filtered list
+      return markdownResponse(await generateIntegrationsSummaryMarkdown(filtered));
     }
 
     // Summary format

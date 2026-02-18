@@ -269,7 +269,9 @@ const KNOWN_PATTERNS: KnownIntegrationPattern[] = [
 
   // AI Services
   {
-    pattern: /openai|gpt-|sk-[a-zA-Z0-9]{32,}/gi,
+    // Match OpenAI references but avoid Stripe keys (sk_live_, sk_test_)
+    // OpenAI keys use sk- followed by alphanumeric (no underscore after sk-)
+    pattern: /openai|gpt-(?:3\.5|4|4o)|sk-(?!_)[a-zA-Z0-9]{20,}/gi,
     type: 'ai',
     displayName: 'OpenAI',
     id: 'openai',

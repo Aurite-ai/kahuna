@@ -266,12 +266,19 @@ export async function mergeIntegration(
 }
 
 /**
- * Generate markdown summary of all integrations
+ * Generate markdown summary of integrations
  *
  * Used for surfacing to project context.
+ *
+ * @param integrationsOrDir - Either a pre-filtered array of integrations, or a custom directory path
  */
-export async function generateIntegrationsSummaryMarkdown(customDir?: string): Promise<string> {
-  const integrations = await listIntegrations(customDir);
+export async function generateIntegrationsSummaryMarkdown(
+  integrationsOrDir?: IntegrationDescriptor[] | string
+): Promise<string> {
+  // If it's an array, use it directly; otherwise treat as customDir and fetch all
+  const integrations = Array.isArray(integrationsOrDir)
+    ? integrationsOrDir
+    : await listIntegrations(integrationsOrDir);
 
   if (integrations.length === 0) {
     return `# Available Integrations

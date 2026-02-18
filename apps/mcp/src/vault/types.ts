@@ -7,6 +7,9 @@
  * See: docs/design/secure-integrations.md
  */
 
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
 /**
  * Supported vault providers
  */
@@ -126,7 +129,7 @@ export const DEFAULT_VAULT_CONFIG: VaultConfig = {
   fallbackProviders: [],
   providerConfig: {
     env: {
-      filePath: '~/.kahuna/.env',
+      filePath: join(homedir(), '.kahuna', '.env'),
       prefix: 'KAHUNA_',
     },
   },
