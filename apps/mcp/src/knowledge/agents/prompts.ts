@@ -20,10 +20,12 @@ export const CATEGORIZATION_PROMPT = `You are a file analyzer. Classify this fil
 4. **decision**: Decision records, rationale, trade-off analyses
 5. **pattern**: Source code, implementation patterns, reusable examples, config files
 6. **context**: General background, overviews, onboarding docs, or unclear fit
+7. **integration**: Data sources, external services, APIs, tools, connectors, authentication methods, and workflows connecting systems. Use when file describes how to connect to or use external services (e.g., Gmail, Slack, HubSpot, databases, payment providers).
 
 **Guidelines:**
 - Choose the category matching the file's *primary purpose*
 - If multiple categories apply, choose the dominant one
+- Use **integration** when the primary purpose is describing connections to external systems, APIs, or data sources
 - Use **context** as fallback when no other category clearly fits
 
 Use the 'categorize_file' tool to provide your analysis.`;

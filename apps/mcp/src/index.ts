@@ -31,9 +31,12 @@ import { askTool } from './tools/ask.js';
 import { healthCheckTool } from './tools/health-check.js';
 import { initializeTool } from './tools/initialize.js';
 import { learnTool } from './tools/learn.js';
+import { listIntegrationsTool } from './tools/list-integrations.js';
 import { prepareContextTool } from './tools/prepare-context.js';
 import type { ToolContext } from './tools/types.js';
 import { createUsageTrackerFromEnv } from './usage/index.js';
+import { useIntegrationTool } from './tools/use-integration.js';
+import { verifyIntegrationTool } from './tools/verify-integration.js';
 
 // =============================================================================
 // SERVER CONFIGURATION
@@ -49,6 +52,10 @@ const allTools = [
   learnTool.definition,
   prepareContextTool.definition,
   askTool.definition,
+  // Integration tools
+  listIntegrationsTool.definition,
+  useIntegrationTool.definition,
+  verifyIntegrationTool.definition,
 ];
 
 /**
@@ -75,6 +82,16 @@ async function routeToolCall(
 
     case 'kahuna_ask':
       return askTool.handler(args, ctx);
+
+    // Integration tools
+    case 'kahuna_list_integrations':
+      return listIntegrationsTool.handler(args, ctx);
+
+    case 'kahuna_use_integration':
+      return useIntegrationTool.handler(args, ctx);
+
+    case 'kahuna_verify_integration':
+      return verifyIntegrationTool.handler(args, ctx);
 
     default:
       return {

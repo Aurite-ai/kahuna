@@ -3,6 +3,7 @@
  *
  * Accepts files/folders, classifies each using an LLM categorization agent,
  * and stores them in the knowledge base as .mdc files.
+ * Also detects integrations and sensitive data during ingestion.
  *
  * See: docs/internal/designs/context-management-system.md
  */
@@ -11,6 +12,13 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { MODELS } from '../config.js';
+import {
+  type IntegrationDescriptor,
+  extractIntegrationsFrom1PasswordRefs,
+  extractIntegrationsFromPatterns,
+  mergeIntegration,
+  mergeSecretsWithIntegrations,
+} from '../integrations/index.js';
 import {
   type AgentResult,
   type AgentUsageStats,
@@ -23,6 +31,7 @@ import {
   runAgent,
 } from '../knowledge/index.js';
 import { formatCost, formatTokens } from '../usage/index.js';
+import { envVaultProvider, redactSensitiveData } from '../vault/index.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -106,6 +115,22 @@ interface FileLearnResult {
   error?: string;
   slug?: string;
   created?: boolean;
+  /** Number of sensitive data items redacted */
+  redactedCount?: number;
+  /** Integrations detected in this file */
+  integrationsDetected?: string[];
+}
+
+/**
+ * Aggregate results for integrations and secrets across all files
+ */
+interface LearnAggregateResults {
+  /** All integrations discovered across files */
+  integrations: IntegrationDescriptor[];
+  /** Total secrets redacted across files */
+  totalSecretsRedacted: number;
+  /** Secrets by type */
+  secretsByType: Map<string, number>;
 }
 
 /**
@@ -213,7 +238,25 @@ function extractCategorizationResult(agentResult: AgentResult): {
 // MARKDOWN RESPONSE BUILDERS
 // =============================================================================
 
-function buildLearnSuccessMarkdown(results: FileLearnResult[]): string {
+function buildLearnNoFilesMarkdown(): string {
+  return `# No Files Found
+
+No accessible files found in the provided paths.
+
+<hints>
+- Check that the paths exist and are accessible
+- Provide at least one file or folder path
+- Folders are searched recursively (hidden files and node_modules are skipped)
+</hints>`;
+}
+
+/**
+ * Enhanced markdown builder that includes integration and secret information
+ */
+function buildLearnSuccessMarkdownWithAggregates(
+  results: FileLearnResult[],
+  aggregates: LearnAggregateResults
+): string {
   const successful = results.filter((r) => r.success);
   const failed = results.filter((r) => !r.success);
   const created = successful.filter((r) => r.created).length;
@@ -263,28 +306,58 @@ function buildLearnSuccessMarkdown(results: FileLearnResult[]): string {
     }
   }
 
+  // Integrations section
+  if (aggregates.integrations.length > 0) {
+    parts.push('\n## 🔌 Integrations Discovered\n');
+    parts.push(
+      'Kahuna detected and stored these integration descriptors in `~/.kahuna/integrations/`:\n'
+    );
+    parts.push('| Integration | Type | Operations | Auth |');
+    parts.push('|-------------|------|------------|------|');
+    for (const integration of aggregates.integrations) {
+      const ops = integration.operations.map((op) => op.name).join(', ');
+      parts.push(
+        `| **${integration.displayName}** | ${integration.type} | ${ops} | ${integration.authentication.method} |`
+      );
+    }
+    parts.push('\nThese integrations are now available for agents to use automatically.');
+  }
+
+  // Secrets redaction section
+  if (aggregates.totalSecretsRedacted > 0) {
+    parts.push('\n## 🔐 Sensitive Data Handled\n');
+    parts.push(
+      `**${aggregates.totalSecretsRedacted} credential(s)** were detected, stored in vault, and redacted from knowledge base:\n`
+    );
+    for (const [secretType, count] of aggregates.secretsByType) {
+      const typeName = secretType.replace(/_/g, ' ');
+      parts.push(
+        `- ${typeName}: ${count} → stored in \`~/.kahuna/.env\` and referenced via \`vault://env/...\``
+      );
+    }
+    parts.push(
+      '\n✅ **Secrets are now stored in your vault** at `~/.kahuna/.env` and can be retrieved by integrations.'
+    );
+  }
+
   // Hints
   parts.push('\n<hints>');
   parts.push('- Use `kahuna_prepare_context` to surface this knowledge for a specific task');
   parts.push('- Send more files anytime — Kahuna handles classification automatically');
+  if (aggregates.integrations.length > 0) {
+    parts.push(
+      '- Integrations are ready — agents can now connect to detected services without manual config'
+    );
+  }
+  if (aggregates.totalSecretsRedacted > 0) {
+    parts.push('- Credentials are safely referenced via vault — never stored in plain text');
+  }
   if (failed.length > 0) {
     parts.push('- Large files can be split into smaller, focused documents');
   }
   parts.push('</hints>');
 
   return parts.join('\n');
-}
-
-function buildLearnNoFilesMarkdown(): string {
-  return `# No Files Found
-
-No accessible files found in the provided paths.
-
-<hints>
-- Check that the paths exist and are accessible
-- Provide at least one file or folder path
-- Folders are searched recursively (hidden files and node_modules are skipped)
-</hints>`;
 }
 
 // =============================================================================
@@ -337,6 +410,13 @@ export async function learnToolHandler(
     totalLatencyMs: 0,
   };
 
+  // Track aggregates for integrations and secrets
+  const aggregates: LearnAggregateResults = {
+    integrations: [],
+    totalSecretsRedacted: 0,
+    secretsByType: new Map(),
+  };
+
   // Add path errors as failed results
   for (const pathError of pathErrors) {
     results.push({
@@ -378,8 +458,83 @@ export async function learnToolHandler(
         continue;
       }
 
-      // Step 3: Run categorization agent with usage tracking
-      const userMessage = buildCategorizationUserMessage(filename, content, description);
+      // Step 2.5: Detect sensitive data and redact before storing
+      const redactionResult = redactSensitiveData(content);
+      const contentToStore = redactionResult.redactedContent;
+      const secretsDetected = redactionResult.matches;
+
+      // Track secrets for aggregates and store them in the vault
+      if (secretsDetected.length > 0) {
+        aggregates.totalSecretsRedacted += secretsDetected.length;
+        for (const secret of secretsDetected) {
+          const count = aggregates.secretsByType.get(secret.type) ?? 0;
+          aggregates.secretsByType.set(secret.type, count + 1);
+
+          // Store the detected secret in the vault
+          // Skip 1Password references - they're already secure references
+          if (secret.type !== '1password_reference') {
+            try {
+              await envVaultProvider.setSecret(secret.suggestedVaultPath, secret.value);
+            } catch (vaultError) {
+              // Log but don't fail the learning process if vault storage fails
+              console.warn(
+                `Warning: Failed to store secret ${secret.suggestedVaultPath} in vault:`,
+                vaultError instanceof Error ? vaultError.message : 'Unknown error'
+              );
+            }
+          }
+        }
+      }
+
+      // Step 2.6: Extract integrations from content (using original content for detection)
+      const integrationResult = extractIntegrationsFromPatterns(content, {
+        sourceFile: filePath,
+        detectedSecrets: secretsDetected,
+      });
+
+      // Save detected integrations from pattern matching
+      const fileIntegrations: string[] = [];
+      for (const integration of integrationResult.integrations) {
+        // Merge secrets info with integration
+        const enhancedIntegration = mergeSecretsWithIntegrations([integration], secretsDetected)[0];
+        // Save/merge integration
+        const saved = await mergeIntegration(enhancedIntegration);
+        fileIntegrations.push(saved.displayName);
+        // Track in aggregates (avoid duplicates by id)
+        if (!aggregates.integrations.find((i) => i.id === saved.id)) {
+          aggregates.integrations.push(saved);
+        }
+      }
+
+      // Step 2.7: Extract integrations from 1Password references (op:// URLs)
+      // This enables "zero copy-paste" enterprise workflow where users mention
+      // credentials stored in 1Password and Kahuna automatically understands
+      // what integrations are needed
+      const opIntegrationResult = extractIntegrationsFrom1PasswordRefs(content, {
+        sourceFile: filePath,
+      });
+
+      // Save integrations detected from 1Password references
+      for (const integration of opIntegrationResult.integrations) {
+        // Check if we already found this integration via pattern matching
+        if (!aggregates.integrations.find((i) => i.id === integration.id)) {
+          // Save/merge integration
+          const saved = await mergeIntegration(integration);
+          fileIntegrations.push(saved.displayName);
+          aggregates.integrations.push(saved);
+        }
+      }
+
+      // Log unmatched 1Password references for debugging
+      if (opIntegrationResult.unmatched.length > 0) {
+        console.warn(
+          `Note: Found ${opIntegrationResult.unmatched.length} 1Password reference(s) that couldn't be mapped to known integrations:`,
+          opIntegrationResult.unmatched
+        );
+      }
+
+      // Step 3: Run categorization agent (on redacted content) with usage tracking
+      const userMessage = buildCategorizationUserMessage(filename, contentToStore, description);
       const agentResult = await runAgent(
         {
           model: MODELS.categorization,
@@ -413,11 +568,11 @@ export async function learnToolHandler(
         continue;
       }
 
-      // Step 5: Build save input and store
+      // Step 5: Build save input and store (with redacted content)
       const saveInput: SaveKnowledgeEntryInput = {
         title: catResult.title,
         summary: catResult.summary,
-        content,
+        content: contentToStore, // Store redacted content, not original
         sourceFile: filename,
         sourcePath: filePath,
         category: catResult.category as SaveKnowledgeEntryInput['category'],
@@ -443,6 +598,8 @@ export async function learnToolHandler(
         topics: catResult.topics,
         slug: entry.slug,
         created: wasCreated,
+        redactedCount: secretsDetected.length,
+        integrationsDetected: fileIntegrations,
       });
     } catch (error) {
       let errorMessage: string;
@@ -463,7 +620,7 @@ export async function learnToolHandler(
   }
 
   // Build markdown with usage summary
-  let markdown = buildLearnSuccessMarkdown(results);
+  let markdown = buildLearnSuccessMarkdownWithAggregates(results, aggregates);
 
   // Add usage summary if tracking is enabled
   if (usageTracker.shouldIncludeInResponses() && totalUsage.llmCallCount > 0) {

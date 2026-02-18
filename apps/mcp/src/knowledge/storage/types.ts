@@ -14,7 +14,27 @@ export type KnowledgeCategory =
   | 'reference'
   | 'decision'
   | 'pattern'
-  | 'context';
+  | 'context'
+  | 'integration';
+
+/**
+ * Integration metadata for data sources, tools, and external services.
+ * This helps vibe coders make informed decisions when building agents.
+ */
+export interface IntegrationMetadata {
+  /** External services mentioned (e.g., Gmail, HubSpot, PostgreSQL, Slack) */
+  connectedServices?: string[];
+  /** What triggers the integration (e.g., webhook, schedule, manual, event, api-call) */
+  triggers?: string[];
+  /** Where data comes from (e.g., database, api, crm, spreadsheet, email) */
+  dataSources?: string[];
+  /** Where results/actions go (e.g., email, notification, api-call, database-write) */
+  outputs?: string[];
+  /** What AI tasks are involved (e.g., generate-email, analyze-sentiment, classify-ticket) */
+  aiTasks?: string[];
+  /** Authentication methods (e.g., oauth2, api-key, basic-auth, jwt) */
+  authentication?: string[];
+}
 
 /**
  * Entry status for soft delete support
