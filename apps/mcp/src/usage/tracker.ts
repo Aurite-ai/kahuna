@@ -241,6 +241,9 @@ export class UsageTracker {
     this.totals.avgLatencyMs = 0;
   }
 
+  /** Timeout for remote API calls in milliseconds */
+  private static readonly REMOTE_TIMEOUT_MS = 10000;
+
   /**
    * Send usage data to remote API (for enterprise tracking).
    * Override this method to implement custom reporting.
@@ -251,6 +254,10 @@ export class UsageTracker {
     if (!this.config.apiEndpoint || !this.config.apiKey) {
       return;
     }
+
+    // Add timeout to prevent slow/unresponsive endpoints from causing issues
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), UsageTracker.REMOTE_TIMEOUT_MS);
 
     try {
       const response = await fetch(`${this.config.apiEndpoint}/usage/record`, {
@@ -278,12 +285,16 @@ export class UsageTracker {
             errorMessage: call.errorMessage,
           },
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.error(`[UsageTracker] Remote API returned ${response.status}`);
       }
     } catch (error) {
+      clearTimeout(timeoutId);
       console.error('[UsageTracker] Failed to send to remote API:', error);
     }
   }
