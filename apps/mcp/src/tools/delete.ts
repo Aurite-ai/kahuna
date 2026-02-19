@@ -193,7 +193,7 @@ export async function deleteToolHandler(
       }
 
       // Delete the file
-      await storage.delete(slug);
+      await storage.delete(slug, true);
 
       results.push({
         slug,
