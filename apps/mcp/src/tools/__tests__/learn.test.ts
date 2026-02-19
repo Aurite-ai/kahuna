@@ -70,6 +70,13 @@ function mockContradictionCheckResult(
         contradictions,
       },
     ],
+    usage: {
+      totalCost: 0,
+      totalInputTokens: 0,
+      totalLatencyMs: 0,
+      totalOutputTokens: 0,
+      llmCallCount: 0,
+    },
   };
 }
 
