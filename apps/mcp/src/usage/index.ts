@@ -48,7 +48,7 @@ export {
   getModelPricing,
   getShortModelName,
   isKnownModel,
-  MODEL_PRICING,
+  MODEL_REGISTRY,
   type ModelPricing,
 } from './pricing.js';
 

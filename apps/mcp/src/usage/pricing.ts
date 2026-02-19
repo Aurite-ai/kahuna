@@ -7,12 +7,7 @@
  * Pricing reference: https://platform.claude.com/docs/en/about-claude/pricing
  */
 
-import {
-  type ModelPricing as ConfigModelPricing,
-  MODEL_REGISTRY,
-  type ModelConfig,
-  getModelConfig,
-} from '../config.js';
+import { MODEL_REGISTRY, type ModelConfig, getModelConfig } from '../config.js';
 
 /**
  * Pricing structure for a model (backward compatible interface).
