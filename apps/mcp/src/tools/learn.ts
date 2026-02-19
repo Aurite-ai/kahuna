@@ -645,6 +645,13 @@ export async function learnToolHandler(
         anthropic
       );
 
+      // Accumulate usage stats
+      totalUsage.totalInputTokens += contradictionCheckResult.usage.totalInputTokens;
+      totalUsage.totalOutputTokens += contradictionCheckResult.usage.totalOutputTokens;
+      totalUsage.totalCost += contradictionCheckResult.usage.totalCost;
+      totalUsage.llmCallCount += contradictionCheckResult.usage.llmCallCount;
+      totalUsage.totalLatencyMs += contradictionCheckResult.usage.totalLatencyMs;
+
       // Step 6: Extract contradiction results
       const contradictionsResult = extractContradictionsResult(contradictionCheckResult);
       if (contradictionsResult && contradictionsResult.contradictions.length > 0) {
