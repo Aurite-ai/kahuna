@@ -1,7 +1,0 @@
-# Anthropic API Key - add your key if your agent uses an Anthropic model
-
-ANTHROPIC_API_KEY=
-
-# OpenAI API Key - add your key if your agent uses an OpenAI model
-
-OPENAI_API_KEY=

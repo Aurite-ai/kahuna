@@ -59,12 +59,6 @@ importers:
         specifier: ^22.0.0
         version: 22.19.7
 
-  packages/vck-templates:
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.7
-
 packages:
 
   '@anthropic-ai/sdk@0.32.1':
