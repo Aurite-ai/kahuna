@@ -88,11 +88,10 @@ Expected: JSON response with health check results
 
 ## Test 5: Build Docker Image (Optional)
 
-If Docker is available:
+If Docker is available (run from repo root):
 
 ```bash
-cd apps/mcp
-docker build -t kahuna/mcp-test .
+docker build -t kahuna/mcp-test -f apps/mcp/Dockerfile .
 ```
 
 Expected: Image builds successfully (~195 MB)
@@ -236,10 +235,8 @@ npm install -g @kahuna/mcp && kahuna-mcp --help
 ### Publishing to Docker Hub (Optional)
 
 ```bash
-cd apps/mcp
-
-# Build with proper tag
-docker build -t kahuna/mcp:0.1.0 -t kahuna/mcp:latest .
+# Build with proper tag (from repo root)
+docker build -t kahuna/mcp:0.1.0 -t kahuna/mcp:latest -f apps/mcp/Dockerfile .
 
 # Login to Docker Hub
 docker login
