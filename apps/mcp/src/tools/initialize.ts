@@ -1,20 +1,17 @@
 /**
  * Initialize Tool - Copy copilot configuration and seed knowledge base
  *
- * This tool writes the Claude Code copilot configuration from the VCK templates
+ * This tool writes the Claude Code copilot configuration from the templates
  * to the directory where the user is running Claude Code, and seeds the knowledge
- * base with starter content from the VCK templates.
+ * base with starter content.
  *
- * All templates are embedded as strings for bundler compatibility.
+ * Templates are read from the filesystem for easy maintenance.
  */
 
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import {
-  getClaudeCodeFiles,
-  getKnowledgeBaseFiles,
-} from '@kahuna/vck-templates';
+import { getClaudeCodeFiles, getKnowledgeBaseFiles } from '../templates/index.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -24,7 +21,7 @@ export const initializeToolDefinition = {
   name: 'kahuna_initialize',
   description: `Initialize a new project with Kahuna copilot configuration and seed the knowledge base.
 
-This tool writes the Claude Code copilot configuration from Kahuna's VCK templates
+This tool writes the Claude Code copilot configuration from Kahuna's templates
 to the specified directory and seeds the knowledge base with starter content. It sets up:
 - .claude/settings.json - Permissions and default mode
 - .claude/rules/ - Project rules and guidelines
@@ -97,7 +94,7 @@ function getKnowledgeBaseDir(): string {
 }
 
 /**
- * Write a file from embedded template content.
+ * Write a file from template content.
  * Creates parent directories if needed.
  */
 async function writeTemplateFile(
@@ -117,7 +114,7 @@ async function writeTemplateFile(
 }
 
 /**
- * Seed the knowledge base with .mdc files from embedded templates.
+ * Seed the knowledge base with .mdc files from templates.
  *
  * @returns Object with arrays of seeded and skipped file names
  */
@@ -128,7 +125,7 @@ async function seedKnowledgeBase(
   const skipped: string[] = [];
 
   const kbDir = getKnowledgeBaseDir();
-  const kbFiles = getKnowledgeBaseFiles();
+  const kbFiles = await getKnowledgeBaseFiles();
 
   // Create KB directory if it doesn't exist
   if (!(await pathExists(kbDir))) {
@@ -182,8 +179,8 @@ export async function initializeToolHandler(
     const copiedFiles: string[] = [];
     const skippedFiles: string[] = [];
 
-    // Get embedded Claude Code templates
-    const claudeCodeFiles = getClaudeCodeFiles();
+    // Get Claude Code templates (async now!)
+    const claudeCodeFiles = await getClaudeCodeFiles();
 
     // Write all template files
     for (const file of claudeCodeFiles) {

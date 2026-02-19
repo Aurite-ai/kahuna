@@ -5,15 +5,15 @@
  * Also writes shared project files (.env, .gitignore).
  * Used by prepare_context when the agent selects a framework.
  *
- * All templates are embedded as strings for bundler compatibility.
+ * Templates are stored as files in apps/mcp/templates/ and read at runtime.
  *
  * See: docs/internal/plans/02-10_framework-selection.md
  */
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { getFrameworkFiles, getProjectFiles } from '@kahuna/vck-templates';
 import { FRAMEWORKS } from '../../config.js';
+import { getFrameworkFiles, getProjectFiles } from '../../templates/index.js';
 
 /**
  * Result of a boilerplate copy operation.
@@ -117,14 +117,14 @@ export async function copyFrameworkBoilerplate(
   const skippedFiles: string[] = [];
 
   // 1. Write shared project files (.env, .gitignore)
-  const projectFiles = getProjectFiles();
+  const projectFiles = await getProjectFiles();
   for (const file of projectFiles) {
     const destPath = path.join(projectDir, file.path);
     await writeFileIfNotExists(destPath, file.content, file.path, copiedFiles, skippedFiles);
   }
 
   // 2. Write framework-specific files
-  const frameworkFiles = getFrameworkFiles(frameworkId);
+  const frameworkFiles = await getFrameworkFiles(frameworkId);
   for (const file of frameworkFiles) {
     const destPath = path.join(projectDir, file.path);
     await writeFileIfNotExists(destPath, file.content, file.path, copiedFiles, skippedFiles);

@@ -6,18 +6,39 @@
  * - Bundle all source code and dependencies into one file
  * - Target Node 20 LTS for broad compatibility
  * - Add shebang for CLI execution
- * - Output to dist/kahuna-mcp.js
+ * - Output to dist/kahuna-mcp.cjs
+ * - Copy templates to dist/templates/
  *
  * Usage: pnpm bundle
  */
 
 import * as fs from 'node:fs';
+import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
+
+/**
+ * Recursively copy a directory.
+ */
+async function copyDir(src: string, dest: string): Promise<void> {
+  await fsp.mkdir(dest, { recursive: true });
+  const entries = await fsp.readdir(src, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      await copyDir(srcPath, destPath);
+    } else {
+      await fsp.copyFile(srcPath, destPath);
+    }
+  }
+}
 
 async function bundle() {
   console.log('🔨 Building MCP server bundle...\n');
@@ -70,6 +91,13 @@ async function bundle() {
     const metafilePath = path.join(rootDir, 'dist/metafile.json');
     fs.writeFileSync(metafilePath, JSON.stringify(result.metafile, null, 2));
 
+    // Copy templates to dist/templates/
+    console.log('\n📁 Copying templates...');
+    const templatesSrc = path.join(rootDir, 'templates');
+    const templatesDest = path.join(rootDir, 'dist/templates');
+    await copyDir(templatesSrc, templatesDest);
+    console.log('   Copied templates/ to dist/templates/');
+
     // Calculate bundle size
     const bundlePath = path.join(rootDir, 'dist/kahuna-mcp.cjs');
     const stats = fs.statSync(bundlePath);
@@ -80,6 +108,7 @@ async function bundle() {
 
     console.log('\n✅ Bundle created successfully!\n');
     console.log('   Output: dist/kahuna-mcp.cjs');
+    console.log('   Assets: dist/templates/');
     console.log(`   Size:   ${sizeKB} KB (${sizeMB} MB)`);
     console.log(`   Time:   ${elapsed}s`);
     console.log('\n   Run with: node dist/kahuna-mcp.cjs');

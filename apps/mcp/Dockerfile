@@ -16,19 +16,16 @@ WORKDIR /build
 # Copy monorepo package files for dependency installation
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/mcp/package.json apps/mcp/
-COPY packages/vck-templates/package.json packages/vck-templates/
 
 # Install pnpm and dependencies
 RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN pnpm install --frozen-lockfile
 
-# Copy source code
+# Copy source code (templates are now inside apps/mcp/)
 COPY tsconfig.base.json ./
 COPY apps/mcp/ apps/mcp/
-COPY packages/vck-templates/ packages/vck-templates/
 
-# Build vck-templates first, then bundle the MCP server
-RUN pnpm --filter @kahuna/vck-templates build
+# Bundle the MCP server (includes copying templates to dist/)
 RUN pnpm --filter @kahuna/mcp bundle
 
 # =============================================================================
@@ -38,8 +35,9 @@ FROM node:20-alpine AS runtime
 
 WORKDIR /app
 
-# Copy only the bundled file
+# Copy bundled file and templates
 COPY --from=builder /build/apps/mcp/dist/kahuna-mcp.cjs ./kahuna-mcp.cjs
+COPY --from=builder /build/apps/mcp/dist/templates ./templates
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S kahuna && \
@@ -55,6 +53,7 @@ USER kahuna
 # Environment
 ENV NODE_ENV=production
 ENV KAHUNA_KNOWLEDGE_DIR=/home/kahuna/.kahuna/knowledge
+ENV KAHUNA_TEMPLATES_DIR=/app/templates
 
 # Labels
 LABEL org.opencontainers.image.title="Kahuna MCP Server"

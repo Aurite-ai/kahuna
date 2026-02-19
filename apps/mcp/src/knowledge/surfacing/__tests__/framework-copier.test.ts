@@ -1,8 +1,8 @@
 /**
  * Tests for the framework boilerplate copier
  *
- * Tests the embedded template approach where templates are strings,
- * not filesystem reads.
+ * Tests the file-based template approach where templates are read
+ * from the filesystem at runtime.
  */
 
 import * as fs from 'node:fs/promises';
@@ -12,27 +12,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock fs/promises before importing the module
 vi.mock('node:fs/promises');
 
-// Mock @kahuna/vck-templates
-vi.mock('@kahuna/vck-templates', () => ({
-  getProjectFiles: () => [
-    { path: '.env', content: '# Anthropic API Key\nANTHROPIC_API_KEY=' },
-    { path: '.gitignore', content: '# Python\n__pycache__/' },
-  ],
-  getFrameworkFiles: (frameworkId: string) => {
-    if (frameworkId === 'langgraph') {
-      return [
-        { path: 'main.py', content: '# Main entry point' },
-        { path: 'pyproject.toml', content: '[project]\nname = "kahuna-agent"' },
-        { path: 'README.md', content: '# LangGraph Agent' },
-        { path: 'src/agent/__init__.py', content: '# Agent init' },
-        { path: 'src/agent/graph.py', content: '# Graph definition' },
-        { path: 'src/agent/state.py', content: '# State schema' },
-        { path: 'src/agent/tools.py', content: '# Tool implementations' },
-      ];
-    }
-    throw new Error(`Unknown framework: ${frameworkId}`);
-  },
+// Mock the local templates module (async functions that return Promises)
+// Use factory functions so mocks survive vi.resetAllMocks()
+vi.mock('../../../templates/index.js', () => ({
+  getProjectFiles: vi.fn(),
+  getFrameworkFiles: vi.fn(),
 }));
+
+// Import the mocked module to set up implementations in beforeEach
+import * as templates from '../../../templates/index.js';
 
 // Mock the config
 vi.mock('../../../config.js', () => ({
@@ -58,6 +46,27 @@ describe('framework-copier', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+
+    // Re-setup mock implementations after reset
+    vi.mocked(templates.getProjectFiles).mockResolvedValue([
+      { path: '.env', content: '# Anthropic API Key\nANTHROPIC_API_KEY=' },
+      { path: '.gitignore', content: '# Python\n__pycache__/' },
+    ]);
+
+    vi.mocked(templates.getFrameworkFiles).mockImplementation(async (frameworkId: string) => {
+      if (frameworkId === 'langgraph') {
+        return [
+          { path: 'main.py', content: '# Main entry point' },
+          { path: 'pyproject.toml', content: '[project]\nname = "kahuna-agent"' },
+          { path: 'README.md', content: '# LangGraph Agent' },
+          { path: 'src/agent/__init__.py', content: '# Agent init' },
+          { path: 'src/agent/graph.py', content: '# Graph definition' },
+          { path: 'src/agent/state.py', content: '# State schema' },
+          { path: 'src/agent/tools.py', content: '# Tool implementations' },
+        ];
+      }
+      throw new Error(`Unknown framework: ${frameworkId}`);
+    });
   });
 
   afterEach(() => {
