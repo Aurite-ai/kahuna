@@ -196,7 +196,9 @@ describe('learnToolHandler', () => {
         }),
         expect.stringContaining('API Guidelines'),
         ctx.storage,
-        ctx.anthropic
+        ctx.anthropic,
+        ctx.usageTracker,
+        'kahuna_learn'
       );
 
       // Verify storage.save called with flat fields from agent result
