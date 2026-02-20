@@ -34,6 +34,10 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 **Verify the package is accessible:**
 
 ```bash
+# Check the published version on npm
+npm view @aurite-ai/kahuna version
+
+# Or run it directly (downloads if needed)
 npx @aurite-ai/kahuna --version
 npx @aurite-ai/kahuna --help
 ```
