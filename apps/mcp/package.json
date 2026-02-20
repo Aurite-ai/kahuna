@@ -7,12 +7,15 @@
   "author": "Kahuna Team",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kahuna-ai/kahuna.git",
+    "url": "https://github.com/Aurite-ai/kahuna.git",
     "directory": "apps/mcp"
   },
-  "homepage": "https://github.com/kahuna-ai/kahuna#readme",
+  "homepage": "https://github.com/Aurite-ai/kahuna#readme",
   "bugs": {
-    "url": "https://github.com/kahuna-ai/kahuna/issues"
+    "url": "https://github.com/Aurite-ai/kahuna/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "keywords": [
     "mcp",
@@ -27,12 +30,7 @@
   "bin": {
     "kahuna-mcp": "./dist/kahuna-mcp.cjs"
   },
-  "files": [
-    "dist/kahuna-mcp.cjs",
-    "dist/kahuna-mcp.cjs.map",
-    "dist/templates",
-    "README.md"
-  ],
+  "files": ["dist/kahuna-mcp.cjs", "dist/kahuna-mcp.cjs.map", "dist/templates", "README.md"],
   "engines": {
     "node": ">=20.0.0"
   },
