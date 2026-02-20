@@ -26,7 +26,7 @@ COPY tsconfig.base.json ./
 COPY apps/mcp/ apps/mcp/
 
 # Bundle the MCP server (includes copying templates to dist/)
-RUN pnpm --filter @kahuna/mcp bundle
+RUN pnpm --filter @aurite-ai/kahuna bundle
 
 # =============================================================================
 # Stage 2: Runtime
@@ -58,7 +58,7 @@ ENV KAHUNA_TEMPLATES_DIR=/app/templates
 # Labels
 LABEL org.opencontainers.image.title="Kahuna MCP Server"
 LABEL org.opencontainers.image.description="Context management tools for coding copilots"
-LABEL org.opencontainers.image.source="https://github.com/kahuna-ai/kahuna"
+LABEL org.opencontainers.image.source="https://github.com/Aurite-ai/kahuna"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # MCP uses stdio transport - the container reads/writes JSON-RPC over stdin/stdout

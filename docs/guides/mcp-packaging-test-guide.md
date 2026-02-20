@@ -26,7 +26,7 @@ pnpm install
 All existing tests should pass:
 
 ```bash
-pnpm --filter @kahuna/mcp test
+pnpm --filter @aurite-ai/kahuna test
 ```
 
 Expected: **159 tests passing**
@@ -36,7 +36,7 @@ Expected: **159 tests passing**
 ## Test 2: Build the Bundle
 
 ```bash
-pnpm --filter @kahuna/mcp bundle
+pnpm --filter @aurite-ai/kahuna bundle
 ```
 
 Expected output:
@@ -166,7 +166,7 @@ docker rmi kahuna/mcp-test  # if Docker test was run
 
 ### Prerequisites
 
-1. **npm account** with access to the `@kahuna` organization
+1. **npm account** with access to the `@aurite-ai` organization on [npmjs.com](https://www.npmjs.com/settings/aurite-ai/packages)
 2. **Login to npm**:
    ```bash
    npm login
@@ -195,11 +195,10 @@ docker rmi kahuna/mcp-test  # if Docker test was run
 
 4. **Publish to npm**:
    ```bash
-   npm publish --access public
+   npm publish
    ```
 
-   For scoped packages (`@kahuna/mcp`), `--access public` makes it publicly accessible.
-   Omit this flag if you want a private package (requires npm paid org).
+   > **Note:** `--access public` is already configured via `publishConfig` in `package.json`, so no flag is needed.
 
 ### Version Bumping
 
@@ -224,12 +223,12 @@ After publishing:
 
 ```bash
 # Check the package exists
-npm view @kahuna/mcp
+npm view @aurite-ai/kahuna
 
 # Test installation
-npx @kahuna/mcp --help
+npx @aurite-ai/kahuna --help
 # Or
-npm install -g @kahuna/mcp && kahuna-mcp --help
+npm install -g @aurite-ai/kahuna && kahuna-mcp --help
 ```
 
 ### Publishing to Docker Hub (Optional)

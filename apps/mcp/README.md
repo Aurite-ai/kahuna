@@ -1,4 +1,4 @@
-# @kahuna/mcp
+# @aurite-ai/kahuna
 
 MCP server providing context management tools for coding copilots. Runs locally via stdio transport — copilots call Kahuna tools to learn from files, surface relevant context, and get answers from the knowledge base.
 
@@ -7,7 +7,7 @@ MCP server providing context management tools for coding copilots. Runs locally 
 ### Option 1: npm (Recommended)
 
 ```bash
-npm install -g @kahuna/mcp
+npm install -g @aurite-ai/kahuna
 ```
 
 Then configure your MCP client to use `kahuna-mcp` as the command.
@@ -17,7 +17,7 @@ Then configure your MCP client to use `kahuna-mcp` as the command.
 Use directly without installing:
 
 ```bash
-npx @kahuna/mcp
+npx @aurite-ai/kahuna
 ```
 
 ### Option 3: Docker
@@ -30,11 +30,11 @@ docker run -i kahuna/mcp
 ### Option 4: From Source
 
 ```bash
-git clone https://github.com/kahuna-ai/kahuna.git
+git clone https://github.com/Aurite-ai/kahuna.git
 cd kahuna
 pnpm install
-pnpm --filter @kahuna/mcp build
-pnpm --filter @kahuna/mcp bundle
+pnpm --filter @aurite-ai/kahuna build
+pnpm --filter @aurite-ai/kahuna bundle
 ```
 
 ## Configuration
@@ -75,7 +75,7 @@ KAHUNA_KNOWLEDGE_DIR=/path/to/custom/knowledge
   "mcpServers": {
     "kahuna": {
       "command": "npx",
-      "args": ["@kahuna/mcp"],
+      "args": ["@aurite-ai/kahuna"],
       "env": {
         "ANTHROPIC_API_KEY": "sk-ant-..."
       }
@@ -104,7 +104,7 @@ KAHUNA_KNOWLEDGE_DIR=/path/to/custom/knowledge
 
 ```
 ┌─────────────────────┐     MCP (stdio)     ┌─────────────────────┐
-│   Coding Copilot    │ ◄────────────────► │     @kahuna/mcp     │
+│   Coding Copilot    │ ◄────────────────► │   @aurite-ai/kahuna │
 │   (Claude, Roo,     │                     │                     │
 │    Cursor, etc.)    │                     │  knowledge/ module  │
 └─────────────────────┘                     │  ├── agents/        │
@@ -193,19 +193,19 @@ apps/mcp/src/
 
 ```bash
 # Run in watch mode
-pnpm --filter @kahuna/mcp dev
+pnpm --filter @aurite-ai/kahuna dev
 
 # Run tests
-pnpm --filter @kahuna/mcp test
+pnpm --filter @aurite-ai/kahuna test
 
 # Watch tests
-pnpm --filter @kahuna/mcp test:watch
+pnpm --filter @aurite-ai/kahuna test:watch
 
 # Type-check
-pnpm --filter @kahuna/mcp typecheck
+pnpm --filter @aurite-ai/kahuna typecheck
 
 # Create production bundle
-pnpm --filter @kahuna/mcp bundle
+pnpm --filter @aurite-ai/kahuna bundle
 ```
 
 The MCP server uses **stdio** transport — it reads/writes JSON-RPC over stdin/stdout. Use `dev` for local development; connect via an MCP client.

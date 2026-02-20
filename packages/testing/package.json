@@ -1,5 +1,5 @@
 {
-  "name": "@kahuna/testing",
+  "name": "@aurite-ai/kahuna-testing",
   "version": "0.0.0",
   "private": true,
   "type": "module",
