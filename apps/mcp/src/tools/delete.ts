@@ -209,7 +209,8 @@ export async function deleteToolHandler(
     }
   }
 
-  return markdownResponse(buildDeleteSuccessMarkdown(results));
+  const allFailed = results.every((r) => !r.success);
+  return markdownResponse(buildDeleteSuccessMarkdown(results), allFailed);
 }
 
 /**
