@@ -12,7 +12,7 @@ npx @aurite-ai/kahuna --version
 npx @aurite-ai/kahuna --help
 ```
 
-## Installation
+## Installation (Claude Code setup steps below in "Connecting to MCP Clients" section)
 
 ### Option 1: npm (Recommended)
 
@@ -74,7 +74,7 @@ claude mcp add kahuna -s project -- npx @aurite-ai/kahuna
 # Add globally (available in all projects)
 claude mcp add kahuna -s user -- npx @aurite-ai/kahuna
 
-# Verify it was added
+# Verify it was added (sometimes this doesn't show, go to claude code to verify "/mcp")
 claude mcp list
 ```
 
