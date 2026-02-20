@@ -140,12 +140,29 @@ export async function copyFrameworkBoilerplate(
   };
 }
 
+// Track if deprecation warning has been shown
+let _resolveFrameworkTemplateDirWarned = false;
+
 /**
  * Resolve the path to a framework's template directory.
- * @deprecated This function is kept for backwards compatibility but no longer needed
- * since templates are now embedded. Use getFrameworkFiles() instead.
+ * @deprecated This function is deprecated and will be removed in a future version.
+ * Templates are now embedded in the bundle. Use getFrameworkFiles() from
+ * '../../templates/index.js' instead.
+ *
+ * @param frameworkId - Framework identifier
+ * @returns A placeholder string (not a real path)
+ * @throws FrameworkError if framework is invalid
  */
 export function resolveFrameworkTemplateDir(frameworkId: string): string {
+  // Warn once per process about deprecation
+  if (!_resolveFrameworkTemplateDirWarned) {
+    _resolveFrameworkTemplateDirWarned = true;
+    console.warn(
+      '[kahuna] DEPRECATED: resolveFrameworkTemplateDir() is deprecated and will be removed. ' +
+        'Use getFrameworkFiles() from templates/index.js instead.'
+    );
+  }
+
   // Validate framework ID
   if (!FRAMEWORKS[frameworkId]) {
     throw new FrameworkError(
@@ -153,6 +170,7 @@ export function resolveFrameworkTemplateDir(frameworkId: string): string {
       'INVALID_FRAMEWORK'
     );
   }
-  // Return a placeholder path - templates are now embedded
+
+  // Return a placeholder - templates are now embedded, not read from filesystem
   return `[embedded:frameworks/${frameworkId}]`;
 }

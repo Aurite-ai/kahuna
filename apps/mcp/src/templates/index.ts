@@ -99,8 +99,18 @@ function getTemplatesDir(): string {
   // In bundled CJS with esbuild, we need to find templates/ relative to the bundle
   // The bundle is at dist/kahuna-mcp.cjs, templates are at dist/templates/
 
-  // Use process.argv[1] which is the path to the script being executed
-  // This works for both `node dist/kahuna-mcp.cjs` and npx scenarios
+  // Try __dirname first (available in CJS context, more reliable than process.argv)
+  // In bundled CJS, __dirname points to the directory containing the bundle
+  // biome-ignore lint/suspicious/noExplicitAny: CJS global check
+  const cjsDirname = typeof __dirname !== 'undefined' ? __dirname : undefined;
+  if (cjsDirname) {
+    _templatesDir = path.resolve(cjsDirname, 'templates');
+    return _templatesDir;
+  }
+
+  // Fallback: Use process.argv[1] which is the path to the script being executed
+  // This works for `node dist/kahuna-mcp.cjs` and npx scenarios
+  // but may fail when loaded as a library or in some test runners
   const scriptPath = process.argv[1];
   if (scriptPath) {
     const scriptDir = path.dirname(scriptPath);
