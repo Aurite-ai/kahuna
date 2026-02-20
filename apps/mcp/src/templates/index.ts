@@ -177,10 +177,7 @@ export function listCopilotConfigs(): CopilotConfigTemplate[] {
  * Recursively read all files from a directory.
  * Returns TemplateFile[] with relative paths.
  */
-async function readDirectoryRecursive(
-  dirPath: string,
-  basePath = ''
-): Promise<TemplateFile[]> {
+async function readDirectoryRecursive(dirPath: string, basePath = ''): Promise<TemplateFile[]> {
   const files: TemplateFile[] = [];
 
   try {
@@ -203,9 +200,16 @@ async function readDirectoryRecursive(
         });
       }
     }
-  } catch {
-    // Directory doesn't exist or can't be read
-    // Return empty array
+  } catch (error) {
+    // Log template read failures for debugging
+    // ENOENT (directory doesn't exist) is expected in some scenarios, log as debug
+    const isNotFound = (error as NodeJS.ErrnoException).code === 'ENOENT';
+    if (isNotFound) {
+      console.warn(`[kahuna] Template directory not found: ${dirPath}`);
+    } else {
+      console.error(`[kahuna] Failed to read template directory: ${dirPath}`, error);
+    }
+    // Return empty array - caller should handle gracefully
   }
 
   return files;

@@ -263,7 +263,7 @@ export function getActiveModels(): string[] {
  * MCP server identity.
  */
 export const SERVER_NAME = 'kahuna-mcp-server';
-export const SERVER_VERSION = '0.2.0';
+export const SERVER_VERSION = '0.1.0';
 
 // =============================================================================
 // FRAMEWORK CONFIGURATION
