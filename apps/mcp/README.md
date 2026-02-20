@@ -63,13 +63,35 @@ KAHUNA_KNOWLEDGE_DIR=/path/to/custom/knowledge
 
 ### Connecting to MCP Clients
 
-**Claude Code / Roo Code:**
+#### Claude Code (Recommended)
+
+Use the `claude mcp add` command for quick setup:
+
+```bash
+# Add to current project
+claude mcp add kahuna -s project -- npx @aurite-ai/kahuna
+
+# Add globally (available in all projects)
+claude mcp add kahuna -s user -- npx @aurite-ai/kahuna
+
+# Verify it was added
+claude mcp list
+```
+
+This creates a `.mcp.json` file in your project (or user config for `-s user`).
+
+#### Manual JSON Configuration
+
+For other MCP clients or manual setup, edit your MCP config file directly:
+
+**Using npx (no install required):**
 
 ```json
 {
   "mcpServers": {
     "kahuna": {
-      "command": "kahuna-mcp",
+      "command": "npx",
+      "args": ["@aurite-ai/kahuna"],
       "env": {
         "ANTHROPIC_API_KEY": "sk-ant-..."
       }
@@ -78,14 +100,13 @@ KAHUNA_KNOWLEDGE_DIR=/path/to/custom/knowledge
 }
 ```
 
-**Using npx:**
+**Using global install:**
 
 ```json
 {
   "mcpServers": {
     "kahuna": {
-      "command": "npx",
-      "args": ["@aurite-ai/kahuna"],
+      "command": "kahuna-mcp",
       "env": {
         "ANTHROPIC_API_KEY": "sk-ant-..."
       }

@@ -52,8 +52,10 @@ CONFIGURATION:
     KAHUNA_TEMPLATES_DIR     Optional. Path to templates directory.
 
 MCP CLIENT SETUP:
-  Add to your MCP client configuration (e.g., claude_desktop_config.json):
+  For Claude Code, use the CLI:
+    claude mcp add kahuna -s project -- npx @aurite-ai/kahuna
 
+  For other clients, add to your MCP config:
     {
       "mcpServers": {
         "kahuna": {
