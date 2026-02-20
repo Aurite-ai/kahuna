@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentResult, AgentUsageStats } from '../../knowledge/index.js';
+import { generateProjectHash } from '../onboarding-check.js';
 import { prepareContextToolDefinition, prepareContextToolHandler } from '../prepare-context.js';
 import type { ToolContext } from '../types.js';
 import { createMockContext, createMockEntry } from './test-utils.js';
@@ -81,6 +82,17 @@ function mockRetrievalResult(selections: Array<{ slug: string; reason: string }>
   };
 }
 
+/**
+ * Create onboarding context entries (org + project) required to pass the onboarding gate.
+ */
+function createOnboardingContextEntries() {
+  const projectHash = generateProjectHash(process.cwd());
+  return [
+    createMockEntry({ slug: 'org-context', title: 'Organization Context' }),
+    createMockEntry({ slug: `project-context-${projectHash}`, title: 'Project Context' }),
+  ];
+}
+
 describe('prepareContextToolDefinition', () => {
   it('has the correct name', () => {
     expect(prepareContextToolDefinition.name).toBe('kahuna_prepare_context');
@@ -140,14 +152,16 @@ describe('prepareContextToolHandler', () => {
 
   describe('successful retrieval', () => {
     it('runs agent, writes README with KB references, returns markdown', async () => {
+      const onboardingEntries = createOnboardingContextEntries();
       const entries = [
+        ...onboardingEntries,
         createMockEntry({ slug: 'api-guidelines', title: 'API Guidelines' }),
         createMockEntry({ slug: 'error-patterns', title: 'Error Handling Patterns' }),
       ];
       vi.mocked(ctx.storage.list).mockResolvedValue(entries);
       vi.mocked(ctx.storage.get)
-        .mockResolvedValueOnce(entries[0])
-        .mockResolvedValueOnce(entries[1]);
+        .mockResolvedValueOnce(entries[2]) // api-guidelines
+        .mockResolvedValueOnce(entries[3]); // error-patterns
 
       mockRunAgent.mockResolvedValue(
         mockRetrievalResult([
@@ -193,7 +207,11 @@ describe('prepareContextToolHandler', () => {
 
   describe('no relevant files', () => {
     it('returns no-relevant markdown when agent selects nothing', async () => {
-      vi.mocked(ctx.storage.list).mockResolvedValue([createMockEntry({ slug: 'unrelated' })]);
+      const onboardingEntries = createOnboardingContextEntries();
+      vi.mocked(ctx.storage.list).mockResolvedValue([
+        ...onboardingEntries,
+        createMockEntry({ slug: 'unrelated' }),
+      ]);
 
       mockRunAgent.mockResolvedValue(mockRetrievalResult([]));
 
@@ -205,11 +223,67 @@ describe('prepareContextToolHandler', () => {
       expect(result.isError).toBeUndefined();
       const text = result.content[0].text;
       expect(text).toContain('No Relevant Context');
-      expect(text).toContain('1 files');
+      expect(text).toContain('3 files'); // 2 onboarding + 1 unrelated
       expect(text).toContain('<hints>');
 
       // Context writer should NOT be called
       expect(mockClearContextDir).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('onboarding gates', () => {
+    it('returns org-context-required when no org context', async () => {
+      // Only project context, no org context
+      const projectHash = generateProjectHash(process.cwd());
+      vi.mocked(ctx.storage.list).mockResolvedValue([
+        createMockEntry({ slug: `project-context-${projectHash}`, title: 'Project Context' }),
+        createMockEntry({ slug: 'some-doc', title: 'Some Doc' }),
+      ]);
+
+      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
+
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      expect(text).toContain('Organization Context Required');
+      expect(text).toContain('set up org context');
+      // Agent should NOT be called
+      expect(mockRunAgent).not.toHaveBeenCalled();
+    });
+
+    it('returns project-context-required when org exists but no project context', async () => {
+      // Org context exists, but no project context for current directory
+      vi.mocked(ctx.storage.list).mockResolvedValue([
+        createMockEntry({ slug: 'org-context', title: 'Organization Context' }),
+        createMockEntry({ slug: 'some-doc', title: 'Some Doc' }),
+      ]);
+
+      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
+
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      expect(text).toContain('Project Context Required');
+      expect(text).toContain('set up project context');
+      expect(text).toContain('organization context');
+      // Agent should NOT be called
+      expect(mockRunAgent).not.toHaveBeenCalled();
+    });
+
+    it('proceeds when both org and project context exist', async () => {
+      const onboardingEntries = createOnboardingContextEntries();
+      vi.mocked(ctx.storage.list).mockResolvedValue([
+        ...onboardingEntries,
+        createMockEntry({ slug: 'some-doc', title: 'Some Doc' }),
+      ]);
+      vi.mocked(ctx.storage.get).mockResolvedValue(createMockEntry({ slug: 'some-doc' }));
+      mockRunAgent.mockResolvedValue(
+        mockRetrievalResult([{ slug: 'some-doc', reason: 'Relevant' }])
+      );
+
+      const result = await prepareContextToolHandler({ task: 'test task' }, ctx);
+
+      // Agent SHOULD be called
+      expect(mockRunAgent).toHaveBeenCalledOnce();
+      expect(result.content[0].text).toContain('Context Ready');
     });
   });
 

@@ -151,7 +151,7 @@ async function seedKnowledgeBase(
  */
 export async function initializeToolHandler(
   args: Record<string, unknown>,
-  _ctx: ToolContext
+  ctx: ToolContext
 ): Promise<MCPToolResponse> {
   const input = args as unknown as InitializeToolInput;
   const targetPath = input.targetPath;
@@ -202,6 +202,9 @@ export async function initializeToolHandler(
     // Seed knowledge base
     const seedResult = await seedKnowledgeBase(overwrite);
 
+    // Check onboarding status to tailor next steps
+    const onboardingStatus = await checkOnboardingStatus(ctx.storage);
+
     // Build markdown response
     const copiedRelative = copiedFiles.map((f) => path.relative(absoluteTargetPath, f));
     const skippedRelative = skippedFiles.map((f) => path.relative(absoluteTargetPath, f));
@@ -238,13 +241,22 @@ Kahuna copilot configuration copied to: \`${absoluteTargetPath}\`
       markdown += `\n\nSeeded files:\n${seedResult.seeded.map((f) => `- ${f}`).join('\n')}`;
     }
 
-    // Next Steps section with onboarding hint
-    markdown += `\n\n## Next Steps
+    // Next Steps section - tailored based on onboarding status
+    markdown += '\n\n## Next Steps\n\n';
 
-To help me understand your project goals, say **"set up project context"** or just describe what you're building.`;
+    if (!onboardingStatus.hasOrgContext) {
+      // No org context - start there
+      markdown += `Let's start by capturing your organization context. Say **"set up org context"** to begin.`;
+    } else if (!onboardingStatus.hasProjectContext) {
+      // Org exists but no project context
+      markdown += `I found your organization context. Now let's set up this project.\nSay **"set up project context"** to describe what you're building.`;
+    } else {
+      // Both contexts exist - ready to go!
+      markdown +=
+        'Context is ready! Use **kahuna_prepare_context** with your task description to get started.';
+    }
 
     markdown += `\n\n<hints>
-- Setting up project context helps me make better recommendations
 - Stop the current Claude Code instance with Ctrl+C and restart to pick up new config
 ${skippedFiles.length > 0 || seedResult.skipped.length > 0 ? `- To overwrite existing files: kahuna_initialize(targetPath="${targetPath}", overwrite=true)\n` : ''}</hints>`;
 
