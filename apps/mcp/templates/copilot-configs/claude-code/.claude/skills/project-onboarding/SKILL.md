@@ -24,12 +24,16 @@ Trigger this skill when the user:
 Before asking project questions, check if organization context exists:
 
 1. Use `kahuna_ask` to query: "What is our organization context? What industry and priorities?"
-2. If org context is found → Proceed to Step 1 (use it to tailor questions)
-3. If org context NOT found → Tell the user:
+2. **Check the response for a warning banner:**
+   - If response starts with `## ⚠️ Organization Context Missing` → Org context does NOT exist
+   - If NO warning banner at the start → Org context exists, use the answer to tailor questions
+3. If org context is **missing** (warning banner present) → Tell the user:
 
 > I don't have any organization context yet. Let me ask a few quick questions about your organization first, then we'll set up this project.
 
 Then **trigger the org-onboarding skill** (ask the first org question) and return here after it completes.
+
+**IMPORTANT:** Do NOT interpret the synthesized answer content to determine if org context exists. Only check for the `⚠️ Organization Context Missing` warning banner at the start of the response.
 
 ### Step 1: Ask About the Problem
 

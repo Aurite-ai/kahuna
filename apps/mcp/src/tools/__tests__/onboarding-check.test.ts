@@ -9,8 +9,11 @@ import {
   buildMissingOrgContextMarkdown,
   buildMissingProjectContextMarkdown,
   buildOnboardingHints,
+  buildOnboardingWarningBanner,
   checkOnboardingStatus,
   generateProjectHash,
+  isOrgContextSlug,
+  isProjectContextSlug,
 } from '../onboarding-check.js';
 
 // Mock storage
@@ -67,6 +70,65 @@ describe('generateProjectHash', () => {
   });
 });
 
+describe('isOrgContextSlug', () => {
+  it('matches canonical "org-context" slug', () => {
+    expect(isOrgContextSlug('org-context')).toBe(true);
+  });
+
+  it('matches "organization-context" slug', () => {
+    expect(isOrgContextSlug('organization-context')).toBe(true);
+  });
+
+  it('matches "organization-wide-context" slug (real-world case)', () => {
+    expect(isOrgContextSlug('organization-wide-context')).toBe(true);
+  });
+
+  it('matches "org-context-1" (versioned)', () => {
+    expect(isOrgContextSlug('org-context-1')).toBe(true);
+  });
+
+  it('matches case-insensitively', () => {
+    expect(isOrgContextSlug('ORG-CONTEXT')).toBe(true);
+    expect(isOrgContextSlug('Organization-Context')).toBe(true);
+  });
+
+  it('does not match unrelated slugs', () => {
+    expect(isOrgContextSlug('project-context-abc123')).toBe(false);
+    expect(isOrgContextSlug('api-design-guidelines')).toBe(false);
+    expect(isOrgContextSlug('context-only')).toBe(false);
+    expect(isOrgContextSlug('org-only')).toBe(false);
+  });
+});
+
+describe('isProjectContextSlug', () => {
+  it('matches canonical "project-context-{hash}" slug', () => {
+    expect(isProjectContextSlug('project-context-abc123', 'abc123')).toBe(true);
+  });
+
+  it('matches verbose title slugs with hash (real-world case)', () => {
+    // This is the actual slug that caused the bug
+    expect(
+      isProjectContextSlug('project-business-context-and-success-criteria-36d725ab', '36d725')
+    ).toBe(true);
+  });
+
+  it('matches case-insensitively', () => {
+    expect(isProjectContextSlug('PROJECT-CONTEXT-ABC123', 'abc123')).toBe(true);
+  });
+
+  it('does not match without hash', () => {
+    expect(isProjectContextSlug('project-context', 'abc123')).toBe(false);
+  });
+
+  it('does not match with different hash', () => {
+    expect(isProjectContextSlug('project-context-xyz789', 'abc123')).toBe(false);
+  });
+
+  it('does not match org context', () => {
+    expect(isProjectContextSlug('org-context', 'abc123')).toBe(false);
+  });
+});
+
 describe('checkOnboardingStatus', () => {
   let storage: KnowledgeStorageService;
 
@@ -109,6 +171,16 @@ describe('checkOnboardingStatus', () => {
     expect(status.orgContextSlug).toBe('org-context-1');
   });
 
+  it('detects org context with verbose title (real-world bug fix)', async () => {
+    // This is the actual slug that caused the original bug
+    vi.mocked(storage.list).mockResolvedValue([createMockEntry('organization-wide-context')]);
+
+    const status = await checkOnboardingStatus(storage, '/test/project');
+
+    expect(status.hasOrgContext).toBe(true);
+    expect(status.orgContextSlug).toBe('organization-wide-context');
+  });
+
   it('detects project context by exact hash match', async () => {
     const projectPath = '/test/project';
     const expectedHash = generateProjectHash(projectPath);
@@ -121,6 +193,20 @@ describe('checkOnboardingStatus', () => {
     expect(status.hasProjectContext).toBe(true);
     expect(status.projectContextSlug).toBe(expectedSlug);
     expect(status.expectedProjectSlug).toBe(expectedSlug);
+  });
+
+  it('detects project context with verbose title (real-world bug fix)', async () => {
+    const projectPath = '/test/project';
+    const expectedHash = generateProjectHash(projectPath);
+    // This is the actual slug pattern that caused the original bug
+    const verboseSlug = `project-business-context-and-success-criteria-${expectedHash}ab`;
+
+    vi.mocked(storage.list).mockResolvedValue([createMockEntry(verboseSlug)]);
+
+    const status = await checkOnboardingStatus(storage, projectPath);
+
+    expect(status.hasProjectContext).toBe(true);
+    expect(status.projectContextSlug).toBe(verboseSlug);
   });
 
   it('does not match project context with different hash', async () => {
@@ -241,5 +327,86 @@ describe('buildOnboardingHints', () => {
     const hints = buildOnboardingHints(status);
     expect(hints).toContain('set up org context');
     expect(hints).toContain('set up project context');
+  });
+});
+
+describe('buildOnboardingWarningBanner', () => {
+  it('returns empty string when both contexts exist', () => {
+    const status: OnboardingStatus = {
+      hasOrgContext: true,
+      hasProjectContext: true,
+      orgContextSlug: 'org-context',
+      projectContextSlug: 'project-context-abc123',
+      expectedProjectSlug: 'project-context-abc123',
+    };
+
+    const banner = buildOnboardingWarningBanner(status);
+    expect(banner).toBe('');
+  });
+
+  it('returns org context warning banner when missing', () => {
+    const status: OnboardingStatus = {
+      hasOrgContext: false,
+      hasProjectContext: true,
+      projectContextSlug: 'project-context-abc123',
+      expectedProjectSlug: 'project-context-abc123',
+    };
+
+    const banner = buildOnboardingWarningBanner(status);
+    expect(banner).toContain('⚠️ Organization Context Missing');
+    expect(banner).toContain('set up org context');
+    expect(banner).toContain('---'); // Contains separator
+    expect(banner).not.toContain('⚠️ Project Context Missing');
+  });
+
+  it('returns project context warning banner when missing', () => {
+    const status: OnboardingStatus = {
+      hasOrgContext: true,
+      hasProjectContext: false,
+      orgContextSlug: 'org-context',
+      expectedProjectSlug: 'project-context-abc123',
+    };
+
+    const banner = buildOnboardingWarningBanner(status);
+    expect(banner).toContain('⚠️ Project Context Missing');
+    expect(banner).toContain('set up project context');
+    expect(banner).toContain('You have organization context, but no project context');
+    expect(banner).not.toContain('⚠️ Organization Context Missing');
+  });
+
+  it('returns both warning banners when both missing', () => {
+    const status: OnboardingStatus = {
+      hasOrgContext: false,
+      hasProjectContext: false,
+      expectedProjectSlug: 'project-context-abc123',
+    };
+
+    const banner = buildOnboardingWarningBanner(status);
+    expect(banner).toContain('⚠️ Organization Context Missing');
+    expect(banner).toContain('⚠️ Project Context Missing');
+    expect(banner).toContain('set up org context');
+    expect(banner).toContain('set up project context');
+  });
+
+  it('project context message differs based on org context status', () => {
+    const statusWithOrg: OnboardingStatus = {
+      hasOrgContext: true,
+      hasProjectContext: false,
+      orgContextSlug: 'org-context',
+      expectedProjectSlug: 'project-context-abc123',
+    };
+
+    const statusWithoutOrg: OnboardingStatus = {
+      hasOrgContext: false,
+      hasProjectContext: false,
+      expectedProjectSlug: 'project-context-abc123',
+    };
+
+    const bannerWithOrg = buildOnboardingWarningBanner(statusWithOrg);
+    const bannerWithoutOrg = buildOnboardingWarningBanner(statusWithoutOrg);
+
+    expect(bannerWithOrg).toContain('You have organization context, but no project context');
+    expect(bannerWithoutOrg).toContain('No project context exists');
+    expect(bannerWithoutOrg).not.toContain('You have organization context');
   });
 });
