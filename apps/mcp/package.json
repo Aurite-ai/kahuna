@@ -1,6 +1,6 @@
 {
   "name": "@aurite-ai/kahuna",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Kahuna MCP server - context management tools for coding copilots",
   "type": "module",
   "license": "MIT",
@@ -30,7 +30,12 @@
   "bin": {
     "kahuna-mcp": "./dist/kahuna-mcp.cjs"
   },
-  "files": ["dist/kahuna-mcp.cjs", "dist/kahuna-mcp.cjs.map", "dist/templates", "README.md"],
+  "files": [
+    "dist/kahuna-mcp.cjs",
+    "dist/kahuna-mcp.cjs.map",
+    "dist/templates",
+    "README.md"
+  ],
   "engines": {
     "node": ">=20.0.0"
   },
