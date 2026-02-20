@@ -13,7 +13,11 @@ import { z } from 'zod';
 import { MODELS } from '../config.js';
 import { buildQASystemPrompt, qaTools, runAgent } from '../knowledge/index.js';
 import { formatCost, formatTokens } from '../usage/index.js';
-import { buildOnboardingHints, checkOnboardingStatus } from './onboarding-check.js';
+import {
+  buildOnboardingHints,
+  buildOnboardingWarningBanner,
+  checkOnboardingStatus,
+} from './onboarding-check.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -140,9 +144,10 @@ export async function askToolHandler(
     // Get KB files already referenced in .context-guide.md
     const referencedKBFiles = await getReferencedKBFiles();
 
-    // Check for onboarding status (soft warning - don't block)
+    // Check for onboarding status (warning banner - don't block)
     const onboardingStatus = await checkOnboardingStatus(storage);
     const onboardingHints = buildOnboardingHints(onboardingStatus);
+    const warningBanner = buildOnboardingWarningBanner(onboardingStatus);
 
     // Build system prompt with referenced files
     const systemPrompt = buildQASystemPrompt(referencedKBFiles);
@@ -185,7 +190,7 @@ export async function askToolHandler(
       ? [onboardingHints, ...baseHints].join('\n')
       : baseHints.join('\n');
 
-    const markdown = `# Answer
+    const markdown = `${warningBanner}# Answer
 
 **Question:** ${question}
 

@@ -14,16 +14,12 @@ import { parseMdcFile } from '../../knowledge/storage/utils.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/** Resolve the seed templates directory (same relative path the tool uses) */
+/** Resolve the seed templates directory (now at apps/mcp/templates/) */
 const seedTemplatesDir = path.resolve(
   __dirname,
   '..',
   '..',
   '..',
-  '..',
-  '..',
-  'packages',
-  'vck-templates',
   'templates',
   'knowledge-base'
 );

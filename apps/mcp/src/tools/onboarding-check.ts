@@ -5,10 +5,14 @@
  * Used by tools to gate or warn when onboarding is incomplete.
  *
  * Context files are created by:
- * - org-onboarding skill: creates "org-context.md" → slug "org-context"
- * - project-onboarding skill: creates "project-context-{hash}.md" → slug "project-context-{hash}"
+ * - org-onboarding skill: creates files with titles like "Organization Context"
+ * - project-onboarding skill: creates files with titles like "Project Context" + project hash
  *
  * The project hash is the first 6 hex characters of an MD5 hash of the project path.
+ *
+ * IMPORTANT: Slug matching is flexible because copilots may vary the exact titles.
+ * We look for slugs containing key terms (org/organization + context, project + context + hash)
+ * rather than requiring exact patterns.
  */
 
 import * as crypto from 'node:crypto';
@@ -43,6 +47,41 @@ export function generateProjectHash(projectPath: string): string {
 }
 
 /**
+ * Check if a slug represents organization context.
+ *
+ * Flexible matching: accepts slugs containing both "org" (or "organization") and "context".
+ * Examples that match:
+ * - "org-context" (canonical)
+ * - "organization-context"
+ * - "organization-wide-context"
+ * - "org-context-updated"
+ */
+export function isOrgContextSlug(slug: string): boolean {
+  const lower = slug.toLowerCase();
+  const hasOrgTerm = lower.includes('org');
+  const hasContext = lower.includes('context');
+  return hasOrgTerm && hasContext;
+}
+
+/**
+ * Check if a slug represents project context for a specific project hash.
+ *
+ * Flexible matching: accepts slugs containing "project", "context", and the project hash.
+ * Examples that match (for hash "36d725"):
+ * - "project-context-36d725" (canonical)
+ * - "project-business-context-36d725"
+ * - "project-business-context-and-success-criteria-36d725ab"
+ */
+export function isProjectContextSlug(slug: string, projectHash: string): boolean {
+  const lower = slug.toLowerCase();
+  const hashLower = projectHash.toLowerCase();
+  const hasProject = lower.includes('project');
+  const hasContext = lower.includes('context');
+  const hasHash = lower.includes(hashLower);
+  return hasProject && hasContext && hasHash;
+}
+
+/**
  * Check if organization and project context files exist in the knowledge base.
  *
  * @param storage - Knowledge storage service instance
@@ -60,11 +99,11 @@ export async function checkOnboardingStatus(
   // Get all active entries
   const entries = await storage.list({ status: 'active' });
 
-  // Find org context - look for slug starting with "org-context"
-  const orgEntry = entries.find((entry) => entry.slug.startsWith('org-context'));
+  // Find org context - flexible matching for slugs containing "org" and "context"
+  const orgEntry = entries.find((entry) => isOrgContextSlug(entry.slug));
 
-  // Find project context - look for exact match on expected slug
-  const projectEntry = entries.find((entry) => entry.slug === expectedProjectSlug);
+  // Find project context - flexible matching for slugs containing "project", "context", and the hash
+  const projectEntry = entries.find((entry) => isProjectContextSlug(entry.slug, projectHash));
 
   return {
     hasOrgContext: !!orgEntry,
@@ -127,4 +166,35 @@ export function buildOnboardingHints(status: OnboardingStatus): string {
   }
 
   return hints.join('\n');
+}
+
+/**
+ * Build a prominent warning banner for missing context.
+ * Returns empty string if both contexts exist.
+ *
+ * This banner is designed to appear BEFORE the answer in kahuna_ask responses,
+ * making it impossible for copilots to ignore the missing context.
+ */
+export function buildOnboardingWarningBanner(status: OnboardingStatus): string {
+  const warnings: string[] = [];
+
+  if (!status.hasOrgContext) {
+    warnings.push(`## ⚠️ Organization Context Missing
+
+Your knowledge base does not have organization context set up yet.
+**Say "set up org context"** to complete a quick 4-question onboarding.`);
+  }
+
+  if (!status.hasProjectContext) {
+    warnings.push(`## ⚠️ Project Context Missing
+
+${status.hasOrgContext ? 'You have organization context, but n' : 'N'}o project context exists for this directory.
+**Say "set up project context"** to complete a quick 3-question onboarding.`);
+  }
+
+  if (warnings.length === 0) {
+    return '';
+  }
+
+  return `${warnings.join('\n\n')}\n\n---\n\n`;
 }

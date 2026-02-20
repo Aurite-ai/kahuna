@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Load environment variables from .env file
-import 'dotenv/config';
-
 /**
  * Kahuna MCP Server
  *
@@ -16,6 +13,76 @@ import 'dotenv/config';
  * - kahuna_ask: Ask questions about the knowledge base
  */
 
+// =============================================================================
+// CLI ARGUMENT HANDLING
+// =============================================================================
+
+import { SERVER_NAME, SERVER_VERSION } from './config.js';
+
+const args = process.argv.slice(2);
+
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(`
+${SERVER_NAME} v${SERVER_VERSION}
+
+A context management MCP server for coding copilots.
+
+USAGE:
+  kahuna-mcp                  Start the MCP server (stdio transport)
+  kahuna-mcp --help           Show this help message
+  kahuna-mcp --version        Show version information
+
+DESCRIPTION:
+  This is an MCP (Model Context Protocol) server designed to be invoked by
+  MCP-compatible clients like Claude Desktop, Roo Code, or other AI coding
+  assistants. It communicates via JSON-RPC over stdin/stdout.
+
+  The server provides tools for managing a local knowledge base:
+    - health_check           Verify server connectivity
+    - kahuna_initialize      Set up a new knowledge base
+    - kahuna_learn           Categorize and store knowledge files
+    - kahuna_prepare_context Retrieve relevant context for a task
+    - kahuna_ask             Ask questions about the knowledge base
+
+CONFIGURATION:
+  Set these environment variables (or use a .env file):
+    ANTHROPIC_API_KEY        Required. Your Anthropic API key.
+    KAHUNA_KNOWLEDGE_DIR     Optional. Path to knowledge base directory.
+                             Default: ~/.kahuna/knowledge
+    KAHUNA_TEMPLATES_DIR     Optional. Path to templates directory.
+
+MCP CLIENT SETUP:
+  For Claude Code, use the CLI:
+    claude mcp add kahuna -s project -- npx @aurite-ai/kahuna
+
+  For other clients, add to your MCP config:
+    {
+      "mcpServers": {
+        "kahuna": {
+          "command": "npx",
+          "args": ["@aurite-ai/kahuna"]
+        }
+      }
+    }
+
+MORE INFO:
+  https://github.com/Aurite-ai/kahuna
+`);
+  process.exit(0);
+}
+
+if (args.includes('--version') || args.includes('-v')) {
+  console.log(`${SERVER_NAME} v${SERVER_VERSION}`);
+  process.exit(0);
+}
+
+// =============================================================================
+// MAIN SERVER INITIALIZATION
+// =============================================================================
+
+// Load environment variables from .env file
+import 'dotenv/config';
+
 import Anthropic from '@anthropic-ai/sdk';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -25,7 +92,6 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { SERVER_NAME, SERVER_VERSION } from './config.js';
 import { FileKnowledgeStorageService } from './knowledge/index.js';
 import { askTool } from './tools/ask.js';
 import { healthCheckTool } from './tools/health-check.js';
@@ -34,9 +100,9 @@ import { learnTool } from './tools/learn.js';
 import { listIntegrationsTool } from './tools/list-integrations.js';
 import { prepareContextTool } from './tools/prepare-context.js';
 import type { ToolContext } from './tools/types.js';
-import { createUsageTrackerFromEnv } from './usage/index.js';
 import { useIntegrationTool } from './tools/use-integration.js';
 import { verifyIntegrationTool } from './tools/verify-integration.js';
+import { createUsageTrackerFromEnv } from './usage/index.js';
 
 // =============================================================================
 // SERVER CONFIGURATION

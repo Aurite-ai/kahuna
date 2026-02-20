@@ -1,26 +1,19 @@
 /**
  * Framework Boilerplate Copier
  *
- * Copies framework template files to the project directory.
- * Also copies shared project files (project-env → .env, project-gitignore → .gitignore).
+ * Writes framework template files to the project directory.
+ * Also writes shared project files (.env, .gitignore).
  * Used by prepare_context when the agent selects a framework.
+ *
+ * Templates are stored as files in apps/mcp/templates/ and read at runtime.
  *
  * See: docs/internal/plans/02-10_framework-selection.md
  */
 
 import * as fs from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { FRAMEWORKS } from '../../config.js';
-
-/**
- * Mapping of template filenames to their destination names.
- * Used for files that need renaming (e.g., project-env → .env to avoid tooling conflicts).
- */
-const FILE_RENAME_MAP: Record<string, string> = {
-  'project-env': '.env',
-  'project-gitignore': '.gitignore',
-};
+import { getFrameworkFiles, getProjectFiles } from '../../templates/index.js';
 
 /**
  * Result of a boilerplate copy operation.
@@ -54,118 +47,59 @@ export class FrameworkError extends Error {
 }
 
 /**
- * Resolve the path to the vck-templates directory.
- * Uses package resolution to locate @kahuna/vck-templates.
- *
- * @returns Absolute path to the vck-templates package root
+ * Check if a path exists.
  */
-function resolveVckTemplatesDir(): string {
-  const require = createRequire(import.meta.url);
-  const vckPackagePath = require.resolve('@kahuna/vck-templates/package.json');
-  return path.dirname(vckPackagePath);
-}
-
-/**
- * Resolve the path to a framework's template directory.
- * Uses package resolution to locate @kahuna/vck-templates.
- *
- * @param frameworkId - Framework identifier (e.g., 'langgraph')
- * @returns Absolute path to the framework's template directory
- * @throws FrameworkError if framework is invalid or template not found
- */
-export function resolveFrameworkTemplateDir(frameworkId: string): string {
-  // Validate framework ID
-  if (!FRAMEWORKS[frameworkId]) {
-    throw new FrameworkError(
-      `Unknown framework: ${frameworkId}. Valid frameworks: ${Object.keys(FRAMEWORKS).join(', ')}`,
-      'INVALID_FRAMEWORK'
-    );
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
   }
-
-  const vckDir = resolveVckTemplatesDir();
-  return path.join(vckDir, 'templates', 'frameworks', frameworkId);
 }
 
 /**
- * Get the destination filename, applying renaming rules if needed.
+ * Write a file from embedded template content, skipping if it already exists.
  *
- * @param filename - Original template filename
- * @returns Destination filename (renamed if in FILE_RENAME_MAP)
- */
-function getDestFilename(filename: string): string {
-  return FILE_RENAME_MAP[filename] ?? filename;
-}
-
-/**
- * Recursively get all files in a directory.
- *
- * @param dir - Directory to scan
- * @param baseDir - Base directory for relative paths
- * @returns Array of relative file paths
- */
-async function getAllFiles(dir: string, baseDir: string): Promise<string[]> {
-  const files: string[] = [];
-  const entries = await fs.readdir(dir, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    const relativePath = path.relative(baseDir, fullPath);
-
-    if (entry.isDirectory()) {
-      const subFiles = await getAllFiles(fullPath, baseDir);
-      files.push(...subFiles);
-    } else {
-      files.push(relativePath);
-    }
-  }
-
-  return files;
-}
-
-/**
- * Copy a single file from source to destination, with optional renaming.
- * Skips if destination already exists.
- *
- * @param srcPath - Source file path
- * @param destPath - Destination file path (after any renaming)
+ * @param destPath - Destination file path
+ * @param content - File content to write
  * @param displayPath - Path to show in results (for user feedback)
  * @param copiedFiles - Array to push copied file paths to
  * @param skippedFiles - Array to push skipped file paths to
- * @throws FrameworkError if copy fails
+ * @throws FrameworkError if write fails
  */
-async function copyFileIfNotExists(
-  srcPath: string,
+async function writeFileIfNotExists(
   destPath: string,
+  content: string,
   displayPath: string,
   copiedFiles: string[],
   skippedFiles: string[]
 ): Promise<void> {
-  try {
-    await fs.access(destPath);
+  if (await pathExists(destPath)) {
     // File exists, skip it
     skippedFiles.push(displayPath);
-  } catch {
-    // File doesn't exist, copy it
+  } else {
+    // File doesn't exist, write it
     try {
       await fs.mkdir(path.dirname(destPath), { recursive: true });
-      await fs.copyFile(srcPath, destPath);
+      await fs.writeFile(destPath, content, 'utf-8');
       copiedFiles.push(displayPath);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      throw new FrameworkError(`Failed to copy ${displayPath}: ${errorMsg}`, 'COPY_FAILED');
+      throw new FrameworkError(`Failed to write ${displayPath}: ${errorMsg}`, 'COPY_FAILED');
     }
   }
 }
 
 /**
  * Copy framework boilerplate to the project directory.
- * Also copies shared project files (project-env → .env, project-gitignore → .gitignore).
+ * Also writes shared project files (.env, .gitignore).
  * Skips files that already exist (no overwriting).
  *
  * @param frameworkId - Framework identifier (e.g., 'langgraph')
  * @param projectDir - Project root directory (defaults to cwd)
  * @returns Copy result with lists of copied and skipped files
- * @throws FrameworkError if framework is invalid or template not found
+ * @throws FrameworkError if framework is invalid
  */
 export async function copyFrameworkBoilerplate(
   frameworkId: string,
@@ -179,51 +113,21 @@ export async function copyFrameworkBoilerplate(
     );
   }
 
-  const templateDir = resolveFrameworkTemplateDir(frameworkId);
-
-  // Check if template directory exists
-  try {
-    await fs.access(templateDir);
-  } catch {
-    throw new FrameworkError(
-      `Framework template directory not found: ${templateDir}`,
-      'TEMPLATE_NOT_FOUND'
-    );
-  }
-
   const copiedFiles: string[] = [];
   const skippedFiles: string[] = [];
 
-  // 1. Copy shared project files (with renaming)
-  const vckDir = resolveVckTemplatesDir();
-  const sharedTemplatesDir = path.join(vckDir, 'templates');
-
-  for (const [srcFilename, destFilename] of Object.entries(FILE_RENAME_MAP)) {
-    const srcPath = path.join(sharedTemplatesDir, srcFilename);
-    const destPath = path.join(projectDir, destFilename);
-
-    // Check if source file exists before trying to copy
-    try {
-      await fs.access(srcPath);
-      await copyFileIfNotExists(srcPath, destPath, destFilename, copiedFiles, skippedFiles);
-    } catch {
-      // Source file doesn't exist, skip silently (not all shared files may be present)
-    }
+  // 1. Write shared project files (.env, .gitignore)
+  const projectFiles = await getProjectFiles();
+  for (const file of projectFiles) {
+    const destPath = path.join(projectDir, file.path);
+    await writeFileIfNotExists(destPath, file.content, file.path, copiedFiles, skippedFiles);
   }
 
-  // 2. Copy framework-specific files
-  const templateFiles = await getAllFiles(templateDir, templateDir);
-
-  for (const relPath of templateFiles) {
-    const srcPath = path.join(templateDir, relPath);
-    // Apply renaming for any files in the framework dir that need it
-    const filename = path.basename(relPath);
-    const destFilename = getDestFilename(filename);
-    const destRelPath =
-      destFilename !== filename ? path.join(path.dirname(relPath), destFilename) : relPath;
-    const destPath = path.join(projectDir, destRelPath);
-
-    await copyFileIfNotExists(srcPath, destPath, destRelPath, copiedFiles, skippedFiles);
+  // 2. Write framework-specific files
+  const frameworkFiles = await getFrameworkFiles(frameworkId);
+  for (const file of frameworkFiles) {
+    const destPath = path.join(projectDir, file.path);
+    await writeFileIfNotExists(destPath, file.content, file.path, copiedFiles, skippedFiles);
   }
 
   return {
@@ -234,4 +138,39 @@ export async function copyFrameworkBoilerplate(
     success: copiedFiles.length > 0 || skippedFiles.length > 0,
     kbDocSlug: frameworkConfig.kbDocSlug,
   };
+}
+
+// Track if deprecation warning has been shown
+let _resolveFrameworkTemplateDirWarned = false;
+
+/**
+ * Resolve the path to a framework's template directory.
+ * @deprecated This function is deprecated and will be removed in a future version.
+ * Templates are now embedded in the bundle. Use getFrameworkFiles() from
+ * '../../templates/index.js' instead.
+ *
+ * @param frameworkId - Framework identifier
+ * @returns A placeholder string (not a real path)
+ * @throws FrameworkError if framework is invalid
+ */
+export function resolveFrameworkTemplateDir(frameworkId: string): string {
+  // Warn once per process about deprecation
+  if (!_resolveFrameworkTemplateDirWarned) {
+    _resolveFrameworkTemplateDirWarned = true;
+    console.warn(
+      '[kahuna] DEPRECATED: resolveFrameworkTemplateDir() is deprecated and will be removed. ' +
+        'Use getFrameworkFiles() from templates/index.js instead.'
+    );
+  }
+
+  // Validate framework ID
+  if (!FRAMEWORKS[frameworkId]) {
+    throw new FrameworkError(
+      `Unknown framework: ${frameworkId}. Valid frameworks: ${Object.keys(FRAMEWORKS).join(', ')}`,
+      'INVALID_FRAMEWORK'
+    );
+  }
+
+  // Return a placeholder - templates are now embedded, not read from filesystem
+  return `[embedded:frameworks/${frameworkId}]`;
 }

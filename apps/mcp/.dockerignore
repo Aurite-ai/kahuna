@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build outputs (we rebuild in Docker)
+dist/
+
+# Development files
+*.log
+.env
+.env.*
+*.tgz
+
+# Tests
+src/**/__tests__/
+*.test.ts
+vitest.config.ts
+
+# IDE
+.vscode/
+.idea/
+
+# Documentation (not needed in image)
+docs/
+
+# Git
+.git/
+.gitignore

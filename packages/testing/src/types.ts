@@ -1,5 +1,5 @@
 /**
- * Testing-specific type definitions for @kahuna/testing
+ * Testing-specific type definitions for @aurite-ai/kahuna-testing
  *
  * Minimal types for test metadata, project configuration,
  * and the CLI commands (create, list, collect).

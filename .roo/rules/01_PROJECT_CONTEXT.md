@@ -123,12 +123,12 @@ Essential commands for working in this repo:
 
 | Command | What it does |
 | --- | --- |
-| `pnpm --filter @kahuna/mcp build` | Build MCP server |
-| `pnpm --filter @kahuna/mcp dev` | Run MCP server in watch mode (`tsx watch`) |
-| `pnpm --filter @kahuna/mcp start` | Run built MCP server (`node dist/index.js`) |
-| `pnpm --filter @kahuna/mcp test` | Run MCP tests (Vitest) |
-| `pnpm --filter @kahuna/mcp test:watch` | Run MCP tests in watch mode |
-| `pnpm --filter @kahuna/mcp typecheck` | Type-check MCP server only |
+| `pnpm --filter @aurite-ai/kahuna build` | Build MCP server |
+| `pnpm --filter @aurite-ai/kahuna dev` | Run MCP server in watch mode (`tsx watch`) |
+| `pnpm --filter @aurite-ai/kahuna start` | Run built MCP server (`node dist/index.js`) |
+| `pnpm --filter @aurite-ai/kahuna test` | Run MCP tests (Vitest) |
+| `pnpm --filter @aurite-ai/kahuna test:watch` | Run MCP tests in watch mode |
+| `pnpm --filter @aurite-ai/kahuna typecheck` | Type-check MCP server only |
 
 ### Tips
 
