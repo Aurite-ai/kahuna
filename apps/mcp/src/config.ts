@@ -223,6 +223,8 @@ export const MODELS = {
   retrieval: 'claude-sonnet-4-20250514',
   /** Model used for the ask tool's agentic Q&A loop */
   ask: 'claude-sonnet-4-20250514',
+  /** Model used for contradiction check during kahuna_learn */
+  contradiction: 'claude-sonnet-4-20250514',
 } as const satisfies Record<string, keyof typeof MODEL_REGISTRY>;
 
 /**

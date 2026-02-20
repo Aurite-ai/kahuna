@@ -635,7 +635,7 @@ export async function learnToolHandler(
       const contradictionCheckUserMessage = buildContradictionCheckUserMessage(filename, catResult);
       const contradictionCheckResult = await runAgent(
         {
-          model: MODELS.categorization,
+          model: MODELS.contradiction,
           systemPrompt: CONTRADICTION_CHECK_PROMPT,
           tools: contradictionCheckTools,
           maxIterations: 10,
