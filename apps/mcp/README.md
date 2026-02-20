@@ -2,6 +2,16 @@
 
 MCP server providing context management tools for coding copilots. Runs locally via stdio transport — copilots call Kahuna tools to learn from files, surface relevant context, and get answers from the knowledge base.
 
+## Quick Start
+
+```bash
+# Check version
+npx @aurite-ai/kahuna --version
+
+# View help
+npx @aurite-ai/kahuna --help
+```
+
 ## Installation
 
 ### Option 1: npm (Recommended)
@@ -99,6 +109,16 @@ KAHUNA_KNOWLEDGE_DIR=/path/to/custom/knowledge
   }
 }
 ```
+
+## CLI Usage
+
+```bash
+kahuna-mcp              # Start the MCP server (stdio transport)
+kahuna-mcp --help       # Show help and available tools
+kahuna-mcp --version    # Show version information
+```
+
+The server communicates via JSON-RPC over stdin/stdout. It's designed to be invoked by MCP-compatible clients, not run directly from the terminal (except for `--help`/`--version`).
 
 ## Overview
 
