@@ -2,19 +2,32 @@
 
 MCP server providing context management tools for coding copilots. Runs locally via stdio transport — copilots call Kahuna tools to learn from files, surface relevant context, and get answers from the knowledge base.
 
-## Quick Start
+## Quick Start (Claude Code)
+
+**Two commands to get started:**
 
 ```bash
-# Check version
-npx @aurite-ai/kahuna --version
+# Step 1: Add Kahuna to your MCP config
+claude mcp add kahuna -s user -- npx @aurite-ai/kahuna
 
-# View help
+# Step 2: Set your API key (add to ~/.zshrc or ~/.bashrc for persistence)
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+That's it! Restart Claude Code and Kahuna tools will be available. Use `/mcp` in Claude Code to verify the server is connected.
+
+**Verify the package is accessible:**
+
+```bash
+npx @aurite-ai/kahuna --version
 npx @aurite-ai/kahuna --help
 ```
 
-## Installation (Claude Code setup steps below in "Connecting to MCP Clients" section)
+> **Note:** See [Other Installation Methods](#other-installation-methods) below for npm global install, Docker, or building from source.
 
-### Option 1: npm (Recommended)
+## Other Installation Methods
+
+### npm (Global Install)
 
 ```bash
 npm install -g @aurite-ai/kahuna
@@ -22,22 +35,22 @@ npm install -g @aurite-ai/kahuna
 
 Then configure your MCP client to use `kahuna-mcp` as the command.
 
-### Option 2: npx (No Install)
+### npx (No Install)
 
-Use directly without installing:
+Use directly without installing (this is what the Quick Start uses):
 
 ```bash
 npx @aurite-ai/kahuna
 ```
 
-### Option 3: Docker
+### Docker
 
 ```bash
 docker pull kahuna/mcp
 docker run -i kahuna/mcp
 ```
 
-### Option 4: From Source
+### From Source
 
 ```bash
 git clone https://github.com/Aurite-ai/kahuna.git
@@ -49,14 +62,57 @@ pnpm --filter @aurite-ai/kahuna bundle
 
 ## Configuration
 
-### Environment Variables
+### API Key Setup
 
-Create a `.env` file or set these environment variables:
+Kahuna requires an `ANTHROPIC_API_KEY` for LLM-powered tools (`learn`, `ask`, `prepare-context`). Choose the setup method that matches your installation:
+
+#### For npx Users (Recommended: MCP Config)
+
+Since npx doesn't have a persistent installation directory, you cannot use a `.env` file. Instead, configure the API key in your MCP config:
+
+**Option A: Add to MCP config file (recommended)**
+
+Edit your `.mcp.json` (project) or `~/.claude/settings.json` (global) to include the `env` block:
+
+```json
+{
+  "mcpServers": {
+    "kahuna": {
+      "command": "npx",
+      "args": ["@aurite-ai/kahuna"],
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
+    }
+  }
+}
+```
+
+**Option B: Shell environment variable**
+
+Export the key in your shell profile (`~/.zshrc`, `~/.bashrc`, etc.):
 
 ```bash
-# Required for LLM-powered tools (learn, ask, prepare-context)
-ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
 
+The MCP client will inherit this when spawning the npx process.
+
+#### For Global Install Users
+
+If you installed globally via `npm install -g`, you have additional options:
+
+```bash
+# Option 1: Shell environment variable (same as above)
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# Option 2: Create a .env file in your home directory
+echo "ANTHROPIC_API_KEY=sk-ant-..." >> ~/.kahuna/.env
+```
+
+#### Other Environment Variables
+
+```bash
 # Optional: Custom knowledge base location (default: ~/.kahuna/knowledge/)
 KAHUNA_KNOWLEDGE_DIR=/path/to/custom/knowledge
 ```
@@ -65,26 +121,34 @@ KAHUNA_KNOWLEDGE_DIR=/path/to/custom/knowledge
 
 #### Claude Code (Recommended)
 
-Use the `claude mcp add` command for quick setup:
+**Two-step setup:**
 
 ```bash
-# Add to current project
-claude mcp add kahuna -s project -- npx @aurite-ai/kahuna
-
-# Add globally (available in all projects)
+# Step 1: Add Kahuna to your MCP config
 claude mcp add kahuna -s user -- npx @aurite-ai/kahuna
 
-# Verify it was added (sometimes this doesn't show, go to claude code to verify "/mcp")
-claude mcp list
+# Step 2: Set your API key (add to ~/.zshrc or ~/.bashrc for persistence)
+export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-This creates a `.mcp.json` file in your project (or user config for `-s user`).
+That's it! The MCP client will inherit the environment variable when spawning the server.
+
+**Verify it's working:**
+
+```bash
+# Check MCP config
+claude mcp list
+
+# Or use /mcp in Claude Code to see connected servers
+```
+
+> **Alternative:** If you prefer not to set a global environment variable, you can manually edit the generated config file (`.mcp.json` or `~/.claude/settings.json`) to add an `env` block. See [API Key Setup](#api-key-setup) for details.
 
 #### Manual JSON Configuration
 
-For other MCP clients or manual setup, edit your MCP config file directly:
+For other MCP clients, edit your MCP config file directly. Examples for each installation method:
 
-**Using npx (no install required):**
+**Using npx:**
 
 ```json
 {
@@ -250,6 +314,32 @@ pnpm --filter @aurite-ai/kahuna bundle
 ```
 
 The MCP server uses **stdio** transport — it reads/writes JSON-RPC over stdin/stdout. Use `dev` for local development; connect via an MCP client.
+
+## Troubleshooting
+
+### "Missing ANTHROPIC_API_KEY" Error
+
+If tools fail with an API key error:
+
+1. **Check your MCP config** — Ensure the `env` block is present with `ANTHROPIC_API_KEY`
+2. **Verify the key format** — Should start with `sk-ant-`
+3. **Restart your MCP client** — Config changes require a restart (in Claude Code, use `/mcp` then restart)
+4. **Check for typos** — The key name must be exactly `ANTHROPIC_API_KEY`
+
+### Tools Not Appearing
+
+If `kahuna_*` tools don't show up:
+
+1. **Verify the server is running** — Check `/mcp` in Claude Code
+2. **Check config syntax** — Invalid JSON will silently fail
+3. **Try `npx @aurite-ai/kahuna --version`** — Confirms the package is accessible
+
+### Config File Locations
+
+| Client | Project Config | User/Global Config |
+|--------|----------------|-------------------|
+| Claude Code | `.mcp.json` (project root) | `~/.claude/settings.json` |
+| Roo Code | `.mcp.json` (project root) | `~/.config/roo/settings.json` |
 
 ## License
 
