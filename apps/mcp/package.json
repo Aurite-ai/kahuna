@@ -1,5 +1,5 @@
 {
-  "name": "@kahuna/mcp",
+  "name": "@aurite-ai/kahuna",
   "version": "0.1.0",
   "description": "Kahuna MCP server - context management tools for coding copilots",
   "type": "module",
