@@ -80,7 +80,7 @@ function getTemplatesDir(): string {
   const metaUrl = (import.meta as any)?.url;
 
   if (metaUrl) {
-    // ESM mode (development)
+    // ESM mode (development or tsc compiled)
     const __filename = fileURLToPath(metaUrl);
     const __dirname = path.dirname(__filename);
 
@@ -90,7 +90,14 @@ function getTemplatesDir(): string {
       return _templatesDir;
     }
 
-    // ESM bundled (unlikely but handle it)
+    // TSC compiled: dist/templates/index.js -> templates are in dist/templates/
+    // __dirname = dist/templates, templates are at dist/templates/copilot-configs/, etc.
+    if (__dirname.includes('dist')) {
+      _templatesDir = __dirname;
+      return _templatesDir;
+    }
+
+    // ESM bundled fallback
     _templatesDir = path.resolve(__dirname, 'templates');
     return _templatesDir;
   }

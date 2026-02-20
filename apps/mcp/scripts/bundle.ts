@@ -95,6 +95,12 @@ async function bundle() {
       // Log level
       logLevel: 'info',
 
+      // Suppress expected warning about import.meta in CJS
+      // Our code handles this by checking if import.meta.url is available
+      logOverride: {
+        'empty-import-meta': 'silent',
+      },
+
       // Metafile for analysis
       metafile: true,
     });
