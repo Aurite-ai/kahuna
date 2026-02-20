@@ -642,7 +642,9 @@ export async function learnToolHandler(
         },
         contradictionCheckUserMessage,
         storage,
-        anthropic
+        anthropic,
+        usageTracker,
+        'kahuna_learn'
       );
 
       // Accumulate usage stats
