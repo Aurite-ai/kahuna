@@ -1,6 +1,6 @@
 ---
 name: verification
-description: Verify agent code against organizational policies and best practices
+description: Verify agent code against organizational policies and best practices. Trigger this skill when the user says something like "verify my agent", "review agent code", "check compliance", "audit my agent", "check my agent against rules", or "validate agent implementation"
 ---
 
 # Verify Agent
@@ -23,16 +23,13 @@ Trigger this skill when the user asks to:
 
 > **Note:** This skill assumes organizational and IT rules are already available in the conversation context from the `kahuna_prepare_context` call at conversation start (per CLAUDE.md rules).
 
-### Step 1: Load Framework Skill
+### Step 1: Load Framework Best Practices
 
-Check `.claude/skills/` for the relevant framework skill based on what the agent uses:
+Check the `context-guide.md` for framework-specific best practices surfaced by `kahuna_prepare_context`:
 
-| Framework | Skill Location |
-|-----------|----------------|
-| LangGraph | `.claude/skills/langgraph/SKILL.md` |
+These files define best practices, required patterns, and anti-patterns specific to that framework. Load and reference them during verification.
 
-The framework skill defines best practices, required patterns, and anti-patterns specific to that framework. Load and reference it during verification.
-
+If framework best practices aren't available in `context/`, use the **documentation** skill (`.claude/skills/documentation/SKILL.md`) to search for relevant framework documentation.
 ### Step 2: Discover Agent Files
 
 Locate agent implementation files in the project. Check these common locations:
@@ -59,7 +56,7 @@ Analyze the agent code against all available rules:
 
 1. **Organizational rules** - Check code against company policies from conversation context
 2. **IT/Security rules** - Check code against security requirements from conversation context
-3. **Framework best practices** - Check code against patterns from the framework skill
+3. **Framework best practices** - Check code against patterns from the framework best practices in `context-guide.md`
 
 For each rule, determine:
 - ✅ **Pass** - Code complies with the rule
@@ -123,6 +120,6 @@ reports/verification/YYYY-MM-DD_HH-MM-SS.md
 
 - **Privacy first:** All code analysis happens locally. Nothing is sent to external services.
 - **Rules come from Kahuna:** The knowledge base provides organization-specific rules. Apply them as written.
-- **Framework skills define patterns:** Don't duplicate framework best practices here—reference the skill.
+- **Framework best practices:** Don't duplicate framework best practices here—reference files in `context-guide.md`.
 - **Be specific:** Include file names and line numbers when reporting issues.
 - **Explain the "why":** Help developers understand why each rule matters.
