@@ -2,8 +2,9 @@ import * as fs from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentResult, AgentUsageStats } from '../../knowledge/index.js';
 import { askToolDefinition, askToolHandler } from '../ask.js';
+import { generateProjectHash } from '../onboarding-check.js';
 import type { ToolContext } from '../types.js';
-import { createMockContext } from './test-utils.js';
+import { createMockContext, createMockEntry } from './test-utils.js';
 
 /**
  * Default usage stats for mock agent results.
@@ -31,6 +32,17 @@ import { runAgent } from '../../knowledge/agents/run-agent.js';
 const mockReadFile = vi.mocked(fs.readFile);
 
 const mockRunAgent = vi.mocked(runAgent);
+
+/**
+ * Create onboarding context entries (org + project) required by onboarding check.
+ */
+function createOnboardingContextEntries() {
+  const projectHash = generateProjectHash(process.cwd());
+  return [
+    createMockEntry({ slug: 'org-context', title: 'Organization Context' }),
+    createMockEntry({ slug: `project-context-${projectHash}`, title: 'Project Context' }),
+  ];
+}
 
 describe('askToolDefinition', () => {
   it('has the correct name', () => {
@@ -60,6 +72,8 @@ describe('askToolHandler', () => {
     ctx = createMockContext();
     // Default: no .context-guide.md exists
     mockReadFile.mockRejectedValue(new Error('ENOENT: no such file or directory'));
+    // Default: onboarding context exists (for soft warning, ask doesn't block)
+    vi.mocked(ctx.storage.list).mockResolvedValue(createOnboardingContextEntries());
   });
 
   describe('input validation', () => {
@@ -222,6 +236,80 @@ Surfaced from Kahuna knowledge base on 2026-02-12.
       const text = result.content[0].text;
       expect(text).toContain('Failed to answer question');
       expect(text).toContain('API rate limited');
+    });
+  });
+
+  describe('onboarding soft warnings', () => {
+    it('includes onboarding hints when org context is missing', async () => {
+      // Only project context, no org context
+      const projectHash = generateProjectHash(process.cwd());
+      vi.mocked(ctx.storage.list).mockResolvedValue([
+        createMockEntry({ slug: `project-context-${projectHash}`, title: 'Project Context' }),
+      ]);
+      mockRunAgent.mockResolvedValue({
+        textResponse: 'Some answer',
+        toolResults: [],
+        usage: defaultUsage,
+      });
+
+      const result = await askToolHandler({ question: 'Test question' }, ctx);
+
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      expect(text).toContain('# Answer'); // Still answers
+      expect(text).toContain('set up org context'); // But warns
+    });
+
+    it('includes onboarding hints when project context is missing', async () => {
+      // Only org context, no project context
+      vi.mocked(ctx.storage.list).mockResolvedValue([
+        createMockEntry({ slug: 'org-context', title: 'Organization Context' }),
+      ]);
+      mockRunAgent.mockResolvedValue({
+        textResponse: 'Some answer',
+        toolResults: [],
+        usage: defaultUsage,
+      });
+
+      const result = await askToolHandler({ question: 'Test question' }, ctx);
+
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      expect(text).toContain('# Answer'); // Still answers
+      expect(text).toContain('set up project context'); // But warns
+    });
+
+    it('includes both warnings when both contexts are missing', async () => {
+      vi.mocked(ctx.storage.list).mockResolvedValue([]); // Empty KB
+      mockRunAgent.mockResolvedValue({
+        textResponse: 'Some answer',
+        toolResults: [],
+        usage: defaultUsage,
+      });
+
+      const result = await askToolHandler({ question: 'Test question' }, ctx);
+
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      expect(text).toContain('# Answer'); // Still answers
+      expect(text).toContain('set up org context');
+      expect(text).toContain('set up project context');
+    });
+
+    it('does not include warnings when both contexts exist', async () => {
+      // Both contexts exist (default from beforeEach)
+      mockRunAgent.mockResolvedValue({
+        textResponse: 'Some answer',
+        toolResults: [],
+        usage: defaultUsage,
+      });
+
+      const result = await askToolHandler({ question: 'Test question' }, ctx);
+
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      expect(text).not.toContain('set up org context');
+      expect(text).not.toContain('set up project context');
     });
   });
 });
