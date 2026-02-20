@@ -12,6 +12,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { getClaudeCodeFiles, getKnowledgeBaseFiles } from '../templates/index.js';
+import { checkOnboardingStatus } from './onboarding-check.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
