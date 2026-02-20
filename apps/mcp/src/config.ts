@@ -263,7 +263,16 @@ export function getActiveModels(): string[] {
  * MCP server identity.
  */
 export const SERVER_NAME = 'kahuna-mcp-server';
-export const SERVER_VERSION = '0.1.0';
+
+/**
+ * Server version - injected at build time via esbuild `define`.
+ * Falls back to 'dev' when running unbundled in development.
+ *
+ * The BUILD_VERSION constant is replaced by esbuild during bundling.
+ * See scripts/bundle.ts for the injection logic.
+ */
+declare const BUILD_VERSION: string | undefined;
+export const SERVER_VERSION = typeof BUILD_VERSION !== 'undefined' ? BUILD_VERSION : 'dev';
 
 // =============================================================================
 // FRAMEWORK CONFIGURATION

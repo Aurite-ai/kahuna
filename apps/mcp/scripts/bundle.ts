@@ -5,6 +5,7 @@
  * This script uses esbuild to:
  * - Bundle all source code and dependencies into one file
  * - Target Node 20 LTS for broad compatibility
+ * - Inject version from package.json at build time
  * - Add shebang for CLI execution
  * - Output to dist/kahuna-mcp.cjs
  * - Copy templates to dist/templates/
@@ -20,6 +21,10 @@ import * as esbuild from 'esbuild';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
+
+// Read version from package.json
+const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf-8'));
+const version: string = packageJson.version;
 
 /**
  * Recursively copy a directory.
@@ -42,6 +47,7 @@ async function copyDir(src: string, dest: string): Promise<void> {
 
 async function bundle() {
   console.log('🔨 Building MCP server bundle...\n');
+  console.log(`   Version: ${version}`);
 
   const startTime = Date.now();
 
@@ -65,6 +71,12 @@ async function bundle() {
       // Bundle everything - no external dependencies
       // This makes the output fully self-contained
       packages: 'bundle',
+
+      // Inject version from package.json at build time
+      // This replaces BUILD_VERSION constant in config.ts
+      define: {
+        BUILD_VERSION: JSON.stringify(version),
+      },
 
       // Shebang is preserved from source file (src/index.ts has #!/usr/bin/env node)
 
