@@ -48,44 +48,16 @@ You manage the agent development lifecycle:
 
 ## Agent Development Workflow
 
-### Phase 0: Check for Onboarding Context
-
-**Before doing anything, check if we have organization and project context.**
-
-Use `kahuna_ask` to query: "What is our organization context and project context?"
-
-**If user says "skip onboarding", "just start", or "skip context":**
-> Understood - proceeding without additional context. You can always say "set up project context" later if needed.
-
-Proceed directly to Phase 0b.
-
-**If organization context is missing:**
-> I don't have any organization context yet. Let me ask a few quick questions about your organization first.
-> (Say "skip" if you'd like to proceed without setting up context.)
-
-Then trigger the **org-onboarding** skill (see `.claude/skills/org-onboarding/SKILL.md`) by asking the 4 org questions.
-
-**If project context is missing for this project:**
-> Let me capture some context about this specific project.
-> (Say "skip" if you'd like to proceed without setting up context.)
-
-Then trigger the **project-onboarding** skill (see `.claude/skills/project-onboarding/SKILL.md`) by asking the 3 project questions.
-
-**If both exist:** Proceed to Phase 0b.
-
-### Phase 0b: Prepare Context
+### Phase 0: Prepare Context
 
 **Call kahuna_prepare_context to prepare the context guide**
 
-Kahuna Prepare Context Tool - Smart context retrieval
+This tool intelligently selects and references relevant context files before you start working on a task. It will:
+- Surface relevant knowledge base entries
+- Provide onboarding hints if org/project context is missing
+- Format files and references for immediate use
 
-This tool intelligently selects and references relevant context files
-before the copilot starts working on a task.
-
-The "prepare" terminology emphasizes:
-- This should be called after onboarding is complete
-- It's proactive context gathering, not reactive searching
-- Files are formatted and ready to use immediately
+If onboarding context is missing, the tool's output will include instructions. Follow those instructions or proceed with the context provided.
 
 ### Phase 1: Planning
 
@@ -151,7 +123,8 @@ After implementation completes:
 
 1. **Verify deliverables** - Ensure code is created and tests pass
 2. **Confirm instructions** - User knows how to run the agent
-3. **Complete the task** - Use attempt_completion to summarize what was created
+3. **Offer verification** - Ask the user if they would like to verify their agent against company/org policies. If yes, use the verification skill.
+4. **Complete the task** - Use attempt_completion to summarize what was created
 
 ---
 
@@ -206,13 +179,28 @@ If the user gives new context during the development process, either in the form
 
 ---
 
+## Available Skills
+
+Skills are triggered by user requests or specific conditions. Reference these when appropriate:
+
+| Skill | Trigger | Purpose |
+|-------|---------|---------|
+| **org-onboarding** | "set up org context" | Capture organization-wide context (industry, team, constraints, priorities) |
+| **project-onboarding** | "set up project context" | Capture project-specific business context and success criteria |
+| **verification** | "verify my agent" | Check agent code against organizational policies and framework best practices |
+| **documentation** | Internal use | Search guidance for finding external documentation |
+
+Skills are located in `.claude/skills/[skill-name]/SKILL.md`.
+
+---
+
 ## Example Workflow
 
 **User Request:** "Create an agent that monitors GitHub pull requests and posts summaries to Slack"
 
-### Step 0: Prepare context
+### Step 0: Prepare Context
 
-Call **kahuna_prepare_context**, where the task is the user request.
+Call **kahuna_prepare_context** with the user request as the task. The tool will surface relevant context and provide onboarding hints if needed.
 
 ### Step 1: Create Planning Subtask
 
