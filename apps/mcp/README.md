@@ -4,17 +4,32 @@ MCP server providing context management tools for coding copilots. Runs locally 
 
 ## Quick Start (Claude Code)
 
-**Two commands to get started:**
+**One command to get started:**
 
 ```bash
-# Step 1: Add Kahuna to your MCP config
+# Add Kahuna with API key inline
+claude mcp add kahuna -s project -e ANTHROPIC_API_KEY="your-anthropic-api-key" -- npx @aurite-ai/kahuna
+```
+
+> **Scope options:**
+> - `-s project` — Config stored for current project (recommended for project-specific setup)
+> - `-s user` — Config stored as global (available across all projects)
+
+That's it! Restart Claude Code and Kahuna tools will be available. Use `/mcp` in Claude Code to verify the server is connected.
+
+**Alternative: Two-step setup (global scope)**
+
+```bash
+# Step 1: Add Kahuna to your global MCP config
 claude mcp add kahuna -s user -- npx @aurite-ai/kahuna
 
 # Step 2: Set your API key (add to ~/.zshrc or ~/.bashrc for persistence)
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-That's it! Restart Claude Code and Kahuna tools will be available. Use `/mcp` in Claude Code to verify the server is connected.
+> **Scope options:**
+> - `-s project` — Config stored in `.mcp.json` in the current project (recommended for project-specific setup)
+> - `-s user` — Config stored in `~/.claude/settings.json` (available across all projects)
 
 **Verify the package is accessible:**
 
@@ -121,17 +136,25 @@ KAHUNA_KNOWLEDGE_DIR=/path/to/custom/knowledge
 
 #### Claude Code (Recommended)
 
-**Two-step setup:**
+**One command (project scope with inline API key):**
 
 ```bash
-# Step 1: Add Kahuna to your MCP config
+claude mcp add kahuna -s project -e ANTHROPIC_API_KEY=<your-anthropic-api-key> -- npx @aurite-ai/kahuna
+```
+
+**Or two-step setup (global scope):**
+
+```bash
+# Step 1: Add Kahuna to your global MCP config
 claude mcp add kahuna -s user -- npx @aurite-ai/kahuna
 
 # Step 2: Set your API key (add to ~/.zshrc or ~/.bashrc for persistence)
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-That's it! The MCP client will inherit the environment variable when spawning the server.
+> **Scope options:**
+> - `-s project` — Config stored in `.mcp.json` in the current project
+> - `-s user` — Config stored in `~/.claude/settings.json` (available across all projects)
 
 **Verify it's working:**
 
