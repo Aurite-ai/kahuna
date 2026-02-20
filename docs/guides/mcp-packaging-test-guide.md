@@ -29,7 +29,7 @@ All existing tests should pass:
 pnpm --filter @aurite-ai/kahuna test
 ```
 
-Expected: **159 tests passing**
+Expected: **466 tests passing** (4 skipped)
 
 ---
 
@@ -76,7 +76,25 @@ cat /tmp/kahuna-test/.claude/CLAUDE.md | head -10
 
 ---
 
-## Test 4: Test health_check Tool
+## Test 4: Test CLI Arguments
+
+```bash
+# Test --help
+node apps/mcp/dist/kahuna-mcp.cjs --help
+```
+
+Expected: Help text showing usage, available tools, configuration, and MCP setup example.
+
+```bash
+# Test --version
+node apps/mcp/dist/kahuna-mcp.cjs --version
+```
+
+Expected: `kahuna-mcp-server v0.1.0`
+
+---
+
+## Test 5: Test health_check Tool
 
 ```bash
 echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"health_check","arguments":{}},"id":1}' | node apps/mcp/dist/kahuna-mcp.cjs 2>/dev/null
@@ -86,7 +104,7 @@ Expected: JSON response with health check results
 
 ---
 
-## Test 5: Build Docker Image (Optional)
+## Test 6: Build Docker Image (Optional)
 
 If Docker is available (run from repo root):
 
@@ -103,7 +121,7 @@ echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"health_check","ar
 
 ---
 
-## Test 6: Verify Package.json Changes
+## Test 7: Verify Package.json Changes
 
 Check the package.json is configured correctly:
 
@@ -145,7 +163,7 @@ cat apps/mcp/package.json | grep vck-templates
 
 ## Potential Issues to Watch For
 
-1. **Template path resolution** - The templates module uses `process.argv[1]` in bundled CJS mode. If templates aren't found, check the `KAHUNA_TEMPLATES_DIR` env var fallback.
+1. **Template path resolution** - The templates module uses `__dirname` (primary) or `process.argv[1]` (fallback) in bundled CJS mode. If templates aren't found, check the `KAHUNA_TEMPLATES_DIR` env var.
 
 2. **ESbuild warning** - You'll see a warning about `import.meta` not being available in CJS format. This is expected and handled by the code.
 
@@ -225,10 +243,14 @@ After publishing:
 # Check the package exists
 npm view @aurite-ai/kahuna
 
-# Test installation
+# Test CLI
+npx @aurite-ai/kahuna --version
 npx @aurite-ai/kahuna --help
-# Or
-npm install -g @aurite-ai/kahuna && kahuna-mcp --help
+
+# Test global installation
+npm install -g @aurite-ai/kahuna
+kahuna-mcp --version
+kahuna-mcp --help
 ```
 
 ### Publishing to Docker Hub (Optional)
