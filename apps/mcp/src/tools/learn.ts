@@ -211,18 +211,19 @@ async function readFileContent(filePath: string): Promise<string> {
 
 /**
  * Generate a short hash from a file path for title uniqueness.
- * Uses the first 8 characters of SHA-256 hash of the normalized path.
+ * Uses the first 8 characters of SHA-256 hash of the absolute path.
  *
- * @param filePath - The source file path
+ * @param filePath - The source file path (relative or absolute)
  * @returns Short hash string (8 characters)
  *
  * @example
  * generatePathHash("/home/user/docs/api.md") // "a3f2b1c4"
- * generatePathHash("docs/api.md") // "d7e8f9a0"
+ * generatePathHash("docs/api.md") // Converts to absolute first, then hashes
  */
 function generatePathHash(filePath: string): string {
-  // Normalize path to ensure consistent hashing across platforms
-  const normalizedPath = path.normalize(filePath).replace(/\\/g, '/');
+  // Convert to absolute path if relative, then normalize for consistent hashing
+  const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+  const normalizedPath = path.normalize(absolutePath).replace(/\\/g, '/');
   const hash = crypto.createHash('sha256').update(normalizedPath).digest('hex');
   return hash.substring(0, 8);
 }
