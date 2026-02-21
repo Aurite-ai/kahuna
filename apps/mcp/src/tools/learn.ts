@@ -8,7 +8,6 @@
  * See: docs/internal/designs/context-management-system.md
  */
 
-import * as crypto from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
@@ -33,6 +32,7 @@ import {
 } from '../knowledge/index.js';
 import { formatCost, formatTokens } from '../usage/index.js';
 import { envVaultProvider, redactSensitiveData } from '../vault/index.js';
+import { generateProjectHash } from './onboarding-check.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -207,25 +207,6 @@ async function resolvePaths(paths: string[]): Promise<{ files: string[]; errors:
  */
 async function readFileContent(filePath: string): Promise<string> {
   return fs.readFile(filePath, 'utf-8');
-}
-
-/**
- * Generate a short hash from a file path for title uniqueness.
- * Uses the first 8 characters of SHA-256 hash of the absolute path.
- *
- * @param filePath - The source file path (relative or absolute)
- * @returns Short hash string (8 characters)
- *
- * @example
- * generatePathHash("/home/user/docs/api.md") // "a3f2b1c4"
- * generatePathHash("docs/api.md") // Converts to absolute first, then hashes
- */
-function generatePathHash(filePath: string): string {
-  // Convert to absolute path if relative, then normalize for consistent hashing
-  const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
-  const normalizedPath = path.normalize(absolutePath).replace(/\\/g, '/');
-  const hash = crypto.createHash('sha256').update(normalizedPath).digest('hex');
-  return hash.substring(0, 8);
 }
 
 /**
@@ -589,9 +570,10 @@ export async function learnToolHandler(
       }
 
       // Step 5: Build save input and store (with redacted content)
-      // Append path hash to title to ensure uniqueness
-      const pathHash = generatePathHash(filePath);
-      const uniqueTitle = `${catResult.title} [${pathHash}]`;
+      // Append project hash to title to ensure uniqueness
+      const projectDir = process.cwd();
+      const projectHash = generateProjectHash(projectDir);
+      const uniqueTitle = `${catResult.title} [${projectHash}]`;
 
       const saveInput: SaveKnowledgeEntryInput = {
         title: uniqueTitle,
