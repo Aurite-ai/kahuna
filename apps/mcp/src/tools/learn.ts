@@ -34,6 +34,7 @@ import {
 } from '../knowledge/index.js';
 import { formatCost, formatTokens } from '../usage/index.js';
 import { envVaultProvider, redactSensitiveData } from '../vault/index.js';
+import { generateProjectHash } from './onboarding-check.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -667,8 +668,13 @@ export async function learnToolHandler(
       }
 
       // Step 7: Build save input and store
+      // Append project hash to title to ensure uniqueness
+      const projectDir = process.cwd();
+      const projectHash = generateProjectHash(projectDir);
+      const uniqueTitle = `${catResult.title} [${projectHash}]`;
+
       const saveInput: SaveKnowledgeEntryInput = {
-        title: catResult.title,
+        title: uniqueTitle,
         summary: catResult.summary,
         content: contentToStore, // Store redacted content, not original
         sourceFile: filename,

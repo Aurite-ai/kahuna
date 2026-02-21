@@ -18,7 +18,7 @@ This document defines the repository infrastructure for Kahuna 2.0, covering dir
 | **Monorepo Tooling**   | pnpm workspaces + minimal Turborepo  |
 | **Linting/Formatting** | Biome (replaces ESLint + Prettier)   |
 | **Primary App**        | `apps/mcp/` (MCP server, stdio)      |
-| **Package Scope**      | `@kahuna/*`                          |
+| **Package Scope**      | `@aurite-ai/*`                       |
 | **Shared Packages**    | Multiple under `packages/`           |
 | **TypeScript**         | Simple extends pattern, strict mode  |
 
@@ -72,9 +72,9 @@ packages:
 
 ### Package Naming Convention
 
-- Scope: `@kahuna`
-- Apps: `@kahuna/mcp`
-- Packages: `@kahuna/testing`, `@kahuna/vck-templates`
+- Scope: `@aurite-ai`
+- Apps: `@aurite-ai/kahuna`
+- Packages: `@aurite-ai/kahuna-testing`, `@aurite-ai/kahuna-vck-templates`
 
 ### Workspace Dependencies
 
@@ -83,7 +83,7 @@ Use `workspace:*` protocol for internal dependencies:
 ```json
 {
   "dependencies": {
-    "@kahuna/file-router": "workspace:*"
+    "@aurite-ai/kahuna-file-router": "workspace:*"
   }
 }
 ```

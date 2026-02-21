@@ -2,7 +2,6 @@
   "files": [],
   "references": [
     { "path": "apps/mcp" },
-    { "path": "packages/testing" },
-    { "path": "packages/vck-templates" }
+    { "path": "packages/testing" }
   ]
 }

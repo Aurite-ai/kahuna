@@ -31,7 +31,7 @@ The MCP server allows AI assistants (Claude Desktop, Roo Code, etc.) to interact
 
 ```bash
 # Build the MCP server
-pnpm --filter @kahuna/mcp build
+pnpm --filter @aurite-ai/kahuna build
 ```
 
 ### Option A: Using Claude MCP CLI (Recommended)

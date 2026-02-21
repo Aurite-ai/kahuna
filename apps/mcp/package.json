@@ -1,23 +1,57 @@
 {
-  "name": "@kahuna/mcp",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
+  "name": "@aurite-ai/kahuna",
+  "version": "0.1.6",
   "description": "Kahuna MCP server - context management tools for coding copilots",
+  "type": "module",
+  "license": "MIT",
+  "author": "Kahuna Team",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aurite-ai/kahuna.git",
+    "directory": "apps/mcp"
+  },
+  "homepage": "https://github.com/Aurite-ai/kahuna#readme",
+  "bugs": {
+    "url": "https://github.com/Aurite-ai/kahuna/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "copilot",
+    "context-management",
+    "claude",
+    "anthropic"
+  ],
+  "main": "./dist/kahuna-mcp.cjs",
   "bin": {
-    "kahuna-mcp": "./dist/index.js"
+    "kahuna-mcp": "dist/kahuna-mcp.cjs"
+  },
+  "files": [
+    "dist/kahuna-mcp.cjs",
+    "dist/kahuna-mcp.cjs.map",
+    "dist/templates",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
   },
   "scripts": {
     "build": "tsc",
+    "bundle": "tsx scripts/bundle.ts",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "start:bundle": "node dist/kahuna-mcp.cjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build && pnpm bundle"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
-    "@kahuna/vck-templates": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "dotenv": "^16.4.0",
     "yaml": "^2.4.0",
@@ -25,6 +59,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "esbuild": "^0.27.3",
     "tsx": "^4.19.0",
     "vitest": "^3.1.0"
   }

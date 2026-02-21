@@ -1,5 +1,5 @@
 /**
- * Shared utilities for @kahuna/testing
+ * Shared utilities for @aurite-ai/kahuna-testing
  */
 
 import * as fs from 'node:fs';

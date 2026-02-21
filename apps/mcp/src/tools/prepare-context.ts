@@ -28,6 +28,11 @@ import {
   writeContextReadme,
 } from '../knowledge/index.js';
 import { formatCost, formatTokens } from '../usage/index.js';
+import {
+  buildMissingOrgContextMarkdown,
+  buildMissingProjectContextMarkdown,
+  checkOnboardingStatus,
+} from './onboarding-check.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -313,6 +318,17 @@ export async function prepareContextToolHandler(
 
     if (allEntries.length === 0) {
       return markdownResponse(buildEmptyKBMarkdown());
+    }
+
+    // Check for org/project context (hard gate)
+    const onboardingStatus = await checkOnboardingStatus(storage);
+
+    if (!onboardingStatus.hasOrgContext) {
+      return markdownResponse(buildMissingOrgContextMarkdown());
+    }
+
+    if (!onboardingStatus.hasProjectContext) {
+      return markdownResponse(buildMissingProjectContextMarkdown());
     }
 
     // Generate project file tree for the retrieval agent

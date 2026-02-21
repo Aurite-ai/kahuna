@@ -13,6 +13,11 @@ import { z } from 'zod';
 import { MODELS } from '../config.js';
 import { buildQASystemPrompt, qaTools, runAgent } from '../knowledge/index.js';
 import { formatCost, formatTokens } from '../usage/index.js';
+import {
+  buildOnboardingHints,
+  buildOnboardingWarningBanner,
+  checkOnboardingStatus,
+} from './onboarding-check.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -139,6 +144,11 @@ export async function askToolHandler(
     // Get KB files already referenced in .context-guide.md
     const referencedKBFiles = await getReferencedKBFiles();
 
+    // Check for onboarding status (warning banner - don't block)
+    const onboardingStatus = await checkOnboardingStatus(storage);
+    const onboardingHints = buildOnboardingHints(onboardingStatus);
+    const warningBanner = buildOnboardingWarningBanner(onboardingStatus);
+
     // Build system prompt with referenced files
     const systemPrompt = buildQASystemPrompt(referencedKBFiles);
 
@@ -170,16 +180,24 @@ export async function askToolHandler(
 📊 **Usage:** ${MODELS.ask} | ${formatTokens(usage.totalInputTokens)} in + ${formatTokens(usage.totalOutputTokens)} out | ${formatCost(usage.totalCost)} | ${usage.llmCallCount} call(s)`
       : '';
 
-    const markdown = `# Answer
+    // Build hints, including onboarding warning if context is missing
+    const baseHints = [
+      '- Full details may be in the cited knowledge base entries',
+      '- Use kahuna_prepare_context if you need broader context for a task',
+      '- Use kahuna_learn to add new information to the knowledge base',
+    ];
+    const allHints = onboardingHints
+      ? [onboardingHints, ...baseHints].join('\n')
+      : baseHints.join('\n');
+
+    const markdown = `${warningBanner}# Answer
 
 **Question:** ${question}
 
 ${answer}
 
 <hints>
-- Full details may be in the cited knowledge base entries
-- Use kahuna_prepare_context if you need broader context for a task
-- Use kahuna_learn to add new information to the knowledge base
+${allHints}
 </hints>${usageSummary}`;
 
     return markdownResponse(markdown);

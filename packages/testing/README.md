@@ -1,4 +1,4 @@
-# @kahuna/testing
+# @aurite-ai/kahuna-testing
 
 QA testing infrastructure for evaluating Kahuna's VCK (Vibe Code Kit) quality. Provides a CLI for creating test projects, running copilot sessions against scenarios, and collecting results.
 
@@ -18,7 +18,7 @@ pnpm kahuna-test create customer-support-agent --name my-test
 ```
 
 The created project combines:
-- Framework scaffold (from `@kahuna/vck-templates`)
+- Framework scaffold (from `@aurite-ai/kahuna-vck-templates`)
 - Copilot configuration (`.claude/` rules and settings)
 - Scenario context (`project-context.md` and `knowledge-base/`)
 

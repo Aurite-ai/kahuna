@@ -202,9 +202,10 @@ describe('learnToolHandler', () => {
       );
 
       // Verify storage.save called with flat fields from agent result
+      // Title should include hash based on project directory for uniqueness
       expect(ctx.storage.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: 'API Guidelines',
+          title: expect.stringMatching(/^API Guidelines \[[a-f0-9]{6}\]$/),
           summary: expect.stringContaining('REST API'),
           sourceFile: 'api-guidelines.md',
           sourcePath: 'docs/api-guidelines.md',
