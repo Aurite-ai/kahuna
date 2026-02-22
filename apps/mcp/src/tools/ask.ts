@@ -12,7 +12,7 @@ import * as path from 'node:path';
 import { z } from 'zod';
 import { MODELS } from '../config.js';
 import { buildQASystemPrompt, qaTools, runAgent } from '../knowledge/index.js';
-import { formatCost, formatTokens } from '../usage/index.js';
+import { generateAgentUsageLine } from '../usage/index.js';
 import {
   buildOnboardingHints,
   buildOnboardingWarningBanner,
@@ -171,14 +171,17 @@ export async function askToolHandler(
     const answer =
       agentResult.textResponse || "I couldn't find information about this in the knowledge base.";
 
-    // Build usage summary
+    // Build compact usage line with project totals
     const { usage } = agentResult;
-    const usageSummary = usageTracker.shouldIncludeInResponses()
-      ? `
+    const usageLine = await generateAgentUsageLine(
+      usage.totalInputTokens,
+      usage.totalOutputTokens,
+      usage.totalCost
+    );
+    const usageSummary = `
 
 ---
-📊 **Usage:** ${MODELS.ask} | ${formatTokens(usage.totalInputTokens)} in + ${formatTokens(usage.totalOutputTokens)} out | ${formatCost(usage.totalCost)} | ${usage.llmCallCount} call(s)`
-      : '';
+${usageLine}`;
 
     // Build hints, including onboarding warning if context is missing
     const baseHints = [

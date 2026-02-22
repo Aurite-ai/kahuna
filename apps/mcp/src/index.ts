@@ -100,6 +100,7 @@ import { learnTool } from './tools/learn.js';
 import { listIntegrationsTool } from './tools/list-integrations.js';
 import { prepareContextTool } from './tools/prepare-context.js';
 import type { ToolContext } from './tools/types.js';
+import { usageTool } from './tools/usage.js';
 import { useIntegrationTool } from './tools/use-integration.js';
 import { verifyIntegrationTool } from './tools/verify-integration.js';
 import { createUsageTrackerFromEnv } from './usage/index.js';
@@ -118,6 +119,7 @@ const allTools = [
   learnTool.definition,
   prepareContextTool.definition,
   askTool.definition,
+  usageTool.definition,
   // Integration tools
   listIntegrationsTool.definition,
   useIntegrationTool.definition,
@@ -148,6 +150,9 @@ async function routeToolCall(
 
     case 'kahuna_ask':
       return askTool.handler(args, ctx);
+
+    case 'kahuna_usage':
+      return usageTool.handler(args, ctx);
 
     // Integration tools
     case 'kahuna_list_integrations':

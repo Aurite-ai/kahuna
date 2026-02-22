@@ -30,7 +30,7 @@ import {
   categorizationTools,
   runAgent,
 } from '../knowledge/index.js';
-import { formatCost, formatTokens } from '../usage/index.js';
+import { generateAgentUsageLine } from '../usage/index.js';
 import { envVaultProvider, redactSensitiveData } from '../vault/index.js';
 import { generateProjectHash } from './onboarding-check.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
@@ -628,12 +628,17 @@ export async function learnToolHandler(
   // Build markdown with usage summary
   let markdown = buildLearnSuccessMarkdownWithAggregates(results, aggregates);
 
-  // Add usage summary if tracking is enabled
-  if (usageTracker.shouldIncludeInResponses() && totalUsage.llmCallCount > 0) {
+  // Add compact usage line with project totals
+  if (totalUsage.llmCallCount > 0) {
+    const usageLine = await generateAgentUsageLine(
+      totalUsage.totalInputTokens,
+      totalUsage.totalOutputTokens,
+      totalUsage.totalCost
+    );
     markdown += `
 
 ---
-📊 **Usage:** ${MODELS.categorization} | ${formatTokens(totalUsage.totalInputTokens)} in + ${formatTokens(totalUsage.totalOutputTokens)} out | ${formatCost(totalUsage.totalCost)} | ${totalUsage.llmCallCount} call(s)`;
+${usageLine}`;
   }
 
   return markdownResponse(markdown);

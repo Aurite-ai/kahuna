@@ -10,7 +10,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { Tool, ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages';
 import type { UsageTracker } from '../../usage/index.js';
-import { extractTokenUsage } from '../../usage/index.js';
+import { extractTokenUsage, recordProjectUsage } from '../../usage/index.js';
 import type { KnowledgeStorageService } from '../storage/types.js';
 import { executeKnowledgeTool } from './knowledge-tools.js';
 
@@ -142,6 +142,12 @@ export async function runAgent(
         latencyMs,
       });
       agentUsage.totalCost += call.cost.totalCost;
+
+      // Also persist to project-level storage
+      recordProjectUsage(toolName, tokenUsage, call.cost).catch((err) => {
+        // Don't fail the agent run if project storage has issues
+        console.error('[runAgent] Failed to persist project usage:', err);
+      });
     }
 
     // Check if we're done (no more tool use)

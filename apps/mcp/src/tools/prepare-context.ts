@@ -27,7 +27,7 @@ import {
   runAgent,
   writeContextReadme,
 } from '../knowledge/index.js';
-import { formatCost, formatTokens } from '../usage/index.js';
+import { generateAgentUsageLine } from '../usage/index.js';
 import {
   buildMissingOrgContextMarkdown,
   buildMissingProjectContextMarkdown,
@@ -439,13 +439,18 @@ export async function prepareContextToolHandler(
       frameworkResult
     );
 
-    // Add usage summary if tracking is enabled
+    // Add compact usage line with project totals
     const { usage } = agentResult;
-    if (usageTracker.shouldIncludeInResponses() && usage.llmCallCount > 0) {
+    if (usage.llmCallCount > 0) {
+      const usageLine = await generateAgentUsageLine(
+        usage.totalInputTokens,
+        usage.totalOutputTokens,
+        usage.totalCost
+      );
       markdown += `
 
 ---
-📊 **Usage:** ${MODELS.retrieval} | ${formatTokens(usage.totalInputTokens)} in + ${formatTokens(usage.totalOutputTokens)} out | ${formatCost(usage.totalCost)} | ${usage.llmCallCount} call(s)`;
+${usageLine}`;
     }
 
     return markdownResponse(markdown);
