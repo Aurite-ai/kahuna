@@ -128,6 +128,39 @@ export const categorizeFileTool: Tool = {
 };
 
 /**
+ * Tool definition for reporting contradictions.
+ * Structured output: agent returns contradicting files with explanations.
+ */
+export const reportContradictionsTool: Tool = {
+  name: 'report_contradictions',
+  description: 'Report files in the knowledge base that contradict the new file being categorized',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      contradictions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            slug: {
+              type: 'string',
+              description: 'Slug of the contradicting file',
+            },
+            explanation: {
+              type: 'string',
+              description: 'Clear explanation of how the files contradict each other',
+            },
+          },
+          required: ['slug', 'explanation'],
+        },
+        description: 'List of files that contradict the new file',
+      },
+    },
+    required: ['contradictions'],
+  },
+};
+
+/**
  * Tool definition for selecting a framework scaffold.
  * Structured output: agent returns framework ID and reason.
  */
@@ -170,6 +203,13 @@ export const qaTools: Tool[] = [listKnowledgeFilesTool, readKnowledgeFileTool];
 /** Tools for the categorization agent (learn): categorize_file only */
 export const categorizationTools: Tool[] = [categorizeFileTool];
 
+/** Tools for the contradiction checking agent (learn): list + read + report_contradictions */
+export const contradictionCheckTools: Tool[] = [
+  listKnowledgeFilesTool,
+  readKnowledgeFileTool,
+  reportContradictionsTool,
+];
+
 // =============================================================================
 // TOOL EXECUTION
 // =============================================================================
@@ -211,6 +251,18 @@ const categorizeFileInputSchema = z.object({
 const selectFrameworkInputSchema = z.object({
   framework: z.string().min(1, 'Framework cannot be empty'),
   reason: z.string().min(1, 'Reason cannot be empty'),
+});
+
+/**
+ * Schema for validating report_contradictions tool input.
+ */
+const reportContradictionsInputSchema = z.object({
+  contradictions: z.array(
+    z.object({
+      slug: z.string(),
+      explanation: z.string(),
+    })
+  ),
 });
 
 /**
@@ -280,6 +332,15 @@ export async function executeKnowledgeTool(
 
     case 'select_framework': {
       const parseResult = selectFrameworkInputSchema.safeParse(toolInput);
+      if (!parseResult.success) {
+        const issues = parseResult.error.issues.map((i) => i.message).join(', ');
+        return `Invalid input: ${issues}`;
+      }
+      return JSON.stringify(parseResult.data);
+    }
+
+    case 'report_contradictions': {
+      const parseResult = reportContradictionsInputSchema.safeParse(toolInput);
       if (!parseResult.success) {
         const issues = parseResult.error.issues.map((i) => i.message).join(', ');
         return `Invalid input: ${issues}`;

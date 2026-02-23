@@ -56,6 +56,30 @@ function mockCategorizationResult(overrides?: Record<string, unknown>): AgentRes
   };
 }
 
+/**
+ * Helper: Build a mock AgentResult for report_contradictions tool.
+ */
+function mockContradictionCheckResult(
+  contradictions: Array<{ slug: string; explanation: string }>
+): AgentResult {
+  return {
+    textResponse: '',
+    toolResults: [
+      {
+        tool: 'report_contradictions',
+        contradictions,
+      },
+    ],
+    usage: {
+      totalCost: 0,
+      totalInputTokens: 0,
+      totalLatencyMs: 0,
+      totalOutputTokens: 0,
+      llmCallCount: 0,
+    },
+  };
+}
+
 describe('learnToolDefinition', () => {
   it('has the correct name', () => {
     expect(learnToolDefinition.name).toBe('kahuna_learn');
@@ -137,16 +161,40 @@ describe('learnToolHandler', () => {
         })
       );
 
+      // Mock both agent calls: categorization then contradiction check
+      mockRunAgent
+        .mockResolvedValueOnce(mockCategorizationResult())
+        .mockResolvedValueOnce(mockContradictionCheckResult([]));
+
       const result = await learnToolHandler({ paths: ['docs/api-guidelines.md'] }, ctx);
 
-      // Verify agent was called
-      expect(mockRunAgent).toHaveBeenCalledOnce();
-      expect(mockRunAgent).toHaveBeenCalledWith(
+      // Verify both agents were called
+      expect(mockRunAgent).toHaveBeenCalledTimes(2);
+
+      // First call: categorization agent
+      expect(mockRunAgent).toHaveBeenNthCalledWith(
+        1,
         expect.objectContaining({
           model: expect.any(String),
           systemPrompt: expect.any(String),
+          maxIterations: 1,
         }),
         expect.stringContaining('api-guidelines.md'),
+        ctx.storage,
+        ctx.anthropic,
+        ctx.usageTracker,
+        'kahuna_learn'
+      );
+
+      // Second call: contradiction check agent
+      expect(mockRunAgent).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          model: expect.any(String),
+          systemPrompt: expect.any(String),
+          maxIterations: 10,
+        }),
+        expect.stringContaining('API Guidelines'),
         ctx.storage,
         ctx.anthropic,
         ctx.usageTracker,
@@ -248,7 +296,7 @@ describe('learnToolHandler', () => {
       const result = await learnToolHandler({ paths: ['test.md'] }, ctx);
 
       const text = result.content[0].text;
-      expect(text).toContain('did not produce categorization result');
+      expect(text).toContain('Categorization agent did not produce result');
     });
 
     it('handles unexpected API errors', async () => {
@@ -258,6 +306,91 @@ describe('learnToolHandler', () => {
 
       const text = result.content[0].text;
       expect(text).toContain('API rate limited');
+    });
+  });
+
+  describe('contradiction detection', () => {
+    it('reports contradictions when agent detects them', async () => {
+      const now = new Date().toISOString();
+      vi.mocked(ctx.storage.save).mockResolvedValue(
+        createMockEntry({
+          slug: 'new-api-guidelines',
+          title: 'New API Guidelines',
+          created_at: now,
+          updated_at: now,
+        })
+      );
+
+      // Mock both agent calls: categorization then contradiction check with contradictions
+      mockRunAgent
+        .mockResolvedValueOnce(
+          mockCategorizationResult({
+            category: 'reference',
+            title: 'New API Guidelines',
+            summary: 'Updated REST API design standards',
+          })
+        )
+        .mockResolvedValueOnce(
+          mockContradictionCheckResult([
+            {
+              slug: 'old-api-guidelines',
+              explanation:
+                'The new file specifies JWT authentication while the old file requires OAuth2',
+            },
+          ])
+        );
+
+      const result = await learnToolHandler({ paths: ['docs/new-api.md'] }, ctx);
+
+      const text = result.content[0].text;
+      expect(text).toContain('⚠️ Contradictions Detected');
+      expect(text).toContain('old-api-guidelines');
+      expect(text).toContain('JWT authentication');
+      expect(text).toContain('OAuth2');
+      expect(text).toContain('kahuna_delete');
+    });
+
+    it('reports multiple contradictions', async () => {
+      const now = new Date().toISOString();
+      vi.mocked(ctx.storage.save).mockResolvedValue(
+        createMockEntry({ created_at: now, updated_at: now })
+      );
+
+      // Mock both agent calls with multiple contradictions
+      mockRunAgent.mockResolvedValueOnce(mockCategorizationResult()).mockResolvedValueOnce(
+        mockContradictionCheckResult([
+          {
+            slug: 'old-policy-1',
+            explanation: 'Conflicting rate limit values',
+          },
+          {
+            slug: 'old-policy-2',
+            explanation: 'Different authentication requirements',
+          },
+        ])
+      );
+
+      const result = await learnToolHandler({ paths: ['docs/new-policy.md'] }, ctx);
+
+      const text = result.content[0].text;
+      expect(text).toContain('old-policy-1');
+      expect(text).toContain('old-policy-2');
+      expect(text).toContain('rate limit');
+      expect(text).toContain('authentication');
+    });
+
+    it('does not show contradiction section when none detected', async () => {
+      const now = new Date().toISOString();
+      vi.mocked(ctx.storage.save).mockResolvedValue(
+        createMockEntry({ created_at: now, updated_at: now })
+      );
+
+      mockRunAgent.mockResolvedValue(mockCategorizationResult());
+
+      const result = await learnToolHandler({ paths: ['docs/api.md'] }, ctx);
+
+      const text = result.content[0].text;
+      expect(text).not.toContain('⚠️ Contradictions Detected');
     });
   });
 });
