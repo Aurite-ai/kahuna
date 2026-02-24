@@ -11,6 +11,7 @@
  * - kahuna_learn: Categorize and store knowledge files
  * - kahuna_prepare_context: Retrieve relevant context for a task
  * - kahuna_ask: Ask questions about the knowledge base
+ * - kahuna_delete: Remove outdated files from the knowledge base
  */
 
 // =============================================================================
@@ -94,6 +95,7 @@ import {
 
 import { FileKnowledgeStorageService } from './knowledge/index.js';
 import { askTool } from './tools/ask.js';
+import { deleteTool } from './tools/delete.js';
 import { healthCheckTool } from './tools/health-check.js';
 import { initializeTool } from './tools/initialize.js';
 import { learnTool } from './tools/learn.js';
@@ -119,6 +121,7 @@ const allTools = [
   learnTool.definition,
   prepareContextTool.definition,
   askTool.definition,
+  deleteTool.definition,
   usageTool.definition,
   // Integration tools
   listIntegrationsTool.definition,
@@ -150,6 +153,9 @@ async function routeToolCall(
 
     case 'kahuna_ask':
       return askTool.handler(args, ctx);
+
+    case 'kahuna_delete':
+      return deleteTool.handler(args, ctx);
 
     case 'kahuna_usage':
       return usageTool.handler(args, ctx);

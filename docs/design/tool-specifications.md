@@ -11,9 +11,10 @@
 | Tool | Purpose |
 |------|---------|
 | `kahuna_initialize` | Initialize new project |
-| `kahuna_learn` | Send files for Kahuna to learn from |
+| `kahuna_learn` | Send files for Kahuna to learn from (detects contradictions) |
 | `kahuna_prepare_context` | Prepare .context-guide.md for a task |
 | `kahuna_ask` | Quick Q&A |
+| `kahuna_delete` | Remove outdated files from knowledge base |
 | `kahuna_sync` | Sync all changes (deferred) |
 
 ---
@@ -163,8 +164,9 @@ USE THIS TOOL WHEN:
 
 Kahuna's agents will:
 1. Classify what kind of knowledge each file contains
-2. Store in ~/.kahuna knowledge base with metadata
-3. Files will be available for future context surfacing
+2. Detect contradictions with existing knowledge base files
+3. Store in ~/.kahuna knowledge base with metadata
+4. Files will be available for future context surfacing
 
 <examples>
 ### Single file
@@ -205,29 +207,58 @@ kahuna_learn(
 
 ### Response Format
 
+**Without contradictions:**
+
 ```markdown
 # Context Received
 
-Processed **2 files**:
+Processed **2 files** — 2 added:
 
-| File | What Kahuna Found |
-|------|-------------------|
-| `docs/api-guidelines.md` | API design standards - added to context |
-| `requirements.txt` | Dependencies only - no knowledge extracted |
+| File | Category | What Kahuna Found |
+|------|----------|-------------------|
+| `api-guidelines.md` | policy | REST API design standards covering naming conventions and auth |
+| `security-policy.md` | policy | Security requirements for API authentication |
 
-## Added to Knowledge Base
+## Key Topics Learned
 
-**API Design Standards**
-- REST naming conventions
-- Error response format
-- Authentication requirements
+- **API Design Guidelines** — REST API design standards covering naming conventions and auth
+- **Security Policy** — Security requirements for API authentication
 
-*Stored in ~/.kahuna knowledge base*
+<hints>
+- Use `kahuna_prepare_context` to surface this knowledge for a specific task
+- Send more files anytime — Kahuna handles classification automatically
+</hints>
+```
+
+**With contradictions detected:**
+
+```markdown
+# Context Received
+
+Processed **1 files** — 1 added:
+
+| File | Category | What Kahuna Found |
+|------|----------|-------------------|
+| `new-api-guidelines.md` | policy | Updated REST API design standards with JWT authentication |
+
+## Key Topics Learned
+
+- **New API Guidelines** — Updated REST API design standards with JWT authentication
+
+## ⚠️ Contradictions Detected
+
+The following existing files contradict the new file(s). Consider removing outdated information:
+
+- **old-api-guidelines** (from `old-api-guidelines.md`)
+  The new file specifies JWT authentication while the old file requires OAuth2
 
 <hints>
 - Review .context-guide.md to verify accuracy
 - The API standards will be used in future recommendations
 - Send more files anytime with this tool
+- Use `kahuna_prepare_context` to surface this knowledge for a specific task
+- Send more files anytime — Kahuna handles classification automatically
+- Review contradicting files and use `kahuna_delete` to remove outdated information after user approval
 </hints>
 ```
 
@@ -239,11 +270,15 @@ Processed **2 files**:
 - Write raw content to .context-guide.md with metadata
 - Update .context-guide.md
 
+**Implemented:**
+- LLM-powered categorization (Haiku)
+- Contradiction detection with existing KB files
+- Metadata extraction (title, summary, topics)
+
 **Future enhancements:**
-- LLM-powered knowledge extraction
-- Duplicate/conflict detection
 - Smart merging with existing context
 - Pattern extraction from code
+- Semantic similarity detection
 
 ---
 
@@ -426,7 +461,84 @@ kahuna_prepare_context(
 
 ---
 
-## 5. kahuna_ask
+## 5. kahuna_delete
+
+### Tool Description
+
+```
+Delete files from the Kahuna knowledge base.
+
+⚠️ IMPORTANT: This tool should ONLY be called after:
+1. kahuna_learn reports contradictions with existing files
+2. You ask the user for permission to delete the outdated files
+3. The user explicitly approves the deletion
+
+USE THIS TOOL WHEN:
+- kahuna_learn output indicates contradictions with existing KB files
+- User confirms they want to remove the outdated/contradicting files
+- You need to clean up superseded policies, outdated decisions, or conflicting information
+
+DO NOT USE THIS TOOL:
+- Without explicit user permission
+- Based solely on your own judgment
+- For files that are complementary rather than contradictory
+
+<examples>
+### After user approves deletion
+kahuna_delete(slugs=["old-api-guidelines", "deprecated-security-policy"])
+</examples>
+
+<hints>
+- Always confirm with the user before calling this tool
+- Provide context about why files should be deleted
+- Deletion is permanent - files cannot be recovered
+- Use kahuna_learn to add updated versions after deletion
+</hints>
+```
+
+### Input Schema
+
+```typescript
+{
+  slugs: string[]            // Required: Slugs of KB files to delete
+}
+```
+
+### Response Format
+
+```markdown
+# Files Deleted from Knowledge Base
+
+Processed **2 files** — 2 deleted, 0 failed:
+
+| Slug | Title |
+|------|-------|
+| `old-api-guidelines` | Old API Guidelines |
+| `deprecated-security-policy` | Deprecated Security Policy |
+
+<hints>
+- Files have been permanently removed from the knowledge base
+- Use `kahuna_learn` to add updated versions if needed
+- Use `kahuna_prepare_context` to refresh context for your current task
+</hints>
+```
+
+### MVP Scope
+
+**Implemented:**
+- Delete files by slug from knowledge base
+- Retrieve file title before deletion for confirmation
+- Handle partial failures gracefully
+- Permanent deletion (no soft delete/archive)
+
+**Future enhancements:**
+- Soft delete with archive status
+- Batch operations with rollback
+- Deletion history/audit log
+
+---
+
+## 6. kahuna_ask
 
 ### Tool Description
 

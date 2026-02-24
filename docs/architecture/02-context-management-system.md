@@ -61,9 +61,10 @@ All domain logic lives in the `knowledge/` module under `apps/mcp/src/`. MCP too
 
 | Tool | When Called | Side Effects | Agent Model |
 |------|------------|--------------|-------------|
-| `kahuna_learn` | User shares files | Writes `.mdc` to KB | Haiku (categorization) |
+| `kahuna_learn` | User shares files | Writes `.mdc` to KB, detects contradictions | Haiku (categorization) |
 | `kahuna_prepare_context` | Task start (once) | Writes `.context-guide.md` to project root | Haiku (retrieval) |
 | `kahuna_ask` | Mid-task questions | None (read-only) | Sonnet (Q&A synthesis) |
+| `kahuna_delete` | After user approval | Deletes `.mdc` from KB | None (direct operation) |
 
 ---
 
@@ -163,14 +164,15 @@ The runner handles message loop management, tool call routing, iteration countin
 
 ### Agent Tools (Shared)
 
-Both `prepare_context` and `ask` use common KB access tools:
+Agent tools used across different MCP tools:
 
-| Tool | Purpose | Output |
-|------|---------|--------|
-| `list_knowledge_files` | Browse KB with summaries | Slug, title, category, summary, topics per entry |
-| `read_knowledge_file` | Read full content by slug | `# {title}\n\n{content}` |
-| `select_files_for_context` | Structured file selection (prepare_context only) | `[{slug, reason}]` |
-| `categorize_file` | Structured classification (learn only) | Category, confidence, reasoning, title, summary, topics |
+| Tool | Purpose | Used By | Output |
+|------|---------|---------|--------|
+| `list_knowledge_files` | Browse KB with summaries | learn, prepare_context, ask | Slug, title, category, summary, topics per entry |
+| `read_knowledge_file` | Read full content by slug | learn, prepare_context, ask | `# {title}\n\n{content}` |
+| `select_files_for_context` | Structured file selection | prepare_context | `[{slug, reason}]` |
+| `categorize_file` | Structured classification | learn | Category, confidence, reasoning, title, summary, topics |
+| `report_contradictions` | Report contradicting files | learn | `[{slug, explanation}]` |
 
 ### Context Writer
 
@@ -210,6 +212,7 @@ apps/mcp/src/
 │   ├── learn.ts
 │   ├── prepare-context.ts
 │   ├── ask.ts
+│   ├── delete.ts
 │   ├── health-check.ts
 │   └── initialize.ts
 ```

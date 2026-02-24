@@ -63,6 +63,7 @@ const STRUCTURED_TOOL_NAMES = new Set([
   'select_files_for_context',
   'categorize_file',
   'select_framework',
+  'report_contradictions',
 ]);
 
 /**

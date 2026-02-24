@@ -36,6 +36,7 @@ export {
 export {
   // Prompts
   CATEGORIZATION_PROMPT,
+  CONTRADICTION_CHECK_PROMPT,
   RETRIEVAL_PROMPT,
   QA_PROMPT_TEMPLATE,
   buildCategorizationUserMessage,
@@ -46,10 +47,12 @@ export {
   readKnowledgeFileTool,
   selectFilesForContextTool,
   categorizeFileTool,
+  reportContradictionsTool,
   selectFrameworkTool,
   retrievalTools,
   qaTools,
   categorizationTools,
+  contradictionCheckTools,
   executeKnowledgeTool,
   // Runner
   runAgent,
