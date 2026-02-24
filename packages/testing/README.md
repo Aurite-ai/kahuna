@@ -18,8 +18,8 @@ pnpm kahuna-test create customer-support-agent --name my-test
 ```
 
 The created project combines:
-- Framework scaffold (from `@aurite-ai/kahuna-vck-templates`)
-- Copilot configuration (`.claude/` rules and settings)
+- Framework scaffold (from `apps/mcp/templates/frameworks/`)
+- Copilot configuration (`.claude/` rules and settings from `apps/mcp/templates/copilot-configs/`)
 - Scenario context (`project-context.md` and `knowledge-base/`)
 
 ### `list` — Show available scenarios
