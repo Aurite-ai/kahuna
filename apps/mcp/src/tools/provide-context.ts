@@ -104,18 +104,35 @@ function getContextFilePath(type: ContextType): string {
 }
 
 /**
- * Generate .mdc file content with minimal frontmatter.
- * Context files use a simplified format since they're not categorized.
+ * Generate .mdc file content with full frontmatter compatible with storage service.
+ * Uses type: knowledge so files can be read by storage.get() and parseMdcFile().
+ * Follows KnowledgeEntryFrontmatter structure from types.ts.
  */
-function generateContextMdc(type: ContextType, content: string): string {
+function generateContextMdc(contextType: ContextType, content: string): string {
   const now = new Date().toISOString();
-  const title = type === 'org' ? 'Organization Context' : 'User Context';
+  const title = contextType === 'org' ? 'Organization Context' : 'User Context';
+  const summary =
+    contextType === 'org'
+      ? 'Organization constraints, domain, and patterns that apply to all tasks'
+      : 'User preferences, working style, and communication preferences';
+  const slug = contextType === 'org' ? 'org-context' : 'user-context';
 
   const frontmatter = `---
-type: context
+type: knowledge
 title: "${title}"
+summary: "${summary}"
 created_at: ${now}
 updated_at: ${now}
+source:
+  file: "${slug}.mdc"
+  project: null
+  path: null
+classification:
+  category: context
+  confidence: 1.0
+  reasoning: "Foundation context created by kahuna_provide_context"
+  topics: []
+status: active
 ---`;
 
   return `${frontmatter}\n\n${content}`;

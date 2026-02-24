@@ -132,7 +132,8 @@ describe('provideContextToolHandler', () => {
 
       const writtenContent = mockWriteFile.mock.calls[0][1] as string;
       expect(writtenContent).toContain('---');
-      expect(writtenContent).toContain('type: context');
+      expect(writtenContent).toContain('type: knowledge');
+      expect(writtenContent).toContain('category: context');
       expect(writtenContent).toContain('title: "Organization Context"');
       expect(writtenContent).toContain('created_at:');
       expect(writtenContent).toContain('updated_at:');
