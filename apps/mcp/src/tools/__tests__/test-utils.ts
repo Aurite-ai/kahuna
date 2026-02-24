@@ -17,7 +17,7 @@ export function createMockStorage(
 ): KnowledgeStorageService {
   return {
     save: vi.fn(),
-    list: vi.fn(),
+    list: vi.fn().mockResolvedValue([]), // Default to empty array
     get: vi.fn(),
     exists: vi.fn(),
     delete: vi.fn(),
