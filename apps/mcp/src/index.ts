@@ -101,6 +101,7 @@ import { initializeTool } from './tools/initialize.js';
 import { learnTool } from './tools/learn.js';
 import { listIntegrationsTool } from './tools/list-integrations.js';
 import { prepareContextTool } from './tools/prepare-context.js';
+import { provideContextTool } from './tools/provide-context.js';
 import type { ToolContext } from './tools/types.js';
 import { usageTool } from './tools/usage.js';
 import { useIntegrationTool } from './tools/use-integration.js';
@@ -119,6 +120,7 @@ const allTools = [
   healthCheckTool.definition,
   initializeTool.definition,
   learnTool.definition,
+  provideContextTool.definition,
   prepareContextTool.definition,
   askTool.definition,
   deleteTool.definition,
@@ -147,6 +149,9 @@ async function routeToolCall(
 
     case 'kahuna_learn':
       return learnTool.handler(args, ctx);
+
+    case 'kahuna_provide_context':
+      return provideContextTool.handler(args, ctx);
 
     case 'kahuna_prepare_context':
       return prepareContextTool.handler(args, ctx);

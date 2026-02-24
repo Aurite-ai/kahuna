@@ -149,8 +149,6 @@ The `copilot-configs/claude-code/.claude/` directory contains Claude Code's rule
 │   └── implementer.md
 └── skills/             # Procedures (run in current conversation)
     ├── documentation/
-    ├── org-onboarding/
-    ├── project-onboarding/
     └── verification/
 ```
 
