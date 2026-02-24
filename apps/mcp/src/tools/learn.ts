@@ -258,6 +258,7 @@ function extractContradictionsResult(agentResult: AgentResult): {
  *
  * @param filename - Name of the file being checked
  * @param catResult - Categorization result from the first agent
+ * @param existingSlug - Slug of the existing KB entry (if updating), to exclude from contradiction checks
  */
 function buildContradictionCheckUserMessage(
   filename: string,
@@ -266,15 +267,20 @@ function buildContradictionCheckUserMessage(
     title: string;
     summary: string;
     topics: string[];
-  }
+  },
+  existingSlug?: string
 ): string {
+  const excludeNote = existingSlug
+    ? `\n\n**IMPORTANT:** This file is updating an existing entry with slug "${existingSlug}". Do NOT report this slug as a contradiction - it's the same file being updated.`
+    : '';
+
   return `**New file to check for contradictions:**
 
 Filename: ${filename}
 Category: ${catResult.category}
 Title: ${catResult.title}
 Summary: ${catResult.summary}
-Topics: ${catResult.topics.join(', ')}
+Topics: ${catResult.topics.join(', ')}${excludeNote}
 
 Check if this file contradicts any existing files in the knowledge base. Use 'report_contradictions' to report any conflicts found (or an empty array if none).`;
 }
@@ -632,8 +638,23 @@ export async function learnToolHandler(
         continue;
       }
 
+      // Step 4.5: Check if this file already exists in KB (to exclude from contradiction checks)
+      // Build the unique title that will be used for storage
+      const projectDir = process.cwd();
+      const projectHash = generateProjectHash(projectDir);
+      const uniqueTitle = `${catResult.title} [${projectHash}]`;
+
+      // Check if an entry with this title already exists
+      const existingEntries = await storage.list({ status: 'active' });
+      const existingEntry = existingEntries?.find((e) => e.title === uniqueTitle);
+      const existingSlug = existingEntry?.slug;
+
       // Step 5: Run contradiction checking agent
-      const contradictionCheckUserMessage = buildContradictionCheckUserMessage(filename, catResult);
+      const contradictionCheckUserMessage = buildContradictionCheckUserMessage(
+        filename,
+        catResult,
+        existingSlug
+      );
       const contradictionCheckResult = await runAgent(
         {
           model: MODELS.contradiction,
@@ -668,11 +689,7 @@ export async function learnToolHandler(
       }
 
       // Step 7: Build save input and store
-      // Append project hash to title to ensure uniqueness
-      const projectDir = process.cwd();
-      const projectHash = generateProjectHash(projectDir);
-      const uniqueTitle = `${catResult.title} [${projectHash}]`;
-
+      // (uniqueTitle already computed in Step 4.5)
       const saveInput: SaveKnowledgeEntryInput = {
         title: uniqueTitle,
         summary: catResult.summary,

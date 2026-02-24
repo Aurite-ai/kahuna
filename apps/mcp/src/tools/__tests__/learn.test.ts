@@ -6,6 +6,15 @@ import { learnToolDefinition, learnToolHandler } from '../learn.js';
 import type { ToolContext } from '../types.js';
 import { createMockContext, createMockEntry } from './test-utils.js';
 
+// Mock the generateProjectHash function
+vi.mock('../onboarding-check.js', async () => {
+  const actual = await vi.importActual('../onboarding-check.js');
+  return {
+    ...actual,
+    generateProjectHash: vi.fn(() => '123abc'),
+  };
+});
+
 /**
  * Default usage stats for mock agent results.
  */
@@ -391,6 +400,54 @@ describe('learnToolHandler', () => {
 
       const text = result.content[0].text;
       expect(text).not.toContain('⚠️ Contradictions Detected');
+    });
+
+    it('excludes the file being updated from contradiction checks', async () => {
+      // Simulate uploading the same file twice (update scenario)
+      const projectHash = '123abc'; // Mock hash
+      const uniqueTitle = `API Guidelines [${projectHash}]`;
+      const existingSlug = 'api-guidelines-123abc';
+
+      // Mock storage.list to return the existing entry
+      vi.mocked(ctx.storage.list).mockResolvedValue([
+        createMockEntry({
+          slug: existingSlug,
+          title: uniqueTitle,
+          summary: 'REST API design standards',
+        }),
+      ]);
+
+      // Mock storage.save to return updated entry (same created/updated time = update)
+      const now = new Date().toISOString();
+      const earlier = new Date(Date.now() - 10000).toISOString();
+      vi.mocked(ctx.storage.save).mockResolvedValue(
+        createMockEntry({
+          slug: existingSlug,
+          title: uniqueTitle,
+          created_at: earlier,
+          updated_at: now, // Different from created_at = update
+        })
+      );
+
+      // Mock categorization agent
+      mockRunAgent
+        .mockResolvedValueOnce(mockCategorizationResult())
+        // Mock contradiction check - should NOT report the file itself
+        .mockResolvedValueOnce(mockContradictionCheckResult([]));
+
+      const result = await learnToolHandler({ paths: ['docs/api-guidelines.md'] }, ctx);
+
+      // Verify the contradiction check message excludes the existing slug
+      const contradictionCheckCall = mockRunAgent.mock.calls[1];
+      const contradictionCheckMessage = contradictionCheckCall[1] as string;
+      expect(contradictionCheckMessage).toContain('IMPORTANT');
+      expect(contradictionCheckMessage).toContain(existingSlug);
+      expect(contradictionCheckMessage).toContain('Do NOT report this slug as a contradiction');
+
+      // Verify no contradictions in response
+      const text = result.content[0].text;
+      expect(text).not.toContain('⚠️ Contradictions Detected');
+      expect(text).toContain('updated existing entry');
     });
   });
 });
