@@ -4,6 +4,9 @@
  * In-memory session tracker for LLM usage and costs.
  * Tracks all LLM calls within a session and provides summaries.
  *
+ * Also persists usage to project-level storage (.kahuna/usage.json)
+ * for cumulative cost tracking across sessions.
+ *
  * For enterprise deployment, this can be extended to send data
  * to a remote API for persistent storage and analytics.
  */
@@ -13,11 +16,17 @@ import {
   addToSummary,
   calculateCost,
   createEmptySummary,
+  formatCost,
+  formatTokens,
   generateUsageDisplay,
 } from './calculator.js';
+import { ProjectUsageStorage } from './project-storage.js';
 import type {
+  CostBreakdown,
   LLMCall,
   ModelUsage,
+  ProjectUsageData,
+  ProjectUsageTotals,
   RecordCallInput,
   SessionSummary,
   TokenUsage,
@@ -361,4 +370,100 @@ export function extractTokenUsage(response: {
     cacheReadTokens: response.usage?.cache_read_input_tokens,
     cacheCreationTokens: response.usage?.cache_creation_input_tokens,
   };
+}
+
+// =============================================================================
+// PROJECT-LEVEL USAGE TRACKING
+// =============================================================================
+
+/** Global project storage instance (lazily initialized) */
+let projectStorageInstance: ProjectUsageStorage | null = null;
+
+/**
+ * Get the global project storage instance.
+ * Creates one if it doesn't exist.
+ */
+export function getProjectStorage(): ProjectUsageStorage {
+  if (!projectStorageInstance) {
+    projectStorageInstance = new ProjectUsageStorage();
+  }
+  return projectStorageInstance;
+}
+
+/**
+ * Record usage to project-level storage.
+ * This persists usage data to .kahuna/usage.json.
+ *
+ * @param toolName - Name of the tool that made the call
+ * @param usage - Token usage from the call
+ * @param cost - Cost breakdown from the call
+ */
+export async function recordProjectUsage(
+  toolName: string,
+  usage: TokenUsage,
+  cost: CostBreakdown
+): Promise<void> {
+  try {
+    const storage = getProjectStorage();
+    await storage.recordUsage(toolName, usage, cost);
+  } catch (error) {
+    // Log but don't fail if project storage has issues
+    console.error('[UsageTracker] Failed to persist to project storage:', error);
+  }
+}
+
+/**
+ * Get project usage totals.
+ *
+ * @returns Project usage totals
+ */
+export async function getProjectUsageTotals(): Promise<ProjectUsageTotals> {
+  const storage = getProjectStorage();
+  return storage.getTotals();
+}
+
+/**
+ * Get full project usage data.
+ *
+ * @returns Full project usage data including per-tool breakdown
+ */
+export async function getProjectUsageData(): Promise<ProjectUsageData> {
+  const storage = getProjectStorage();
+  return storage.getData();
+}
+
+/**
+ * Generate a compact usage line for tool responses.
+ * Format: 📊 This call: 1.2K tokens | $0.0023 | Project total: $1.23 (47 calls)
+ *
+ * @param thisCallTokens - Total tokens (input + output) for this call
+ * @param thisCallCost - Cost for this call in USD
+ * @param projectTotals - Project-level usage totals
+ * @returns Formatted usage line string
+ */
+export function generateCompactUsageLine(
+  thisCallTokens: number,
+  thisCallCost: number,
+  projectTotals: ProjectUsageTotals
+): string {
+  return `📊 This call: ${formatTokens(thisCallTokens)} tokens | ${formatCost(thisCallCost)} | Project total: ${formatCost(projectTotals.estimatedCostUSD)} (${projectTotals.callCount} calls)`;
+}
+
+/**
+ * Generate a compact usage line for agent-based tools.
+ * Takes the total usage from an agent run and generates the display line.
+ *
+ * @param totalInputTokens - Total input tokens from the agent run
+ * @param totalOutputTokens - Total output tokens from the agent run
+ * @param totalCost - Total cost from the agent run
+ * @returns Formatted usage line string (async to get project totals)
+ */
+export async function generateAgentUsageLine(
+  totalInputTokens: number,
+  totalOutputTokens: number,
+  totalCost: number
+): Promise<string> {
+  const projectTotals = await getProjectUsageTotals();
+  const totalTokens = totalInputTokens + totalOutputTokens;
+  return generateCompactUsageLine(totalTokens, totalCost, projectTotals);
 }

@@ -194,3 +194,62 @@ export interface UsageDisplay {
     };
   };
 }
+
+// =============================================================================
+// PROJECT-LEVEL USAGE TYPES
+// =============================================================================
+
+/**
+ * Usage totals for project-level tracking.
+ */
+export interface ProjectUsageTotals {
+  /** Total input tokens */
+  inputTokens: number;
+  /** Total output tokens */
+  outputTokens: number;
+  /** Total estimated cost in USD */
+  estimatedCostUSD: number;
+  /** Total number of LLM calls */
+  callCount: number;
+}
+
+/**
+ * Per-tool usage breakdown for project tracking.
+ */
+export interface ProjectToolUsage {
+  /** Input tokens for this tool */
+  inputTokens: number;
+  /** Output tokens for this tool */
+  outputTokens: number;
+  /** Estimated cost in USD for this tool */
+  estimatedCostUSD: number;
+  /** Number of calls for this tool */
+  callCount: number;
+}
+
+/**
+ * Complete project usage data stored in .kahuna/usage.json
+ */
+export interface ProjectUsageData {
+  /** Total usage across all tools and time */
+  totalUsage: ProjectUsageTotals;
+  /** Usage breakdown by tool name */
+  byTool: Record<string, ProjectToolUsage>;
+  /** ISO timestamp of last update */
+  lastUpdated: string;
+}
+
+/**
+ * Compact usage line for tool responses.
+ * Format: 📊 This call: 1.2K tokens | $0.0023 | Project total: $1.23 (47 calls)
+ */
+export interface CompactUsageLine {
+  /** This call's token count (input + output) */
+  thisCallTokens: number;
+  /** This call's cost */
+  thisCallCost: number;
+  /** Project total cost */
+  projectTotalCost: number;
+  /** Project total call count */
+  projectCallCount: number;
+}
