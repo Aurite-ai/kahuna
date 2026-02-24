@@ -1089,6 +1089,248 @@ const KNOWN_PATTERNS: KnownIntegrationPattern[] = [
       },
     ],
   },
+
+  // Database - SQLite
+  {
+    pattern: /sqlite|\.sqlite\b|\.db\b|sqlite3/gi,
+    type: 'database',
+    displayName: 'SQLite',
+    id: 'sqlite',
+    authMethod: 'none',
+    credentialKeys: ['database_path'],
+    defaultOperations: [
+      {
+        name: 'query',
+        description: 'Execute a SQL query',
+        params: [
+          { name: 'sql', description: 'SQL query to execute', type: 'string', required: true },
+          { name: 'params', description: 'Query parameters', type: 'array', required: false },
+        ],
+        returns: { type: 'array', description: 'Query results as array of objects' },
+      },
+      {
+        name: 'execute',
+        description: 'Execute a SQL statement (insert, update, delete)',
+        params: [
+          { name: 'sql', description: 'SQL statement to execute', type: 'string', required: true },
+          { name: 'params', description: 'Statement parameters', type: 'array', required: false },
+        ],
+        returns: { type: 'object', description: 'Execution result with affected rows' },
+      },
+    ],
+  },
+
+  // Database - MySQL
+  {
+    pattern: /mysql|mariadb|mysql:\/\//gi,
+    type: 'database',
+    displayName: 'MySQL Database',
+    id: 'mysql',
+    authMethod: 'basic_auth',
+    credentialKeys: ['host', 'username', 'password', 'database'],
+    defaultOperations: [
+      {
+        name: 'query',
+        description: 'Execute a SQL query',
+        params: [
+          { name: 'sql', description: 'SQL query to execute', type: 'string', required: true },
+          { name: 'params', description: 'Query parameters', type: 'array', required: false },
+        ],
+        returns: { type: 'array', description: 'Query results as array of objects' },
+      },
+      {
+        name: 'execute',
+        description: 'Execute a SQL statement (insert, update, delete)',
+        params: [
+          { name: 'sql', description: 'SQL statement to execute', type: 'string', required: true },
+          { name: 'params', description: 'Statement parameters', type: 'array', required: false },
+        ],
+        returns: { type: 'object', description: 'Execution result with affected rows' },
+      },
+      {
+        name: 'backup',
+        description: 'Create a database backup',
+        params: [
+          {
+            name: 'tables',
+            description: 'Tables to backup (all if not specified)',
+            type: 'array',
+            required: false,
+          },
+          {
+            name: 'output_path',
+            description: 'Path to save backup file',
+            type: 'string',
+            required: true,
+          },
+        ],
+        returns: { type: 'object', description: 'Backup result with file path' },
+      },
+    ],
+  },
+
+  // Payment - PayPal
+  {
+    pattern: /paypal|paypal\.com|PAYPAL_/gi,
+    type: 'payment',
+    displayName: 'PayPal',
+    id: 'paypal',
+    authMethod: 'oauth2',
+    credentialKeys: ['client_id', 'client_secret'],
+    defaultOperations: [
+      {
+        name: 'create-payment',
+        description: 'Create a new payment order',
+        params: [
+          { name: 'amount', description: 'Payment amount', type: 'number', required: true },
+          {
+            name: 'currency',
+            description: 'Currency code (USD, EUR, etc.)',
+            type: 'string',
+            required: true,
+          },
+          {
+            name: 'description',
+            description: 'Payment description',
+            type: 'string',
+            required: false,
+          },
+          {
+            name: 'return_url',
+            description: 'URL to redirect after approval',
+            type: 'string',
+            required: true,
+          },
+          {
+            name: 'cancel_url',
+            description: 'URL to redirect if cancelled',
+            type: 'string',
+            required: true,
+          },
+        ],
+        returns: { type: 'object', description: 'Payment order with approval URL' },
+      },
+      {
+        name: 'capture-payment',
+        description: 'Capture an approved payment',
+        params: [
+          { name: 'order_id', description: 'PayPal order ID', type: 'string', required: true },
+        ],
+        returns: { type: 'object', description: 'Captured payment details' },
+      },
+      {
+        name: 'refund',
+        description: 'Refund a captured payment',
+        params: [
+          {
+            name: 'capture_id',
+            description: 'Capture ID to refund',
+            type: 'string',
+            required: true,
+          },
+          {
+            name: 'amount',
+            description: 'Amount to refund (full if not specified)',
+            type: 'number',
+            required: false,
+          },
+          { name: 'currency', description: 'Currency code', type: 'string', required: false },
+        ],
+        returns: { type: 'object', description: 'Refund details' },
+      },
+      {
+        name: 'get-transactions',
+        description: 'Get transaction history',
+        params: [
+          {
+            name: 'start_date',
+            description: 'Start date (ISO format)',
+            type: 'string',
+            required: true,
+          },
+          {
+            name: 'end_date',
+            description: 'End date (ISO format)',
+            type: 'string',
+            required: true,
+          },
+          {
+            name: 'page_size',
+            description: 'Number of results per page',
+            type: 'number',
+            required: false,
+          },
+        ],
+        returns: { type: 'array', description: 'List of transactions' },
+      },
+    ],
+  },
+
+  // Messaging - Discord
+  {
+    pattern: /discord|discord\.com|discord\.gg/gi,
+    type: 'messaging',
+    displayName: 'Discord',
+    id: 'discord',
+    authMethod: 'bearer_token',
+    credentialKeys: ['bot_token', 'client_id', 'client_secret'],
+    defaultOperations: [
+      {
+        name: 'send-message',
+        description: 'Send a message to a Discord channel',
+        params: [
+          { name: 'channel_id', description: 'Discord channel ID', type: 'string', required: true },
+          { name: 'content', description: 'Message content', type: 'string', required: true },
+          { name: 'embeds', description: 'Message embeds', type: 'array', required: false },
+        ],
+        returns: { type: 'object', description: 'Sent message details' },
+      },
+      {
+        name: 'list-channels',
+        description: 'List channels in a guild/server',
+        params: [
+          {
+            name: 'guild_id',
+            description: 'Discord guild/server ID',
+            type: 'string',
+            required: true,
+          },
+        ],
+        returns: { type: 'array', description: 'List of channels' },
+      },
+      {
+        name: 'create-webhook',
+        description: 'Create a webhook for a channel',
+        params: [
+          { name: 'channel_id', description: 'Channel ID', type: 'string', required: true },
+          { name: 'name', description: 'Webhook name', type: 'string', required: true },
+          {
+            name: 'avatar',
+            description: 'Avatar URL or base64 image',
+            type: 'string',
+            required: false,
+          },
+        ],
+        returns: { type: 'object', description: 'Created webhook details' },
+      },
+      {
+        name: 'send-webhook',
+        description: 'Send a message via webhook',
+        params: [
+          { name: 'webhook_url', description: 'Webhook URL', type: 'string', required: true },
+          { name: 'content', description: 'Message content', type: 'string', required: true },
+          {
+            name: 'username',
+            description: 'Override webhook username',
+            type: 'string',
+            required: false,
+          },
+          { name: 'embeds', description: 'Message embeds', type: 'array', required: false },
+        ],
+        returns: { type: 'object', description: 'Webhook response' },
+      },
+    ],
+  },
 ];
 
 // =============================================================================
@@ -1108,6 +1350,7 @@ const OP_ITEM_TO_INTEGRATION: Array<{
   { keywords: ['postgres', 'postgresql', 'pg', 'pgsql'], patternId: 'postgresql' },
   { keywords: ['mongo', 'mongodb'], patternId: 'mongodb' },
   { keywords: ['mysql', 'mariadb'], patternId: 'mysql' },
+  { keywords: ['sqlite', 'sqlite3'], patternId: 'sqlite' },
   { keywords: ['redis'], patternId: 'redis' },
   { keywords: ['supabase'], patternId: 'supabase' },
   { keywords: ['firebase', 'firestore'], patternId: 'firebase' },
@@ -1115,6 +1358,7 @@ const OP_ITEM_TO_INTEGRATION: Array<{
 
   // Messaging
   { keywords: ['slack'], patternId: 'slack' },
+  { keywords: ['discord'], patternId: 'discord' },
   { keywords: ['gmail', 'google-mail', 'googlemail'], patternId: 'gmail' },
   { keywords: ['sendgrid'], patternId: 'sendgrid' },
   { keywords: ['twilio'], patternId: 'twilio' },
@@ -1132,6 +1376,7 @@ const OP_ITEM_TO_INTEGRATION: Array<{
 
   // Payment
   { keywords: ['stripe'], patternId: 'stripe' },
+  { keywords: ['paypal'], patternId: 'paypal' },
 
   // Storage
   { keywords: ['aws', 's3', 'amazon'], patternId: 'aws-s3' },
@@ -1512,6 +1757,9 @@ export function mergeSecretsWithIntegrations(
     google_api_key: 'gmail',
     slack_bot_token: 'slack',
     slack_webhook: 'slack',
+    discord_bot_token: 'discord',
+    discord_client_id: 'discord',
+    discord_client_secret: 'discord',
     twilio_account_sid: 'twilio',
     twilio_auth_token: 'twilio',
     whatsapp_access_token: 'whatsapp-business',
@@ -1548,12 +1796,20 @@ export function mergeSecretsWithIntegrations(
     // Databases
     database_url: 'postgresql',
     database_password: 'postgresql',
+    mysql_host: 'mysql',
+    mysql_username: 'mysql',
+    mysql_password: 'mysql',
+    mysql_database: 'mysql',
     supabase_url: 'supabase',
     supabase_anon_key: 'supabase',
     supabase_service_role_key: 'supabase',
     firebase_api_key: 'firebase',
     firebase_project_id: 'firebase',
     firebase_service_account: 'firebase',
+
+    // Additional Payment
+    paypal_client_id: 'paypal',
+    paypal_client_secret: 'paypal',
   };
 
   return integrations.map((integration) => {

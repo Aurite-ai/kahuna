@@ -95,6 +95,7 @@ import {
 
 import { FileKnowledgeStorageService } from './knowledge/index.js';
 import { askTool } from './tools/ask.js';
+import { checkIntegrationRequirementsTool } from './tools/check-integration-requirements.js';
 import { deleteTool } from './tools/delete.js';
 import { healthCheckTool } from './tools/health-check.js';
 import { initializeTool } from './tools/initialize.js';
@@ -127,6 +128,7 @@ const allTools = [
   listIntegrationsTool.definition,
   useIntegrationTool.definition,
   verifyIntegrationTool.definition,
+  checkIntegrationRequirementsTool.definition,
 ];
 
 /**
@@ -169,6 +171,9 @@ async function routeToolCall(
 
     case 'kahuna_verify_integration':
       return verifyIntegrationTool.handler(args, ctx);
+
+    case 'kahuna_check_integration_requirements':
+      return checkIntegrationRequirementsTool.handler(args, ctx);
 
     default:
       return {
