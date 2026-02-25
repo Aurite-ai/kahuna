@@ -10,6 +10,7 @@
 
 import { z } from 'zod';
 import { MODELS } from '../config.js';
+import { type IntegrationSummary, listIntegrationSummaries } from '../integrations/index.js';
 import {
   type AgentResult,
   type FrameworkCopyResult,
@@ -279,6 +280,51 @@ The knowledge base has ${totalFiles} files, but none are relevant to: "${task}"
 </hints>`;
 }
 
+/**
+ * Build markdown section for available integrations.
+ * Returns empty string if no integrations are available.
+ */
+function buildIntegrationsMarkdown(integrations: IntegrationSummary[]): string {
+  if (integrations.length === 0) {
+    return '';
+  }
+
+  const statusIcon = (status: string) => {
+    switch (status) {
+      case 'verified':
+        return '✅';
+      case 'configured':
+        return '🔧';
+      case 'error':
+        return '❌';
+      default:
+        return '🔍';
+    }
+  };
+
+  const parts: string[] = [];
+  parts.push('## Available Integrations\n');
+  parts.push('These integrations are configured and ready to use:\n');
+  parts.push('| Integration | Type | Operations | Status |');
+  parts.push('|-------------|------|------------|--------|');
+
+  for (const integration of integrations) {
+    const ops = integration.operationNames.slice(0, 3).join(', ');
+    const opsDisplay = integration.operationNames.length > 3 ? `${ops}, ...` : ops;
+    parts.push(
+      `| ${integration.displayName} | ${integration.type} | ${opsDisplay} | ${statusIcon(integration.status)} ${integration.status} |`
+    );
+  }
+
+  parts.push('');
+  parts.push(
+    'Use `kahuna_use_integration(integration="<id>", operation="<op>", params={...})` to call them.'
+  );
+  parts.push('');
+
+  return parts.join('\n');
+}
+
 // =============================================================================
 // TOOL HANDLER
 // =============================================================================
@@ -438,6 +484,18 @@ export async function prepareContextToolHandler(
       referencedFiles.length > 0 ? referencedFiles : undefined,
       frameworkResult
     );
+
+    // Fetch and surface available integrations
+    try {
+      const integrations = await listIntegrationSummaries();
+      const integrationsMarkdown = buildIntegrationsMarkdown(integrations);
+      if (integrationsMarkdown) {
+        markdown += `\n${integrationsMarkdown}`;
+      }
+    } catch {
+      // Don't fail if integration fetching fails - just skip the section
+      console.error('Failed to fetch integrations for context surfacing');
+    }
 
     // Add compact usage line with project totals
     const { usage } = agentResult;

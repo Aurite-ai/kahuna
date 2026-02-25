@@ -259,6 +259,7 @@ async function main() {
 
   // Log startup (to stderr so it doesn't interfere with MCP protocol on stdout)
   console.error(`[${SERVER_NAME}] Server started successfully`);
+  console.error(`[${SERVER_NAME}] Working directory: ${process.cwd()}`);
   console.error(`[${SERVER_NAME}] Tools available: ${allTools.map((t) => t.name).join(', ')}`);
 }
 
