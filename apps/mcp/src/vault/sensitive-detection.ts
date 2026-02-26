@@ -14,6 +14,8 @@
  * See: docs/design/secure-integrations.md
  */
 
+import { MODELS } from '../config.js';
+
 /**
  * Confidence level for sensitive data detection
  */
@@ -709,7 +711,7 @@ export async function verifySecretWithLLM(
   context: string,
   options: LLMVerificationOptions
 ): Promise<LLMVerificationResult> {
-  const { anthropic, model = 'claude-3-haiku-20240307' } = options;
+  const { anthropic, model = MODELS.llmVerification } = options;
 
   // Build the prompt
   const prompt = VERIFICATION_PROMPT.replace('{{type}}', match.type)

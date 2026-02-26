@@ -1,6 +1,6 @@
 # @aurite-ai/kahuna
 
-MCP server providing context management tools for coding copilots. Runs locally via stdio transport — copilots call Kahuna tools to learn from files, surface relevant context, and get answers from the knowledge base.
+MCP server providing context management tools for coding copilots. Runs locally via stdio transport — copilots call Kahuna tools to learn from files, surface relevant context, manage integrations, and track usage.
 
 ## Quick Start (Claude Code)
 
@@ -26,10 +26,6 @@ claude mcp add kahuna -s user -- npx @aurite-ai/kahuna
 # Step 2: Set your API key (add to ~/.zshrc or ~/.bashrc for persistence)
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
-
-> **Scope options:**
-> - `-s project` — Config stored in `.mcp.json` in the current project (recommended for project-specific setup)
-> - `-s user` — Config stored in `~/.claude/settings.json` (available across all projects)
 
 **Verify the package is accessible:**
 
@@ -239,39 +235,44 @@ The server communicates via JSON-RPC over stdin/stdout. It's designed to be invo
 │   Coding Copilot    │ ◄────────────────► │   @aurite-ai/kahuna │
 │   (Claude, Roo,     │                     │                     │
 │    Cursor, etc.)    │                     │  knowledge/ module  │
-└─────────────────────┘                     │  ├── agents/        │
-                                            │  ├── storage/       │
-                                            │  └── surfacing/     │
+└─────────────────────┘                     │  integrations/      │
+                                            │  vault/             │
+                                            │  usage/             │
                                             └─────────────────────┘
                                                       │
                                                 reads/writes
                                                       │
                                             ┌─────────▼──────────┐
                                             │  ~/.kahuna/         │
-                                            │  knowledge/         │
-                                            │  (flat .mdc files)  │
+                                            │  ├── knowledge/     │
+                                            │  ├── integrations/  │
+                                            │  └── usage.json     │
                                             └────────────────────┘
 ```
 
 ## Available Tools
 
-### `kahuna_learn`
+### Knowledge Base Tools
+
+#### `kahuna_learn`
 
 Send files or folders to Kahuna to learn from and add to the knowledge base.
 
 - **Input:** `paths: string[]`, `description?: string`
 - **Process:** Reads files → LLM categorization agent classifies each → stores as `.mdc` files in `~/.kahuna/knowledge/`
 - **Response:** Markdown summary with file table, key topics, and `<hints>`
+- **Contradiction Detection:** If new content contradicts existing KB files, learn will report the conflicts and suggest using `kahuna_delete` to remove outdated files
 
-### `kahuna_prepare_context`
+#### `kahuna_prepare_context`
 
 Prepare the `.context-guide.md` file with task-relevant knowledge.
 
 - **Input:** `task: string`, `files?: string[]`
 - **Process:** LLM retrieval agent searches KB → selects relevant files → writes references to these files in `.context-guide.md`
 - **Response:** Markdown with surfaced files table, "Start Here" section, and `<hints>`
+- **Requires:** Organization and project context must be set up first (see [Onboarding](#onboarding-system))
 
-### `kahuna_ask`
+#### `kahuna_ask`
 
 Quick Q&A using the knowledge base.
 
@@ -279,47 +280,292 @@ Quick Q&A using the knowledge base.
 - **Process:** LLM Q&A agent searches KB → reads relevant files → synthesizes answer with source citations
 - **Response:** Markdown answer with sources and `<hints>`
 
-### `kahuna_initialize`
+#### `kahuna_delete`
+
+Remove files from the knowledge base.
+
+- **Input:** `slugs: string[]` — Array of file slugs to delete
+- **Process:** Deletes specified files from `~/.kahuna/knowledge/`
+- **Response:** Markdown summary of deleted files
+- **Usage:** Should be called after `kahuna_learn` reports contradictions, with user confirmation
+
+```
+# Example: Delete outdated files after user confirms
+kahuna_delete(slugs=["old-api-guidelines", "deprecated-security-policy"])
+```
+
+#### `kahuna_provide_context`
+
+Store org or user context in the knowledge base.
+
+- **Input:**
+  - `type: 'org' | 'user'` — Type of context to store
+  - `content: string` — Markdown content to store
+- **Process:** Writes context file to `~/.kahuna/knowledge/` as `org-context.mdc` or `user-context.mdc`
+- **Response:** Confirmation with file path
+- **Usage:** Used during onboarding to capture synthesized context from conversation
+
+```
+# Example: Store organization context
+kahuna_provide_context(
+  type="org",
+  content="# Organization Context\n\nHealthcare startup building patient portals.\n\n## Constraints\n- HIPAA compliance required"
+)
+
+# Example: Store user context
+kahuna_provide_context(
+  type="user",
+  content="# User Context\n\nSenior developer, prefers TDD approach."
+)
+```
+
+### Usage Tracking
+
+#### `kahuna_usage`
+
+View token usage and cost summary for the current project.
+
+- **Input:** None
+- **Process:** Reads from `.kahuna/usage.json`
+- **Response:** Markdown table showing:
+  - Total tokens (input/output)
+  - Estimated cost in USD
+  - Breakdown by tool
+  - Number of LLM calls
+
+```
+# Example output
+📊 Project Usage Summary
+
+## Totals
+| Metric | Value |
+|--------|-------|
+| **Total Tokens** | 45.2K |
+| Input Tokens | 38.1K |
+| Output Tokens | 7.1K |
+| **Estimated Cost** | $0.23 |
+| Total Calls | 12 |
+```
+
+### Integration Tools
+
+Kahuna can discover, verify, and use external service integrations (APIs, databases, messaging systems, etc.).
+
+#### `kahuna_list_integrations`
+
+List all discovered integrations and their status.
+
+- **Input:** `type?: string`, `status?: string`, `format?: 'summary' | 'detailed'`
+- **Process:** Scans discovered integrations from knowledge base
+- **Response:** Table of integrations with name, type, operations, auth method, and status
+
+```
+# Example: List all integrations
+kahuna_list_integrations()
+
+# Example: Filter by type
+kahuna_list_integrations(type="database")
+```
+
+#### `kahuna_use_integration`
+
+Execute an operation on a discovered integration.
+
+- **Input:**
+  - `integration: string` — Integration ID (e.g., "postgresql", "slack")
+  - `operation: string` — Operation name (e.g., "query", "send-message")
+  - `params?: object` — Operation-specific parameters
+  - `timeout?: number` — Timeout in milliseconds (default: 30000)
+  - `skipRetry?: boolean` — Skip retry logic (default: false)
+- **Features:**
+  - Automatic credential resolution from vault
+  - Retry logic with exponential backoff
+  - Circuit breaker to prevent cascading failures
+
+```
+# Example: Query a database
+kahuna_use_integration(
+  integration="postgresql",
+  operation="query",
+  params={sql: "SELECT * FROM users LIMIT 10"}
+)
+
+# Example: Send a Slack message
+kahuna_use_integration(
+  integration="slack",
+  operation="send-message",
+  params={channel: "#general", text: "Hello from Kahuna!"}
+)
+```
+
+#### `kahuna_verify_integration`
+
+Verify that an integration is correctly configured and can connect.
+
+- **Input:** `integration?: string`, `skipConnectionTest?: boolean`
+- **Process:** Checks credentials exist → attempts test operation
+- **Response:** Verification status with details on credentials and connection
+
+```
+# Example: Verify single integration
+kahuna_verify_integration(integration="postgresql")
+
+# Example: Verify all integrations
+kahuna_verify_integration()
+```
+
+### Setup & Utility Tools
+
+#### `kahuna_initialize`
 
 Initialize a project with Kahuna copilot configuration (VCK templates).
 
 - **Input:** `targetPath: string`, `overwrite?: boolean`
 - **Creates:** `.claude/` config directory, `CLAUDE.md`, copilot rules and skills
 
-### `kahuna_health_check`
+#### `health_check`
 
 Verify the MCP server is running.
 
 - **Input:** `action: "ping"`
 - **Response:** Server status confirmation
 
+## Onboarding System
+
+Kahuna uses a guided onboarding process to understand your organization and project context. This enables more relevant context surfacing.
+
+### Organization Context
+
+Set up once per organization. Captures:
+- Industry and domain
+- Team structure
+- Technical constraints
+- Priorities and standards
+
+**To set up:** Say **"set up org context"** to your copilot
+
+### Project Context
+
+Set up per project directory. Captures:
+- Problem being solved
+- Target users
+- Success criteria
+
+**To set up:** Say **"set up project context"** to your copilot
+
+### How It Works
+
+1. `kahuna_prepare_context` checks for org/project context
+2. If missing, returns a prompt guiding you to complete onboarding
+3. Once both contexts exist, full functionality is enabled
+
+The project context is tied to the current directory using a hash, allowing multiple projects with different contexts.
+
+## Vault & Credential Management
+
+Kahuna includes a secure vault system for managing integration credentials.
+
+### Supported Providers
+
+| Provider | Description | Status |
+|----------|-------------|--------|
+| `env` | Environment variables | ✅ Default |
+| `1password` | 1Password vault | ✅ Supported |
+| `hashicorp` | HashiCorp Vault | 🔜 Planned |
+| `aws` | AWS Secrets Manager | 🔜 Planned |
+| `gcp` | GCP Secret Manager | 🔜 Planned |
+
+### Secret Reference Format
+
+Secrets are referenced using the `vault://` URI format:
+
+```
+vault://[provider]/[path]
+
+# Examples
+vault://env/GMAIL_API_KEY
+vault://1password/kahuna/gmail-oauth
+vault://hashicorp/secret/integrations/gmail
+```
+
+### Configuration
+
+The vault defaults to using environment variables. For other providers:
+
+```json
+{
+  "vault": {
+    "defaultProvider": "1password",
+    "providerConfig": {
+      "1password": {
+        "vaultName": "kahuna",
+        "autoCreateItems": true
+      }
+    }
+  }
+}
+```
+
 ## Architecture
 
 ```
 apps/mcp/src/
-├── index.ts                # MCP server entry point, tool registration
-├── config.ts               # Model identifiers, server constants
-├── knowledge/              # Knowledge base domain logic
-│   ├── agents/             # Agent prompts, tools, shared runner
-│   │   ├── prompts.ts      # System prompts (categorization, retrieval, Q&A)
+├── index.ts                    # MCP server entry point, tool registration
+├── config.ts                   # Model identifiers, server constants
+│
+├── knowledge/                  # Knowledge base domain logic
+│   ├── agents/                 # Agent prompts, tools, shared runner
+│   │   ├── prompts.ts          # System prompts (categorization, retrieval, Q&A)
 │   │   ├── knowledge-tools.ts  # Agent tools (list, read, select, categorize)
-│   │   └── run-agent.ts    # Shared agentic loop runner
-│   ├── storage/            # KB storage service
-│   │   ├── types.ts        # KnowledgeEntry, classification types
-│   │   ├── knowledge-storage.ts  # CRUD for .mdc files
-│   │   └── utils.ts        # Slug generation, frontmatter parsing
-│   └── surfacing/          # Context surfacing
-│       └── context-writer.ts  # Write .context-guide.md
-└── tools/                  # MCP tool handlers (thin wrappers)
-    ├── types.ts            # ToolContext, MCPToolResponse, markdownResponse()
-    ├── learn.ts            # kahuna_learn handler
-    ├── prepare-context.ts  # kahuna_prepare_context handler
-    ├── ask.ts              # kahuna_ask handler
-    ├── initialize.ts       # kahuna_initialize handler
-    └── health-check.ts     # kahuna_health_check handler
+│   │   └── run-agent.ts        # Shared agentic loop runner
+│   ├── storage/                # KB storage service
+│   │   ├── types.ts            # KnowledgeEntry, classification types
+│   │   ├── knowledge-storage.ts # CRUD for .mdc files
+│   │   └── utils.ts            # Slug generation, frontmatter parsing
+│   └── surfacing/              # Context surfacing
+│       └── context-writer.ts   # Write .context-guide.md
+│
+├── integrations/               # External service integration management
+│   ├── types.ts                # Integration descriptor types
+│   ├── extraction.ts           # Extract integrations from KB files
+│   ├── storage.ts              # Integration storage service
+│   ├── execution/              # Integration execution engine
+│   │   ├── executor.ts         # Main executor
+│   │   ├── retry.ts            # Retry logic with backoff
+│   │   └── circuit-breaker.ts  # Circuit breaker pattern
+│   └── verification/           # Integration verification
+│       └── verifier.ts         # Credential and connection verification
+│
+├── vault/                      # Secure credential management
+│   ├── types.ts                # Vault provider interfaces
+│   ├── env-provider.ts         # Environment variable provider
+│   ├── 1password-provider.ts   # 1Password integration
+│   └── sensitive-detection.ts  # Detect sensitive data in files
+│
+├── usage/                      # Token usage and cost tracking
+│   ├── types.ts                # Usage tracking interfaces
+│   ├── tracker.ts              # Session-level tracking
+│   ├── project-storage.ts      # Project-level persistence
+│   ├── pricing.ts              # Model pricing data
+│   └── calculator.ts           # Cost calculation
+│
+└── tools/                      # MCP tool handlers (thin wrappers)
+    ├── types.ts                # ToolContext, MCPToolResponse
+    ├── learn.ts                # kahuna_learn handler
+    ├── prepare-context.ts      # kahuna_prepare_context handler
+    ├── provide-context.ts      # kahuna_provide_context handler
+    ├── ask.ts                  # kahuna_ask handler
+    ├── delete.ts               # kahuna_delete handler
+    ├── usage.ts                # kahuna_usage handler
+    ├── list-integrations.ts    # kahuna_list_integrations handler
+    ├── use-integration.ts      # kahuna_use_integration handler
+    ├── verify-integration.ts   # kahuna_verify_integration handler
+    ├── initialize.ts           # kahuna_initialize handler
+    ├── health-check.ts         # health_check handler
+    └── onboarding-check.ts     # Onboarding status utilities
 ```
 
-**Design principle:** Tool handlers are thin wrappers that validate input, call into `knowledge/`, and format markdown responses. Domain logic lives in the `knowledge/` module.
+**Design principle:** Tool handlers are thin wrappers that validate input, call into domain modules, and format markdown responses. Domain logic lives in dedicated modules (`knowledge/`, `integrations/`, `vault/`, `usage/`).
 
 ## Development
 
@@ -360,6 +606,21 @@ If `kahuna_*` tools don't show up:
 1. **Verify the server is running** — Check `/mcp` in Claude Code
 2. **Check config syntax** — Invalid JSON will silently fail
 3. **Try `npx @aurite-ai/kahuna --version`** — Confirms the package is accessible
+
+### "Organization Context Required" or "Project Context Required"
+
+This means onboarding is incomplete:
+
+1. **Say "set up org context"** to create organization context (one-time)
+2. **Say "set up project context"** to create project context (per project)
+
+### Integration Verification Fails
+
+If `kahuna_verify_integration` reports errors:
+
+1. **Check credentials** — Ensure environment variables are set
+2. **Check connectivity** — Verify the service is accessible
+3. **Check permissions** — Ensure the credentials have required permissions
 
 ### Config File Locations
 
