@@ -294,7 +294,7 @@ export interface FrameworkConfig {
 
 /**
  * Registry of supported frameworks for prepare_context.
- * The framework ID maps to the template subdirectory in vck-templates.
+ * The framework ID maps to the template subdirectory in the coding copilot templates folder.
  */
 export const FRAMEWORKS: Record<string, FrameworkConfig> = {
   langgraph: {

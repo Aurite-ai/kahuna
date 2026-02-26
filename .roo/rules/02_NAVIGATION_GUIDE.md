@@ -117,26 +117,49 @@ Orchestrator subtask prompts specify exact paths. See `.roo/rules-orchestrator/O
 ```
 apps/
 └── mcp/                    # MCP server (stdio) — context management tools for copilots
-    └── src/
-        ├── knowledge/      # Knowledge base domain logic
-        │   ├── agents/     # Agent prompts, tools, shared runner
-        │   ├── storage/    # KB storage service, types, utilities
-        │   └── surfacing/  # Context writer
-        ├── tools/          # MCP tool handlers (learn, ask, prepare-context, health-check, initialize)
-        ├── config.ts       # Centralized configuration (models, server constants)
-        └── index.ts        # Server entry point
-
-packages/
-├── testing/                # QA testing infrastructure
-│   ├── scenarios/          # Test scenarios (customer-support-agent, etc.)
-│   └── src/                # CLI: create, list, collect commands
-└── vck-templates/          # VCK content (copilot configs, framework scaffolds, KB seeds)
-    ├── src/                # Template generator logic
-    └── templates/          # Static template files
-        ├── copilot-configs/  # Copilot configuration templates
+    ├── src/
+    │   ├── knowledge/      # Knowledge base domain logic
+    │   │   ├── agents/     # Agent prompts, tools, shared runner
+    │   │   ├── storage/    # KB storage service, types, utilities
+    │   │   └── surfacing/  # Context writer
+    │   ├── tools/          # MCP tool handlers (learn, ask, prepare-context, health-check, initialize)
+    │   ├── config.ts       # Centralized configuration (models, server constants)
+    │   └── index.ts        # Server entry point
+    └── templates/          # VCK templates (bundled with MCP server)
+        ├── copilot-configs/  # Copilot configuration templates (claude-code, roo-code, etc.)
         ├── frameworks/       # Framework boilerplate templates
         └── knowledge-base/   # KB seed files (.mdc) copied during initialize
+
+packages/
+└── testing/                # QA testing infrastructure
+    ├── scenarios/          # Test scenarios (customer-support-agent, etc.)
+    └── src/                # CLI: create, list, collect commands
 ```
+
+### Claude Code Configuration (`.claude/`)
+
+The `copilot-configs/claude-code/.claude/` directory contains Claude Code's rule system. Understanding the terminology helps avoid confusion when working across Roo Code and Claude Code:
+
+```
+.claude/
+├── CLAUDE.md           # System prompt (loaded at conversation start)
+├── settings.json       # Other settings (mostly tool permission settings)
+├── agents/             # Subagents (spawn new conversations)
+│   ├── architect.md
+│   └── implementer.md
+└── skills/             # Procedures (run in current conversation)
+    ├── documentation/
+    └── verification/
+```
+
+| Claude Code | Purpose | Roo Code Equivalent |
+|-------------|---------|---------------------|
+| `CLAUDE.md` | System prompt loaded at start | `.roo/rules/` global rules |
+| `agents/` | Subagents with **new conversation** context | Modes via `new_task` tool |
+| `skills/` | Procedures in **same conversation** | Inline instructions (no equivalent) |
+| `settings.json` | IDE settings | — |
+
+**Key distinction:** Agents create fresh conversations with their own context window. Skills execute within the parent conversation, inheriting its full context.
 
 ---
 

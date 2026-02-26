@@ -40,13 +40,16 @@ kahuna/
 │       │   ├── tools/         # MCP tool handlers
 │       │   ├── config.ts      # Model IDs, server constants
 │       │   └── index.ts       # Server entry point
+│       ├── templates/         # VCK templates (bundled with MCP server)
+│       │   ├── copilot-configs/   # Copilot configuration templates
+│       │   ├── frameworks/        # Framework boilerplate templates
+│       │   └── knowledge-base/    # KB seed files
 │       ├── .env.example
 │       ├── package.json
 │       ├── tsconfig.json
 │       └── vitest.config.ts
 ├── packages/
-│   ├── testing/               # QA testing infrastructure (scenarios + CLI)
-│   └── vck-templates/         # VCK content (copilot configs, frameworks)
+│   └── testing/               # QA testing infrastructure (scenarios + CLI)
 ├── docs/                      # Documentation
 ├── biome.json                 # Linting + formatting config
 ├── tsconfig.base.json         # Shared TypeScript settings
@@ -74,7 +77,7 @@ packages:
 
 - Scope: `@aurite-ai`
 - Apps: `@aurite-ai/kahuna`
-- Packages: `@aurite-ai/kahuna-testing`, `@aurite-ai/kahuna-vck-templates`
+- Packages: `@aurite-ai/kahuna-testing`
 
 ### Workspace Dependencies
 

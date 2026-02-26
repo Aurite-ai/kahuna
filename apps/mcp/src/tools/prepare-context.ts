@@ -29,11 +29,6 @@ import {
   writeContextReadme,
 } from '../knowledge/index.js';
 import { generateAgentUsageLine } from '../usage/index.js';
-import {
-  buildMissingOrgContextMarkdown,
-  buildMissingProjectContextMarkdown,
-  checkOnboardingStatus,
-} from './onboarding-check.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -366,17 +361,6 @@ export async function prepareContextToolHandler(
       return markdownResponse(buildEmptyKBMarkdown());
     }
 
-    // Check for org/project context (hard gate)
-    const onboardingStatus = await checkOnboardingStatus(storage);
-
-    if (!onboardingStatus.hasOrgContext) {
-      return markdownResponse(buildMissingOrgContextMarkdown());
-    }
-
-    if (!onboardingStatus.hasProjectContext) {
-      return markdownResponse(buildMissingProjectContextMarkdown());
-    }
-
     // Generate project file tree for the retrieval agent
     const fileTree = await generateFileTree({ maxDepth: 4, maxEntries: 200 });
 
@@ -398,6 +382,21 @@ export async function prepareContextToolHandler(
     // Extract file selections and framework selection
     const selections = extractSelections(agentResult);
     const frameworkSelection = extractFrameworkSelection(agentResult);
+
+    // Always include foundation context (org-context, user-context) if they exist
+    // These are injected at code level, not relying on agent selection
+    const foundationSlugs = ['org-context', 'user-context'];
+    for (const slug of foundationSlugs) {
+      if (!selections.some((s) => s.slug === slug)) {
+        const entry = await storage.get(slug);
+        if (entry) {
+          selections.unshift({
+            slug,
+            reason: 'Foundation context (always included)',
+          });
+        }
+      }
+    }
 
     if (selections.length === 0 && !frameworkSelection) {
       return markdownResponse(buildNoRelevantFilesMarkdown(task, allEntries.length));

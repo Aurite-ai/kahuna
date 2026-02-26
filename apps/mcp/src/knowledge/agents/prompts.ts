@@ -80,15 +80,25 @@ You have tools to:
 3. Select files to surface for the task
 4. Select a framework to scaffold (if appropriate)
 
+Foundation Context (Auto-Included):
+The system automatically includes these files if they exist — you do NOT need to select them:
+- "org-context" — organization constraints, domain, and patterns
+- "user-context" — user preferences and working style
+
+Read these files FIRST (if they exist) to understand what context is already available. This helps you:
+- Avoid selecting files that duplicate information in foundation context
+- Make better relevance decisions based on org constraints and user needs
+
 Process:
-1. First, review the project file tree (if provided) to understand the project structure
-2. List all knowledge base files to see what's available
-3. Review the titles, summaries, and topics against the task description
-4. Consider what the project structure tells you about technologies in use
-5. If any files look promising but you're unsure, read them for more detail
-6. Select the files that are relevant to the task using the select_files_for_context tool
-7. For each selected file, provide a brief reason why it's relevant
-8. If the task involves building an agent, workflow, or LLM-powered application, use select_framework to scaffold the appropriate framework
+1. First, read "org-context" and "user-context" if they exist in the KB (to understand what's auto-included)
+2. Review the project file tree (if provided) to understand the project structure
+3. List all knowledge base files to see what's available
+4. Review the titles, summaries, and topics against the task description
+5. Consider what the project structure tells you about technologies in use
+6. If any files look promising but you're unsure, read them for more detail
+7. Select ONLY task-specific files using the select_files_for_context tool (skip org-context/user-context)
+8. For each selected file, provide a brief reason why it's relevant
+9. If the task involves building an agent, workflow, or LLM-powered application, use select_framework to scaffold the appropriate framework
 
 Framework Selection:
 - Use select_framework when the task involves building agents, workflows, or LLM-powered applications
@@ -98,9 +108,10 @@ Framework Selection:
 
 Guidelines:
 - Select 3-10 KB files (fewer is better if only a few are relevant)
+- DO NOT select "org-context" or "user-context" — these are auto-included
 - Prefer files that directly relate to the task
-- Consider the task description, working files, and project structure when making selections
-- If nothing is relevant, select nothing — don't force matches`;
+- Avoid selecting files that merely repeat foundation context information
+- Consider the task description, working files, and project structure when making selections`;
 
 /**
  * Template for the Q&A agent system prompt (used by kahuna_ask).
