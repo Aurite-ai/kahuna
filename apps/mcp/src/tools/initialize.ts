@@ -1,53 +1,227 @@
 /**
- * Initialize Tool - Copy copilot configuration and seed knowledge base
+ * Initialize Tool - Deploy copilot configuration and run adaptive onboarding
  *
  * This tool writes the Claude Code copilot configuration from the templates
- * to the directory where the user is running Claude Code, and seeds the knowledge
- * base with starter content.
+ * to the directory where the user is running Claude Code, seeds the knowledge
+ * base with starter content, and returns onboarding instructions based on
+ * whether org/user context already exists.
  *
- * Templates are read from the filesystem for easy maintenance.
+ * Design refs:
+ * - docs/design/tool-specifications.md (Section 1: kahuna_initialize)
+ * - docs/internal/designs/user-interaction-model.md (Section 3: Initialize Response Format)
  */
 
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { getClaudeCodeFiles, getKnowledgeBaseFiles } from '../templates/index.js';
-import { checkOnboardingStatus } from './onboarding-check.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
+
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+/**
+ * Minimum file size (bytes) to consider a context file as "present".
+ * Files smaller than this are treated as empty/corrupted.
+ */
+const MIN_CONTEXT_FILE_SIZE = 50;
+
+// =============================================================================
+// ONBOARDING INSTRUCTION TEMPLATES
+// =============================================================================
+
+/**
+ * Full onboarding instructions when neither org nor user context exists.
+ * This guides the copilot through the complete onboarding flow.
+ */
+const FULL_ONBOARDING_INSTRUCTIONS = `---
+
+## What Makes Context Useful
+
+Context helps Kahuna give better recommendations when you start a task.
+
+**Useful context passes this test:** "If the user later says 'help me build X', would this information change what patterns, constraints, or knowledge apply?"
+
+- **Domain/industry** → Different compliance rules, patterns
+- **Technical constraints** → Affects implementation choices
+- **Scale** → Solo vs. team affects complexity needs
+- **Explicit preferences** → "We always use X framework"
+
+**If the answer wouldn't change recommendations, don't collect it.**
+
+---
+
+## Onboarding Process
+
+### Phase 1: Situational Assessment
+
+Ask the user:
+
+> "Tell me a bit about yourself and what brings you to Kahuna."
+> "What are you working on? Are you solo or part of a team?"
+
+Listen for:
+- Domain/industry
+- Scale (solo, team, organization)
+- Goals (what they're building)
+- Any mentioned constraints
+
+### Phase 2: Document Discovery
+
+Ask:
+
+> "Do you have any existing documentation I should learn from? README, specs, company wiki, anything relevant?"
+
+If they have documents:
+1. **READ the files** to understand their content
+2. Note what context they provide
+3. Note what's still unclear or missing
+4. Call \`kahuna_learn(paths=[...], description="...")\` to store them in the knowledge base
+
+**The copilot decides** what to do with discovered documents. Generally:
+- Call \`kahuna_learn\` for files that should be stored in the knowledge base for future reference
+- Extract key information for \`kahuna_provide_context\` (org/user context synthesis)
+- Both are often appropriate - files go to KB, synthesized context goes to context files
+
+If no documents, proceed to Phase 3.
+
+### Phase 3: Targeted Follow-ups
+
+Based on Phases 1-2, ask follow-up questions **only if the answer would change recommendations**.
+
+**Examples of useful follow-ups:**
+- Domain mentioned but unclear → "What industry or domain does this work fall under?"
+- Technical work mentioned → "Any specific tech stack or platforms I should know about?"
+- Constraints hinted at → "You mentioned [X] - is that a hard constraint?"
+
+**Questions to AVOID:**
+- "What are your team members' names?" (Not useful for recommendations)
+- "What's your company's history?" (Not actionable)
+- "What's your budget?" (Not relevant to knowledge surfacing)
+
+### Phase 4: Store Context
+
+Synthesize everything into context documents:
+
+**Organization context** (stable, spans projects):
+\`\`\`
+kahuna_provide_context(
+  type: "org",
+  content: "# Organization Context\\n\\n[Domain, constraints, patterns that apply across projects]"
+)
+\`\`\`
+
+**User context** (personal preferences, working style):
+\`\`\`
+kahuna_provide_context(
+  type: "user",
+  content: "# User Context\\n\\n[Individual preferences, experience level, how they like to work]"
+)
+\`\`\`
+
+### Phase 5: Complete
+
+Tell the user:
+
+> "Onboarding complete! Please restart Claude Code (Ctrl+C and run \`claude\` again) to apply the new rules."
+
+<hints>
+- Be conversational, not interrogative
+- Read files before learning to understand what's in them
+- Only ask questions that would change recommendations
+- Don't need to collect everything - context grows over time
+</hints>`;
+
+/**
+ * User-only onboarding instructions when org context exists but user context doesn't.
+ */
+const USER_ONLY_ONBOARDING_INSTRUCTIONS = `---
+
+## User Context Needed
+
+I found your organization context, but need to set up your personal preferences.
+
+### What to Collect
+
+Ask the user about themselves:
+
+> "Tell me a bit about yourself - your role, experience level, and how you like to work."
+
+Listen for:
+- Role and responsibilities
+- Experience level and expertise areas
+- Communication preferences (detailed vs. brief)
+- Working patterns (TDD, documentation-first, etc.)
+
+### Store User Context
+
+Synthesize into user context:
+
+\`\`\`
+kahuna_provide_context(
+  type: "user",
+  content: "# User Context\\n\\n[Individual preferences, experience level, how they like to work]"
+)
+\`\`\`
+
+### Complete
+
+Tell the user:
+
+> "Onboarding complete! Please restart Claude Code (Ctrl+C and run \`claude\` again) to apply the new rules."
+
+<hints>
+- Keep it brief - org context already captures the organization
+- Focus on personal working style and preferences
+- One or two questions is usually enough
+</hints>`;
+
+/**
+ * Response when both contexts exist - no onboarding needed.
+ */
+const NO_ONBOARDING_RESPONSE = `Your organization and user context are already set up.
+
+**Next step:** Restart Claude Code (Ctrl+C and run \`claude\` again) to apply the rules.
+
+<hints>
+- After restart, rules will be loaded automatically
+- Use \`kahuna_prepare_context\` to get relevant knowledge for tasks
+- Use \`kahuna_learn\` to add new documents to the knowledge base
+</hints>`;
+
+// =============================================================================
+// TOOL DEFINITION
+// =============================================================================
 
 /**
  * Tool definition for MCP registration.
  */
 export const initializeToolDefinition = {
   name: 'kahuna_initialize',
-  description: `Initialize a new project with Kahuna copilot configuration and seed the knowledge base.
+  description: `Deploy agent-dev rules and optionally run onboarding to collect org/user context.
 
-This tool writes the Claude Code copilot configuration from Kahuna's templates
-to the specified directory and seeds the knowledge base with starter content. It sets up:
-- .claude/settings.json - Permissions and default mode
-- .claude/rules/ - Project rules and guidelines
-- .claude/skills/ - Skills
-- .claude/agents/ - Subagents
-- .claude/plans/ - Empty directory for plan files
-- .claude/CLAUDE.md - Main copilot instructions
-- Knowledge base seed files (e.g., framework best practices)
+USE THIS TOOL WHEN:
+- User says "set up Kahuna", "initialize", "get started with Kahuna"
+- Starting to use Kahuna in a new project
+- User wants to configure their copilot with Kahuna integration
 
-The configuration includes the orchestrator workflow that guides Claude through
-proper architect → code → test cycles for agent development.
+This tool does TWO things:
+1. Deploys agent-dev rules to .claude/ in the project directory
+2. Returns onboarding instructions if org/user context doesn't exist yet
 
 <examples>
-### Initialize a project
+### Basic initialization
 kahuna_initialize(targetPath="/path/to/project")
 
-### Overwrite existing config
+### With overwrite
 kahuna_initialize(targetPath="/path/to/project", overwrite=true)
 </examples>
 
 <hints>
-- targetPath must be an existing directory
-- Set overwrite=true to replace existing files
-- Restart Claude Code after initialization to pick up new config
-- Knowledge base seed files are only copied if they don't already exist (unless overwrite=true)
+- targetPath is required - the directory to initialize
+- After initialization, follow the onboarding instructions in the response
+- Restart Claude Code after onboarding to apply the deployed rules
 </hints>`,
 
   inputSchema: {
@@ -66,6 +240,10 @@ kahuna_initialize(targetPath="/path/to/project", overwrite=true)
   },
 };
 
+// =============================================================================
+// TYPES
+// =============================================================================
+
 /**
  * Input type for the initialize tool.
  */
@@ -73,6 +251,63 @@ interface InitializeToolInput {
   targetPath: string;
   overwrite?: boolean;
 }
+
+/**
+ * Result of checking context file existence.
+ */
+interface ContextStatus {
+  hasOrgContext: boolean;
+  hasUserContext: boolean;
+}
+
+// =============================================================================
+// CONTEXT DETECTION (Phase 3)
+// =============================================================================
+
+/**
+ * Get the knowledge base directory path.
+ * Uses KAHUNA_KNOWLEDGE_DIR env var if set, otherwise defaults to ~/.kahuna/knowledge/
+ */
+function getKnowledgeBaseDir(): string {
+  return process.env.KAHUNA_KNOWLEDGE_DIR || path.join(os.homedir(), '.kahuna', 'knowledge');
+}
+
+/**
+ * Check if a context file exists and is valid (> MIN_CONTEXT_FILE_SIZE bytes).
+ *
+ * @param type - 'org' or 'user'
+ * @returns true if the file exists and is large enough to be considered valid
+ */
+async function checkContextFileExists(type: 'org' | 'user'): Promise<boolean> {
+  const filename = type === 'org' ? 'org-context.mdc' : 'user-context.mdc';
+  const filePath = path.join(getKnowledgeBaseDir(), filename);
+
+  try {
+    const stat = await fs.stat(filePath);
+    return stat.isFile() && stat.size > MIN_CONTEXT_FILE_SIZE;
+  } catch {
+    // File doesn't exist or can't be accessed
+    return false;
+  }
+}
+
+/**
+ * Check the status of both context files.
+ *
+ * @returns ContextStatus indicating which context files exist
+ */
+async function checkContextStatus(): Promise<ContextStatus> {
+  const [hasOrgContext, hasUserContext] = await Promise.all([
+    checkContextFileExists('org'),
+    checkContextFileExists('user'),
+  ]);
+
+  return { hasOrgContext, hasUserContext };
+}
+
+// =============================================================================
+// FILE UTILITIES
+// =============================================================================
 
 /**
  * Check if a path exists (async replacement for fs.existsSync).
@@ -84,14 +319,6 @@ async function pathExists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/**
- * Get the knowledge base directory path.
- * Uses KAHUNA_KNOWLEDGE_DIR env var if set, otherwise defaults to ~/.kahuna/knowledge/
- */
-function getKnowledgeBaseDir(): string {
-  return process.env.KAHUNA_KNOWLEDGE_DIR || path.join(os.homedir(), '.kahuna', 'knowledge');
 }
 
 /**
@@ -147,12 +374,38 @@ async function seedKnowledgeBase(
   return { seeded, skipped, kbDir };
 }
 
+// =============================================================================
+// RESPONSE BUILDING (Phase 4)
+// =============================================================================
+
+/**
+ * Build the onboarding section of the response based on context status.
+ */
+function buildOnboardingSection(contextStatus: ContextStatus): string {
+  if (contextStatus.hasOrgContext && contextStatus.hasUserContext) {
+    // Both contexts exist - no onboarding needed
+    return NO_ONBOARDING_RESPONSE;
+  }
+
+  if (contextStatus.hasOrgContext && !contextStatus.hasUserContext) {
+    // Org exists but user doesn't - partial onboarding
+    return `**Complete user onboarding before restarting.**${USER_ONLY_ONBOARDING_INSTRUCTIONS}`;
+  }
+
+  // Neither exists (or only user exists, which is unusual) - full onboarding
+  return `**Complete onboarding before restarting.**${FULL_ONBOARDING_INSTRUCTIONS}`;
+}
+
+// =============================================================================
+// TOOL HANDLER
+// =============================================================================
+
 /**
  * Handle the kahuna_initialize tool call.
  */
 export async function initializeToolHandler(
   args: Record<string, unknown>,
-  ctx: ToolContext
+  _ctx: ToolContext
 ): Promise<MCPToolResponse> {
   const input = args as unknown as InitializeToolInput;
   const targetPath = input.targetPath;
@@ -203,16 +456,16 @@ export async function initializeToolHandler(
     // Seed knowledge base
     const seedResult = await seedKnowledgeBase(overwrite);
 
-    // Check onboarding status to tailor next steps
-    const onboardingStatus = await checkOnboardingStatus(ctx.storage);
+    // Check context status for adaptive onboarding (Phase 3)
+    const contextStatus = await checkContextStatus();
 
     // Build markdown response
     const copiedRelative = copiedFiles.map((f) => path.relative(absoluteTargetPath, f));
     const skippedRelative = skippedFiles.map((f) => path.relative(absoluteTargetPath, f));
 
-    let markdown = `# Initialized
+    let markdown = `# Kahuna Configured
 
-Kahuna copilot configuration copied to: \`${absoluteTargetPath}\`
+Rules deployed to \`.claude/\` in: \`${absoluteTargetPath}\`
 
 ## Copilot Configuration
 
@@ -242,24 +495,9 @@ Kahuna copilot configuration copied to: \`${absoluteTargetPath}\`
       markdown += `\n\nSeeded files:\n${seedResult.seeded.map((f) => `- ${f}`).join('\n')}`;
     }
 
-    // Next Steps section - tailored based on onboarding status
+    // Onboarding section - adaptive based on context status (Phase 4)
     markdown += '\n\n## Next Steps\n\n';
-
-    if (!onboardingStatus.hasOrgContext) {
-      // No org context - start there
-      markdown += `Let's start by capturing your organization context. Say **"set up org context"** to begin.`;
-    } else if (!onboardingStatus.hasProjectContext) {
-      // Org exists but no project context
-      markdown += `I found your organization context. Now let's set up this project.\nSay **"set up project context"** to describe what you're building.`;
-    } else {
-      // Both contexts exist - ready to go!
-      markdown +=
-        'Context is ready! Use **kahuna_prepare_context** with your task description to get started.';
-    }
-
-    markdown += `\n\n<hints>
-- Stop the current Claude Code instance with Ctrl+C and restart to pick up new config
-${skippedFiles.length > 0 || seedResult.skipped.length > 0 ? `- To overwrite existing files: kahuna_initialize(targetPath="${targetPath}", overwrite=true)\n` : ''}</hints>`;
+    markdown += buildOnboardingSection(contextStatus);
 
     return markdownResponse(markdown);
   } catch (error) {
@@ -278,3 +516,9 @@ export const initializeTool = {
   definition: initializeToolDefinition,
   handler: initializeToolHandler,
 };
+
+// =============================================================================
+// EXPORTED UTILITIES (for testing)
+// =============================================================================
+
+export { checkContextFileExists, checkContextStatus, MIN_CONTEXT_FILE_SIZE };

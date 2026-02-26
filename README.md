@@ -88,7 +88,6 @@ kahuna/
 │   └── mcp/              # MCP server (stdio) — context management tools
 ├── packages/
 │   ├── testing/          # QA testing infrastructure (scenarios + CLI)
-│   └── vck-templates/    # VCK content (copilot configs, frameworks)
 └── docs/                 # Documentation
 ```
 

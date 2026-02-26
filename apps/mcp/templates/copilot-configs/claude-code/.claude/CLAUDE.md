@@ -174,8 +174,6 @@ Skills are triggered by user requests or specific conditions. Reference these wh
 
 | Skill | Trigger | Purpose |
 |-------|---------|---------|
-| **org-onboarding** | "set up org context" | Capture organization-wide context (industry, team, constraints, priorities) |
-| **project-onboarding** | "set up project context" | Capture project-specific business context and success criteria |
 | **verification** | "verify my agent" | Check agent code against organizational policies and framework best practices |
 | **documentation** | Internal use | Search guidance for finding external documentation |
 
@@ -189,7 +187,7 @@ Skills are located in `.claude/skills/[skill-name]/SKILL.md`.
 
 ### Step 0: Prepare Context
 
-Call **kahuna_prepare_context** with the user request as the task. The tool will surface relevant context and provide onboarding hints if needed.
+Call **kahuna_prepare_context** with the user request as the task. The tool will surface relevant context for the task.
 
 ### Step 1: Delegate to Architect
 
