@@ -1,0 +1,29 @@
+# Claude PR Review Workflow
+#
+# Required setup: Add ANTHROPIC_API_KEY to repository secrets
+# Go to: Settings → Secrets and variables → Actions → New repository secret
+# Name: ANTHROPIC_API_KEY
+# Value: Your Anthropic API key from https://console.anthropic.com/
+
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  pull_request_review_comment:
+    types: [created]
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
