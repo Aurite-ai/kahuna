@@ -214,38 +214,6 @@ const CREDENTIAL_INFO: Record<string, Record<string, Partial<CredentialRequireme
       required: false,
     },
   },
-  twilio: {
-    account_sid: {
-      displayName: 'Account SID',
-      description: 'Your Twilio account identifier',
-      envVarName: 'TWILIO_ACCOUNT_SID',
-      exampleFormat: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-      obtainFrom: 'Twilio Console → Dashboard',
-    },
-    auth_token: {
-      displayName: 'Auth Token',
-      description: 'Your Twilio authentication token',
-      envVarName: 'TWILIO_AUTH_TOKEN',
-      exampleFormat: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-      obtainFrom: 'Twilio Console → Dashboard (keep secret!)',
-    },
-  },
-  'whatsapp-business': {
-    access_token: {
-      displayName: 'Access Token',
-      description: 'WhatsApp Business API access token',
-      envVarName: 'WHATSAPP_ACCESS_TOKEN',
-      exampleFormat: 'EAAG...',
-      obtainFrom: 'Meta Business Suite → WhatsApp → API Setup',
-    },
-    phone_number_id: {
-      displayName: 'Phone Number ID',
-      description: 'WhatsApp Business phone number ID',
-      envVarName: 'WHATSAPP_PHONE_NUMBER_ID',
-      exampleFormat: '123456789012345',
-      obtainFrom: 'Meta Business Suite → WhatsApp → Phone Numbers',
-    },
-  },
   'microsoft-teams': {
     client_id: {
       displayName: 'Client ID',

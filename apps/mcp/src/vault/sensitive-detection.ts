@@ -32,7 +32,6 @@ export type SensitiveDataType =
   | 'slack_webhook'
   | 'github_token'
   | 'stripe_api_key'
-  | 'twilio_api_key'
   | 'sendgrid_api_key'
   | 'oauth_client_secret'
   | 'oauth_refresh_token'
@@ -188,16 +187,6 @@ const SENSITIVE_PATTERNS: SensitivePattern[] = [
     description: 'Stripe API key',
     valueGroup: 1,
     vaultPathPrefix: 'stripe',
-  },
-
-  // Twilio API Key
-  {
-    type: 'twilio_api_key',
-    pattern: /\b(SK[a-f0-9]{32})\b/g,
-    confidence: 'high',
-    description: 'Twilio API key',
-    valueGroup: 1,
-    vaultPathPrefix: 'twilio',
   },
 
   // SendGrid API Key

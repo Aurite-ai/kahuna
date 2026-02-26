@@ -541,118 +541,6 @@ const KNOWN_PATTERNS: KnownIntegrationPattern[] = [
     ],
   },
 
-  // Communication - Twilio
-  {
-    pattern: /twilio|TWILIO_|AC[a-f0-9]{32}/gi,
-    type: 'messaging',
-    displayName: 'Twilio',
-    id: 'twilio',
-    authMethod: 'basic_auth',
-    credentialKeys: ['account_sid', 'auth_token'],
-    defaultOperations: [
-      {
-        name: 'send-sms',
-        description: 'Send an SMS message',
-        params: [
-          {
-            name: 'to',
-            description: 'Recipient phone number (E.164 format)',
-            type: 'string',
-            required: true,
-          },
-          { name: 'from', description: 'Sender phone number', type: 'string', required: true },
-          { name: 'body', description: 'Message content', type: 'string', required: true },
-        ],
-        returns: { type: 'object', description: 'Message SID and status' },
-      },
-      {
-        name: 'make-call',
-        description: 'Initiate a phone call',
-        params: [
-          { name: 'to', description: 'Recipient phone number', type: 'string', required: true },
-          { name: 'from', description: 'Caller phone number', type: 'string', required: true },
-          {
-            name: 'twiml_url',
-            description: 'URL to TwiML instructions',
-            type: 'string',
-            required: true,
-          },
-        ],
-        returns: { type: 'object', description: 'Call SID and status' },
-      },
-      {
-        name: 'list-messages',
-        description: 'List sent/received messages',
-        params: [
-          { name: 'to', description: 'Filter by recipient', type: 'string', required: false },
-          { name: 'from', description: 'Filter by sender', type: 'string', required: false },
-          { name: 'limit', description: 'Maximum results', type: 'number', required: false },
-        ],
-        returns: { type: 'array', description: 'List of messages' },
-      },
-    ],
-  },
-
-  // Communication - WhatsApp Business
-  {
-    pattern: /whatsapp|whats\s*app|wa\.me/gi,
-    type: 'messaging',
-    displayName: 'WhatsApp Business',
-    id: 'whatsapp-business',
-    authMethod: 'bearer_token',
-    credentialKeys: ['access_token', 'phone_number_id'],
-    defaultOperations: [
-      {
-        name: 'send-message',
-        description: 'Send a WhatsApp message',
-        params: [
-          {
-            name: 'to',
-            description: 'Recipient phone number (E.164 format)',
-            type: 'string',
-            required: true,
-          },
-          { name: 'text', description: 'Message text', type: 'string', required: true },
-        ],
-        returns: { type: 'object', description: 'Message ID and status' },
-      },
-      {
-        name: 'send-template',
-        description: 'Send a pre-approved template message',
-        params: [
-          { name: 'to', description: 'Recipient phone number', type: 'string', required: true },
-          { name: 'template_name', description: 'Template name', type: 'string', required: true },
-          {
-            name: 'language_code',
-            description: 'Template language (e.g., en_US)',
-            type: 'string',
-            required: true,
-          },
-          {
-            name: 'components',
-            description: 'Template components/variables',
-            type: 'array',
-            required: false,
-          },
-        ],
-        returns: { type: 'object', description: 'Message ID and status' },
-      },
-      {
-        name: 'get-messages',
-        description: 'Get message history',
-        params: [
-          {
-            name: 'phone_number',
-            description: 'Phone number to get messages for',
-            type: 'string',
-            required: false,
-          },
-        ],
-        returns: { type: 'array', description: 'List of messages' },
-      },
-    ],
-  },
-
   // Communication - Microsoft Teams
   {
     pattern: /microsoft\s*teams|ms\s*teams|teams\.microsoft/gi,
@@ -1361,8 +1249,6 @@ const OP_ITEM_TO_INTEGRATION: Array<{
   { keywords: ['discord'], patternId: 'discord' },
   { keywords: ['gmail', 'google-mail', 'googlemail'], patternId: 'gmail' },
   { keywords: ['sendgrid'], patternId: 'sendgrid' },
-  { keywords: ['twilio'], patternId: 'twilio' },
-  { keywords: ['whatsapp', 'wa'], patternId: 'whatsapp-business' },
   { keywords: ['teams', 'microsoft-teams', 'ms-teams'], patternId: 'microsoft-teams' },
 
   // CRM
@@ -1760,9 +1646,6 @@ export function mergeSecretsWithIntegrations(
     discord_bot_token: 'discord',
     discord_client_id: 'discord',
     discord_client_secret: 'discord',
-    twilio_account_sid: 'twilio',
-    twilio_auth_token: 'twilio',
-    whatsapp_access_token: 'whatsapp-business',
     teams_client_id: 'microsoft-teams',
     teams_client_secret: 'microsoft-teams',
     sendgrid_api_key: 'sendgrid',
