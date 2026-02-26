@@ -13,7 +13,7 @@
 | `kahuna_initialize` | Deploy agent-dev rules and run onboarding |
 | `kahuna_provide_context` | Store org/user context from onboarding or conversation |
 | `kahuna_learn` | Send files for Kahuna to learn from (detects contradictions) |
-| `kahuna_prepare_context` | Prepare .context-guide.md for a task |
+| `kahuna_prepare_context` | Prepare .kahuna/context-guide.md for a task |
 | `kahuna_ask` | Quick Q&A |
 | `kahuna_delete` | Remove outdated files from knowledge base |
 | `kahuna_sync` | Sync all changes (deferred) |
@@ -291,7 +291,7 @@ kahuna_learn(
 <hints>
 - Accepts both files AND folders - folders are processed recursively
 - Description helps classification but isn't required
-- Files go to ~/.kahuna knowledge base, NOT directly to .context-guide.md
+- Files go to ~/.kahuna knowledge base, NOT directly to .kahuna/context-guide.md
 - Use kahuna_prepare_context to surface learned knowledge
 </hints>
 ```
@@ -353,7 +353,7 @@ The following existing files contradict the new file(s). Consider removing outda
   The new file specifies JWT authentication while the old file requires OAuth2
 
 <hints>
-- Review .context-guide.md to verify accuracy
+- Review .kahuna/context-guide.md to verify accuracy
 - The API standards will be used in future recommendations
 - Send more files anytime with this tool
 - Use `kahuna_prepare_context` to surface this knowledge for a specific task
@@ -367,8 +367,8 @@ The following existing files contradict the new file(s). Consider removing outda
 **Build first:**
 - Accept files and description
 - Basic classification (policy vs code vs config)
-- Write raw content to .context-guide.md with metadata
-- Update .context-guide.md
+- Write raw content to .kahuna/context-guide.md with metadata
+- Update .kahuna/context-guide.md
 
 **Implemented:**
 - LLM-powered categorization (Haiku)
@@ -445,8 +445,8 @@ Chose keyword-based search over embeddings because simpler infrastructure, suffi
 *Extracted from conversation + code*
 
 <hints>
-- Review .context-guide.md for accuracy
-- Commit .context-guide.md to preserve team knowledge
+- Review .kahuna/context-guide.md for accuracy
+- Commit .kahuna/context-guide.md to preserve team knowledge
 - Next sync will capture new changes
 </hints>
 ```
@@ -472,7 +472,7 @@ Chose keyword-based search over embeddings because simpler infrastructure, suffi
 ### Tool Description
 
 ```
-Prepare the .context-guide.md file with relevant knowledge for a task.
+Prepare the .kahuna/context-guide.md file with relevant knowledge for a task.
 
 USE THIS TOOL WHEN:
 - Starting any new task or feature
@@ -480,7 +480,7 @@ USE THIS TOOL WHEN:
 - Before beginning implementation work
 - User asks "what do we know about X"
 
-This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from .context-guide.md.
+This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from .kahuna/context-guide.md.
 
 <examples>
 ### Starting a task
@@ -501,9 +501,9 @@ kahuna_prepare_context(
 </examples>
 
 <hints>
-- Call ONCE at task start, then work from .context-guide.md
+- Call ONCE at task start, then work from .kahuna/context-guide.md
 - Natural language task description works best
-- After calling, read .context-guide.md for navigation
+- After calling, read .kahuna/context-guide.md for navigation
 - If you need more context mid-task, use kahuna_ask instead
 </hints>
 ```
@@ -534,7 +534,7 @@ kahuna_prepare_context(
 
 ## Start Here
 
-1. **Read .context-guide.md** - Full navigation and content
+1. **Read .kahuna/context-guide.md** - Full navigation and content
 2. **Check API Standards section** - Has rate limiting requirements
 3. **Review Error Patterns section** - Follow existing patterns
 
@@ -551,7 +551,7 @@ kahuna_prepare_context(
 - Accept task description
 - Search existing knowledge base for relevant content
 - Return list of relevant sections with summaries
-- Generate .context-guide.md with task-specific content
+- Generate .kahuna/context-guide.md with task-specific content
 
 **Future enhancements:**
 - LLM-powered relevance scoring
@@ -651,7 +651,7 @@ USE THIS TOOL WHEN:
 - Need clarification on a decision or pattern
 - Context guide doesn't have what you need
 
-Searches .context-guide.md first (if exists), then falls back to ~/.kahuna knowledge base.
+Searches .kahuna/context-guide.md first (if exists), then falls back to ~/.kahuna knowledge base.
 
 <examples>
 ### Direct question
@@ -665,10 +665,10 @@ kahuna_ask(question="Do we have rate limiting requirements documented?")
 </examples>
 
 <hints>
-- Searches project .context-guide.md first, then knowledge base
+- Searches project .kahuna/context-guide.md first, then knowledge base
 - Use for quick questions mid-task
 - For comprehensive context setup, use kahuna_prepare_context instead
-- Returns text directly, doesn't modify .context-guide.md
+- Returns text directly, doesn't modify .kahuna/context-guide.md
 </hints>
 ```
 
@@ -694,10 +694,10 @@ The project uses keyword-based search for these reasons:
 3. **Cost** - No embedding API costs
 4. **Sufficient** - Corpus is small enough for keyword matching
 
-**Source:** .context-guide.md (Search Decision section)
+**Source:** .kahuna/context-guide.md (Search Decision section)
 
 <hints>
-- Full details in .context-guide.md
+- Full details in .kahuna/context-guide.md
 - Related: "What would trigger switching to embeddings?"
 - If you need broader context, use kahuna_prepare
 </hints>
@@ -707,7 +707,7 @@ The project uses keyword-based search for these reasons:
 
 **Build first:**
 - Accept question
-- Search .context-guide.md for relevant content
+- Search .kahuna/context-guide.md for relevant content
 - Return synthesized answer with source citations
 
 **Future enhancements:**
