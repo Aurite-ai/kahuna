@@ -82,7 +82,7 @@ Kahuna accepts knowledge from two sources:
                     ┌─────────────────────┐
                     │   KNOWLEDGE BASE    │
                     │                     │
-                    │   .context-guide.md  │
+                    │   .kahuna/context-guide.md  │
                     │   (single file with │
                     │    all knowledge)   │
                     └─────────────────────┘
@@ -127,14 +127,14 @@ The copilot describes what it's doing, and Kahuna's agents determine what's rele
 
 ### 2.4 Files as Interface
 
-The `.context-guide.md` file is the interface between Kahuna and the copilot.
+The `.kahuna/context-guide.md` file is the interface between Kahuna and the copilot.
 
 ```
 project/
-└── .context-guide.md        # Single markdown file with all relevant knowledge
+└── .kahuna/context-guide.md        # Single markdown file with all relevant knowledge
 ```
 
-**Initial structure:** `kahuna_initialize` creates a starter `.context-guide.md` with curated patterns (e.g., LangGraph best practices). This provides Day 1 value.
+**Initial structure:** `kahuna_initialize` creates a starter `.kahuna/context-guide.md` with curated patterns (e.g., LangGraph best practices). This provides Day 1 value.
 
 **Subsequent updates:** `kahuna_prepare_context` regenerates the entire file with task-relevant knowledge from the knowledge base.
 
@@ -157,7 +157,7 @@ All tool responses include actionable hints guiding what to do next:
 <hints>
 ## What You Can Do Next
 
-- **Read the full decision**: Check the Search Approach section in `.context-guide.md`
+- **Read the full decision**: Check the Search Approach section in `.kahuna/context-guide.md`
 - **Check the policy**: The API guidelines affect how you should implement this
 - **Start implementation**: The decision above provides the rationale you need
 </hints>
@@ -214,7 +214,7 @@ Four active tools (plus one deferred) in three categories. See [tool-specificati
 
 ### 5.2 Files as Interface
 
-**Decision:** Request Task Context writes to `.context-guide.md` rather than returning content directly.
+**Decision:** Request Task Context writes to `.kahuna/context-guide.md` rather than returning content directly.
 
 **Rationale:**
 - Copilots already know how to read files
@@ -233,7 +233,7 @@ Four active tools (plus one deferred) in three categories. See [tool-specificati
 
 ### 5.4 Agent-Determined Structure
 
-**Decision:** Agents determine the `.context-guide.md` content structure based on relevance, rather than predefined categories.
+**Decision:** Agents determine the `.kahuna/context-guide.md` content structure based on relevance, rather than predefined categories.
 
 **Rationale:**
 - Fits "agents figure it out" philosophy
@@ -253,7 +253,7 @@ Four active tools (plus one deferred) in three categories. See [tool-specificati
 
 ### 5.6 Curated Patterns for Cold Start
 
-**Decision:** Init pre-populates `.context-guide.md` with LangGraph-specific starter content.
+**Decision:** Init pre-populates `.kahuna/context-guide.md` with LangGraph-specific starter content.
 
 **Rationale:**
 - Users need Day 1 value
@@ -289,10 +289,10 @@ Four active tools (plus one deferred) in three categories. See [tool-specificati
 
 - v1.0 (2026-02-05): Initial authoritative design consolidating documents 00-08
 - v1.1 (2026-02-05): Added file-based knowledge input; restructured as overview document
-- v1.2 (2026-02-05): Clarified Kahuna as agent-powered documentation generator; adopted agent-determined structure for .context-guide.md
+- v1.2 (2026-02-05): Clarified Kahuna as agent-powered documentation generator; adopted agent-determined structure for .kahuna/context-guide.md
 - v1.3 (2026-02-05): Finalized tool names: setup, learn, prepare_context, ask, review, sync
 - v1.4 (2026-02-05): Two-stage architecture; tool categories; assistance tools use context + KB
 - v1.5 (2026-02-05): Added 09d-copilot-configuration.md to document index; updated 09b/09c status
-- v1.6 (2026-02-05): Clarified .context-guide.md structure (single file approach); fixed ~/.kahuna as global; aligned status terminology
+- v1.6 (2026-02-05): Clarified .kahuna/context-guide.md structure (single file approach); fixed ~/.kahuna as global; aligned status terminology
 - v2.0 (2026-02-05): Promoted to docs/design/; restructured as conceptual overview (technical details moved to companion docs)
 - v2.1 (2026-02-09): Renamed kahuna_setup → kahuna_initialize; removed kahuna_review (now skill-based); updated tool table

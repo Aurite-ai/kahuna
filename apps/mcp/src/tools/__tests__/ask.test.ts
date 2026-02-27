@@ -22,7 +22,7 @@ vi.mock('../../knowledge/agents/run-agent.js', () => ({
   runAgent: vi.fn(),
 }));
 
-// Mock fs/promises for .context-guide.md reading
+// Mock fs/promises for .kahuna/context-guide.md reading
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(),
 }));
@@ -70,7 +70,7 @@ describe('askToolHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ctx = createMockContext();
-    // Default: no .context-guide.md exists
+    // Default: no .kahuna/context-guide.md exists
     mockReadFile.mockRejectedValue(new Error('ENOENT: no such file or directory'));
     // Default: onboarding context exists (for soft warning, ask doesn't block)
     vi.mocked(ctx.storage.list).mockResolvedValue(createOnboardingContextEntries());
@@ -142,8 +142,8 @@ describe('askToolHandler', () => {
       );
     });
 
-    it('includes referenced KB files in system prompt when .context-guide.md exists', async () => {
-      // Mock .context-guide.md with KB file references
+    it('includes referenced KB files in system prompt when .kahuna/context-guide.md exists', async () => {
+      // Mock .kahuna/context-guide.md with KB file references
       const contextGuideContent = `# Context for: Build authentication system
 
 Surfaced from Kahuna knowledge base on 2026-02-12.
@@ -177,11 +177,11 @@ Surfaced from Kahuna knowledge base on 2026-02-12.
       expect(systemPrompt).toContain('/home/user/.kahuna/knowledge/auth-patterns.mdc');
       expect(systemPrompt).toContain('/home/user/.kahuna/knowledge/security-guide.mdc');
       expect(systemPrompt).toContain(
-        'already has these KB files referenced in their .context-guide.md'
+        'already has these KB files referenced in their .kahuna/context-guide.md'
       );
     });
 
-    it('handles missing .context-guide.md gracefully', async () => {
+    it('handles missing .kahuna/context-guide.md gracefully', async () => {
       // mockReadFile already rejects by default in beforeEach
       mockRunAgent.mockResolvedValue({
         textResponse: 'Answer without context',
@@ -198,7 +198,7 @@ Surfaced from Kahuna knowledge base on 2026-02-12.
       expect(systemPrompt).not.toContain('already has these KB files referenced');
     });
 
-    it('extracts multiple KB file paths from .context-guide.md', async () => {
+    it('extracts multiple KB file paths from .kahuna/context-guide.md', async () => {
       const contextGuideContent = `# Context for: Multi-file task
 
 ## Knowledge Base Files

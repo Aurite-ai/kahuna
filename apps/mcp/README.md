@@ -265,10 +265,10 @@ Send files or folders to Kahuna to learn from and add to the knowledge base.
 
 #### `kahuna_prepare_context`
 
-Prepare the `.context-guide.md` file with task-relevant knowledge.
+Prepare the `.kahuna/context-guide.md` file with task-relevant knowledge.
 
 - **Input:** `task: string`, `files?: string[]`
-- **Process:** LLM retrieval agent searches KB → selects relevant files → writes references to these files in `.context-guide.md`
+- **Process:** LLM retrieval agent searches KB → selects relevant files → writes references to these files in `.kahuna/context-guide.md`
 - **Response:** Markdown with surfaced files table, "Start Here" section, and `<hints>`
 - **Requires:** Organization and project context must be set up first (see [Onboarding](#onboarding-system))
 
@@ -523,7 +523,7 @@ apps/mcp/src/
 │   │   ├── knowledge-storage.ts # CRUD for .mdc files
 │   │   └── utils.ts            # Slug generation, frontmatter parsing
 │   └── surfacing/              # Context surfacing
-│       └── context-writer.ts   # Write .context-guide.md
+│       └── context-writer.ts   # Write .kahuna/context-guide.md
 │
 ├── integrations/               # External service integration management
 │   ├── types.ts                # Integration descriptor types

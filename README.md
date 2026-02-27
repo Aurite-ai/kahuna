@@ -76,7 +76,7 @@ For detailed tool documentation and development instructions, see [apps/mcp/READ
 | Tool | Description |
 |------|-------------|
 | `kahuna_learn` | Send files to Kahuna to learn from and add to the knowledge base |
-| `kahuna_prepare_context` | Prepare `.context-guide.md` with task-relevant knowledge |
+| `kahuna_prepare_context` | Prepare `.kahuna/context-guide.md` with task-relevant knowledge |
 | `kahuna_ask` | Quick Q&A using the knowledge base |
 | `kahuna_delete` | Remove outdated files from the knowledge base |
 | `kahuna_provide_context` | Store org or user context in the knowledge base |

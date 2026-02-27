@@ -162,7 +162,7 @@ Assume the entire agent development will be completed within this conversation u
 
 ### Context and Documentation
 
-All context and existing documentation will be referenced by file path in `.context-guide.md`. Reference these files when creating subagent prompts to provide necessary background information.
+All context and existing documentation will be referenced by file path in `.kahuna/context-guide.md`. Reference these files when creating subagent prompts to provide necessary background information.
 
 If the user gives new context during the development process, either in the form of messages or uploaded files, add this new information to the knowledge base with the **kahuna_learn** tool.
 
