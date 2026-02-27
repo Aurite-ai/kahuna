@@ -405,9 +405,7 @@ export async function recordProjectUsage(
 ): Promise<void> {
   try {
     const storage = getProjectStorage();
-    console.error(`[UsageTracker] Recording usage for ${toolName} to ${storage.getUsagePath()}`);
     await storage.recordUsage(toolName, usage, cost);
-    console.error(`[UsageTracker] Successfully recorded usage for ${toolName}`);
   } catch (error) {
     // Log but don't fail if project storage has issues
     console.error('[UsageTracker] Failed to persist to project storage:', error);
