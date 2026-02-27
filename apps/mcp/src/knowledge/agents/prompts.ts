@@ -191,14 +191,14 @@ export function buildRetrievalUserMessage(
 /**
  * Build the full Q&A system prompt with referenced files section.
  *
- * @param referencedKBFiles - List of KB file paths currently referenced in .context-guide.md
+ * @param referencedKBFiles - List of KB file paths currently referenced in .kahuna/context-guide.md
  */
 export function buildQASystemPrompt(referencedKBFiles: string[]): string {
   let referencedFilesSection = '';
 
   if (referencedKBFiles.length > 0) {
     const fileList = referencedKBFiles.map((f) => `- ${f}`).join('\n');
-    referencedFilesSection = `The copilot already has these KB files referenced in their .context-guide.md:
+    referencedFilesSection = `The copilot already has these KB files referenced in their .kahuna/context-guide.md:
 ${fileList}
 
 These files are already accessible to the copilot. Focus on providing information that isn't covered by these files, or that provides additional detail beyond what they contain.`;

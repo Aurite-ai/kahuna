@@ -31,7 +31,7 @@ USE THIS TOOL WHEN:
 - Mid-task and need specific information
 - User asks a direct question about the project
 - Need clarification on a decision or pattern
-- Need information beyond what's in .context-guide.md
+- Need information beyond what's in .kahuna/context-guide.md
 
 Searches the knowledge base and synthesizes an answer with source citations.
 
@@ -80,14 +80,14 @@ const askInputSchema = z.object({
 // =============================================================================
 
 /**
- * Read and parse .context-guide.md to extract KB file references.
+ * Read and parse .kahuna/context-guide.md to extract KB file references.
  * Returns an array of KB file paths that are already surfaced.
  *
  * @returns Array of KB file paths (e.g., ["/home/user/.kahuna/knowledge/file.mdc"])
  */
 async function getReferencedKBFiles(): Promise<string[]> {
   try {
-    const contextGuidePath = path.join(process.cwd(), '.context-guide.md');
+    const contextGuidePath = path.join(process.cwd(), '.kahuna/context-guide.md');
     const content = await fs.readFile(contextGuidePath, 'utf-8');
 
     // Extract KB paths from the markdown table
@@ -103,7 +103,7 @@ async function getReferencedKBFiles(): Promise<string[]> {
 
     return paths;
   } catch (error) {
-    // If .context-guide.md doesn't exist or can't be read, return empty array
+    // If .kahuna/context-guide.md doesn't exist or can't be read, return empty array
     return [];
   }
 }
@@ -117,7 +117,7 @@ async function getReferencedKBFiles(): Promise<string[]> {
  *
  * Pipeline:
  * 1. Validate input
- * 2. Read .context-guide.md to get already-referenced KB files
+ * 2. Read .kahuna/context-guide.md to get already-referenced KB files
  * 3. Build Q&A system prompt with referenced files
  * 4. Run Q&A agent with list + read tools
  * 5. Return markdown response with answer
@@ -141,7 +141,7 @@ export async function askToolHandler(
   const { question } = parseResult.data;
 
   try {
-    // Get KB files already referenced in .context-guide.md
+    // Get KB files already referenced in .kahuna/context-guide.md
     const referencedKBFiles = await getReferencedKBFiles();
 
     // Check for onboarding status (warning banner - don't block)
