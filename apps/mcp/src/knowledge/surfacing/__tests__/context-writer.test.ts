@@ -46,12 +46,20 @@ describe('context-writer', () => {
     });
 
     it('removes .kahuna/context-guide.md from existing directory', async () => {
-      await fs.mkdir(contextDir, { recursive: true });
-      await fs.writeFile(path.join(contextDir, '.kahuna/context-guide.md'), 'readme');
+      const kahunaDir = path.join(contextDir, '.kahuna');
+      await fs.mkdir(kahunaDir, { recursive: true });
+      await fs.writeFile(path.join(kahunaDir, 'context-guide.md'), 'readme');
 
       await clearContextDir(contextDir);
 
-      const files = await fs.readdir(contextDir);
+      // .kahuna directory should still exist but context-guide.md should be removed
+      const kahunaExists = await fs
+        .stat(kahunaDir)
+        .then(() => true)
+        .catch(() => false);
+      expect(kahunaExists).toBe(true);
+
+      const files = await fs.readdir(kahunaDir);
       expect(files).toHaveLength(0);
     });
 

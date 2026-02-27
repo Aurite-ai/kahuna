@@ -56,12 +56,13 @@ export function getKBPath(slug: string): string {
  * @param contextDir - Path to the context directory
  */
 export async function clearContextDir(contextDir: string): Promise<void> {
-  // Ensure directory exists
-  await fs.mkdir(contextDir, { recursive: true });
+  // Ensure .kahuna directory exists
+  const kahunaDir = path.join(contextDir, '.kahuna');
+  await fs.mkdir(kahunaDir, { recursive: true });
 
-  // Remove .kahuna/context-guide.md if it exists (we only write .context-guide now, no other files)
+  // Remove .kahuna/context-guide.md if it exists
   try {
-    await fs.unlink(path.join(contextDir, '.kahuna/context-guide.md'));
+    await fs.unlink(path.join(kahunaDir, 'context-guide.md'));
   } catch (error) {
     // Ignore if file doesn't exist
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
@@ -165,7 +166,11 @@ export async function writeContextReadme(
   parts.push('*Prepared by Kahuna | Use `kahuna_ask` for additional questions*');
   parts.push('');
 
-  await fs.writeFile(path.join(contextDir, '.kahuna/context-guide.md'), parts.join('\n'), 'utf-8');
+  // Ensure .kahuna directory exists before writing
+  const kahunaDir = path.join(contextDir, '.kahuna');
+  await fs.mkdir(kahunaDir, { recursive: true });
+
+  await fs.writeFile(path.join(kahunaDir, 'context-guide.md'), parts.join('\n'), 'utf-8');
 }
 
 /**
