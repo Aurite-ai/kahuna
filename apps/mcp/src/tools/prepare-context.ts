@@ -308,7 +308,7 @@ export async function prepareContextToolHandler(
   const { task, files, includeBoilerplate } = parseResult.data;
 
   // Check for API key before attempting agent call
-  if (!anthropic) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     return markdownResponse(
       'Anthropic API key not configured.\n\n<hints>\n- Set ANTHROPIC_API_KEY in your environment or apps/mcp/.env\n- Restart the MCP server after setting the key\n</hints>',
       true
