@@ -140,6 +140,14 @@ export async function askToolHandler(
 
   const { question } = parseResult.data;
 
+  // Check for API key before attempting agent call
+  if (!anthropic) {
+    return markdownResponse(
+      'Anthropic API key not configured.\n\n<hints>\n- Set ANTHROPIC_API_KEY in your environment or apps/mcp/.env\n- Restart the MCP server after setting the key\n</hints>',
+      true
+    );
+  }
+
   try {
     // Get KB files already referenced in .kahuna/context-guide.md
     const referencedKBFiles = await getReferencedKBFiles();
