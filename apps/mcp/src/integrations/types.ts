@@ -19,6 +19,10 @@ export type IntegrationType =
   | 'analytics' // Mixpanel, Amplitude, Google Analytics
   | 'payment' // Stripe, PayPal
   | 'ai' // OpenAI, Anthropic, custom ML services
+  | 'social' // LinkedIn, Twitter/X
+  | 'developer' // GitHub, GitLab, Bitbucket
+  | 'productivity' // Notion, Airtable
+  | 'project_management' // Jira, Asana, Linear
   | 'custom'; // Anything else
 
 /**

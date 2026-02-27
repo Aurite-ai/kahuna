@@ -144,11 +144,8 @@ export async function runAgent(
       });
       agentUsage.totalCost += call.cost.totalCost;
 
-      // Also persist to project-level storage
-      recordProjectUsage(toolName, tokenUsage, call.cost).catch((err) => {
-        // Don't fail the agent run if project storage has issues
-        console.error('[runAgent] Failed to persist project usage:', err);
-      });
+      // Persist to project-level storage (await to ensure it completes)
+      await recordProjectUsage(toolName, tokenUsage, call.cost);
     }
 
     // Check if we're done (no more tool use)
