@@ -11,6 +11,7 @@
  * - kahuna_learn: Categorize and store knowledge files
  * - kahuna_prepare_context: Retrieve relevant context for a task
  * - kahuna_ask: Ask questions about the knowledge base
+ * - kahuna_delete: Remove outdated files from the knowledge base
  */
 
 // =============================================================================
@@ -94,12 +95,15 @@ import {
 
 import { FileKnowledgeStorageService } from './knowledge/index.js';
 import { askTool } from './tools/ask.js';
+import { deleteTool } from './tools/delete.js';
 import { healthCheckTool } from './tools/health-check.js';
 import { initializeTool } from './tools/initialize.js';
 import { learnTool } from './tools/learn.js';
 import { listIntegrationsTool } from './tools/list-integrations.js';
 import { prepareContextTool } from './tools/prepare-context.js';
+import { provideContextTool } from './tools/provide-context.js';
 import type { ToolContext } from './tools/types.js';
+import { usageTool } from './tools/usage.js';
 import { useIntegrationTool } from './tools/use-integration.js';
 import { verifyIntegrationTool } from './tools/verify-integration.js';
 import { createUsageTrackerFromEnv } from './usage/index.js';
@@ -116,8 +120,11 @@ const allTools = [
   healthCheckTool.definition,
   initializeTool.definition,
   learnTool.definition,
+  provideContextTool.definition,
   prepareContextTool.definition,
   askTool.definition,
+  deleteTool.definition,
+  usageTool.definition,
   // Integration tools
   listIntegrationsTool.definition,
   useIntegrationTool.definition,
@@ -143,11 +150,20 @@ async function routeToolCall(
     case 'kahuna_learn':
       return learnTool.handler(args, ctx);
 
+    case 'kahuna_provide_context':
+      return provideContextTool.handler(args, ctx);
+
     case 'kahuna_prepare_context':
       return prepareContextTool.handler(args, ctx);
 
     case 'kahuna_ask':
       return askTool.handler(args, ctx);
+
+    case 'kahuna_delete':
+      return deleteTool.handler(args, ctx);
+
+    case 'kahuna_usage':
+      return usageTool.handler(args, ctx);
 
     // Integration tools
     case 'kahuna_list_integrations':
@@ -243,6 +259,7 @@ async function main() {
 
   // Log startup (to stderr so it doesn't interfere with MCP protocol on stdout)
   console.error(`[${SERVER_NAME}] Server started successfully`);
+  console.error(`[${SERVER_NAME}] Working directory: ${process.cwd()}`);
   console.error(`[${SERVER_NAME}] Tools available: ${allTools.map((t) => t.name).join(', ')}`);
 }
 

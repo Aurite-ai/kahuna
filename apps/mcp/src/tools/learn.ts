@@ -23,14 +23,16 @@ import {
   type AgentResult,
   type AgentUsageStats,
   CATEGORIZATION_PROMPT,
+  CONTRADICTION_CHECK_PROMPT,
   FILE_SIZE_LIMIT,
   KnowledgeStorageError,
   type SaveKnowledgeEntryInput,
   buildCategorizationUserMessage,
   categorizationTools,
+  contradictionCheckTools,
   runAgent,
 } from '../knowledge/index.js';
-import { formatCost, formatTokens } from '../usage/index.js';
+import { generateAgentUsageLine } from '../usage/index.js';
 import { envVaultProvider, redactSensitiveData } from '../vault/index.js';
 import { generateProjectHash } from './onboarding-check.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
@@ -235,6 +237,54 @@ function extractCategorizationResult(agentResult: AgentResult): {
   };
 }
 
+/**
+ * Extract the report_contradictions result from agent tool results.
+ */
+function extractContradictionsResult(agentResult: AgentResult): {
+  contradictions: Array<{ slug: string; explanation: string }>;
+} | null {
+  const contradictionsResult = agentResult.toolResults.find(
+    (r) => (r as Record<string, unknown>).tool === 'report_contradictions'
+  );
+  if (!contradictionsResult) return null;
+  const r = contradictionsResult as Record<string, unknown>;
+  return {
+    contradictions: r.contradictions as Array<{ slug: string; explanation: string }>,
+  };
+}
+
+/**
+ * Build the user message for the contradiction checking agent.
+ *
+ * @param filename - Name of the file being checked
+ * @param catResult - Categorization result from the first agent
+ * @param existingSlug - Slug of the existing KB entry (if updating), to exclude from contradiction checks
+ */
+function buildContradictionCheckUserMessage(
+  filename: string,
+  catResult: {
+    category: string;
+    title: string;
+    summary: string;
+    topics: string[];
+  },
+  existingSlug?: string
+): string {
+  const excludeNote = existingSlug
+    ? `\n\n**IMPORTANT:** This file is updating an existing entry with slug "${existingSlug}". Do NOT report this slug as a contradiction - it's the same file being updated.`
+    : '';
+
+  return `**New file to check for contradictions:**
+
+Filename: ${filename}
+Category: ${catResult.category}
+Title: ${catResult.title}
+Summary: ${catResult.summary}
+Topics: ${catResult.topics.join(', ')}${excludeNote}
+
+Check if this file contradicts any existing files in the knowledge base. Use 'report_contradictions' to report any conflicts found (or an empty array if none).`;
+}
+
 // =============================================================================
 // MARKDOWN RESPONSE BUILDERS
 // =============================================================================
@@ -256,7 +306,8 @@ No accessible files found in the provided paths.
  */
 function buildLearnSuccessMarkdownWithAggregates(
   results: FileLearnResult[],
-  aggregates: LearnAggregateResults
+  aggregates: LearnAggregateResults,
+  contradictions?: Array<{ filename: string; slug: string; explanation: string }>
 ): string {
   const successful = results.filter((r) => r.success);
   const failed = results.filter((r) => !r.success);
@@ -341,6 +392,18 @@ function buildLearnSuccessMarkdownWithAggregates(
     );
   }
 
+  // Contradictions section
+  if (contradictions && contradictions.length > 0) {
+    parts.push('\n## ⚠️ Contradictions Detected\n');
+    parts.push(
+      'The following existing files contradict the new file(s). Consider removing outdated information:\n'
+    );
+    for (const c of contradictions) {
+      parts.push(`- **${c.slug}** (from \`${c.filename}\`)`);
+      parts.push(`  ${c.explanation}\n`);
+    }
+  }
+
   // Hints
   parts.push('\n<hints>');
   parts.push('- Use `kahuna_prepare_context` to surface this knowledge for a specific task');
@@ -352,6 +415,11 @@ function buildLearnSuccessMarkdownWithAggregates(
   }
   if (aggregates.totalSecretsRedacted > 0) {
     parts.push('- Credentials are safely referenced via vault — never stored in plain text');
+  }
+  if (contradictions && contradictions.length > 0) {
+    parts.push(
+      '- Ask the user for permission to remove the outdated files with the kahuna_delete tool'
+    );
   }
   if (failed.length > 0) {
     parts.push('- Large files can be split into smaller, focused documents');
@@ -417,6 +485,7 @@ export async function learnToolHandler(
     totalSecretsRedacted: 0,
     secretsByType: new Map(),
   };
+  const allContradictions: Array<{ filename: string; slug: string; explanation: string }> = [];
 
   // Add path errors as failed results
   for (const pathError of pathErrors) {
@@ -541,7 +610,7 @@ export async function learnToolHandler(
           model: MODELS.categorization,
           systemPrompt: CATEGORIZATION_PROMPT,
           tools: categorizationTools,
-          maxIterations: 3,
+          maxIterations: 1,
         },
         userMessage,
         storage,
@@ -564,17 +633,63 @@ export async function learnToolHandler(
           filename,
           filepath: filePath,
           success: false,
-          error: 'Agent did not produce categorization result',
+          error: 'Categorization agent did not produce result',
         });
         continue;
       }
 
-      // Step 5: Build save input and store (with redacted content)
-      // Append project hash to title to ensure uniqueness
+      // Step 4.5: Check if this file already exists in KB (to exclude from contradiction checks)
+      // Build the unique title that will be used for storage
       const projectDir = process.cwd();
       const projectHash = generateProjectHash(projectDir);
       const uniqueTitle = `${catResult.title} [${projectHash}]`;
 
+      // Check if an entry with this title already exists
+      const existingEntries = await storage.list({ status: 'active' });
+      const existingEntry = existingEntries?.find((e) => e.title === uniqueTitle);
+      const existingSlug = existingEntry?.slug;
+
+      // Step 5: Run contradiction checking agent
+      const contradictionCheckUserMessage = buildContradictionCheckUserMessage(
+        filename,
+        catResult,
+        existingSlug
+      );
+      const contradictionCheckResult = await runAgent(
+        {
+          model: MODELS.contradiction,
+          systemPrompt: CONTRADICTION_CHECK_PROMPT,
+          tools: contradictionCheckTools,
+          maxIterations: 10,
+        },
+        contradictionCheckUserMessage,
+        storage,
+        anthropic,
+        usageTracker,
+        'kahuna_learn'
+      );
+
+      // Accumulate usage stats
+      totalUsage.totalInputTokens += contradictionCheckResult.usage.totalInputTokens;
+      totalUsage.totalOutputTokens += contradictionCheckResult.usage.totalOutputTokens;
+      totalUsage.totalCost += contradictionCheckResult.usage.totalCost;
+      totalUsage.llmCallCount += contradictionCheckResult.usage.llmCallCount;
+      totalUsage.totalLatencyMs += contradictionCheckResult.usage.totalLatencyMs;
+
+      // Step 6: Extract contradiction results
+      const contradictionsResult = extractContradictionsResult(contradictionCheckResult);
+      if (contradictionsResult && contradictionsResult.contradictions.length > 0) {
+        for (const contradiction of contradictionsResult.contradictions) {
+          allContradictions.push({
+            filename,
+            slug: contradiction.slug,
+            explanation: contradiction.explanation,
+          });
+        }
+      }
+
+      // Step 7: Build save input and store
+      // (uniqueTitle already computed in Step 4.5)
       const saveInput: SaveKnowledgeEntryInput = {
         title: uniqueTitle,
         summary: catResult.summary,
@@ -626,14 +741,19 @@ export async function learnToolHandler(
   }
 
   // Build markdown with usage summary
-  let markdown = buildLearnSuccessMarkdownWithAggregates(results, aggregates);
+  let markdown = buildLearnSuccessMarkdownWithAggregates(results, aggregates, allContradictions);
 
-  // Add usage summary if tracking is enabled
-  if (usageTracker.shouldIncludeInResponses() && totalUsage.llmCallCount > 0) {
+  // Add compact usage line with project totals
+  if (totalUsage.llmCallCount > 0) {
+    const usageLine = await generateAgentUsageLine(
+      totalUsage.totalInputTokens,
+      totalUsage.totalOutputTokens,
+      totalUsage.totalCost
+    );
     markdown += `
 
 ---
-📊 **Usage:** ${MODELS.categorization} | ${formatTokens(totalUsage.totalInputTokens)} in + ${formatTokens(totalUsage.totalOutputTokens)} out | ${formatCost(totalUsage.totalCost)} | ${totalUsage.llmCallCount} call(s)`;
+${usageLine}`;
   }
 
   return markdownResponse(markdown);

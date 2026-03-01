@@ -212,18 +212,124 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
   },
 } as const;
 
+// =============================================================================
+// MODEL SELECTION (Environment Variable Support)
+// =============================================================================
+
+/** Default models for each task */
+const DEFAULT_MODELS = {
+  categorization: 'claude-sonnet-4-20250514',
+  retrieval: 'claude-sonnet-4-20250514',
+  ask: 'claude-sonnet-4-20250514',
+  contradiction: 'claude-sonnet-4-20250514',
+  /** Model used for LLM-based secret verification (fast, cheap recommended) */
+  llmVerification: 'claude-3-haiku-20240307',
+} as const;
+
+/**
+ * Validates a model identifier against the registry.
+ * Logs a warning if the model is unknown but still returns it.
+ *
+ * @param model - Model identifier to validate
+ * @param taskName - Name of the task (for warning message)
+ * @returns The model identifier (validated or not)
+ */
+function validateModel(model: string, taskName: string): string {
+  if (!(model in MODEL_REGISTRY)) {
+    console.warn(
+      `[Kahuna Config] Warning: Unknown model "${model}" for ${taskName}. ` +
+        `Available models: ${Object.keys(MODEL_REGISTRY).join(', ')}`
+    );
+  }
+  return model;
+}
+
+/**
+ * Gets a model from environment variable or falls back to default.
+ *
+ * @param envVar - Environment variable name
+ * @param taskName - Task name for logging
+ * @param defaultModel - Default model if env var not set
+ * @returns Model identifier
+ */
+function getModelFromEnv(envVar: string, taskName: string, defaultModel: string): string {
+  const envValue = process.env[envVar]?.trim();
+  if (envValue) {
+    return validateModel(envValue, taskName);
+  }
+  return defaultModel;
+}
+
 /**
  * Model identifiers for use throughout the application.
  * References models defined in MODEL_REGISTRY.
+ *
+ * Models can be overridden via environment variables:
+ * - KAHUNA_MODEL_CATEGORIZATION: Model for file categorization (fast, cheap)
+ * - KAHUNA_MODEL_RETRIEVAL: Model for KB retrieval agent (prepare_context tool)
+ * - KAHUNA_MODEL_ASK: Model for the ask tool's agentic Q&A loop
+ * - KAHUNA_MODEL_CONTRADICTION: Model for contradiction check during kahuna_learn
+ *
+ * Example .env:
+ *   KAHUNA_MODEL_ASK=claude-opus-4-6
+ *   KAHUNA_MODEL_CATEGORIZATION=claude-3-haiku-20240307
  */
 export const MODELS = {
   /** Model used for file categorization (fast, cheap) */
-  categorization: 'claude-3-haiku-20240307',
+  get categorization(): string {
+    return getModelFromEnv(
+      'KAHUNA_MODEL_CATEGORIZATION',
+      'categorization',
+      DEFAULT_MODELS.categorization
+    );
+  },
   /** Model used for KB retrieval agent (prepare_context tool) */
-  retrieval: 'claude-3-haiku-20240307',
+  get retrieval(): string {
+    return getModelFromEnv('KAHUNA_MODEL_RETRIEVAL', 'retrieval', DEFAULT_MODELS.retrieval);
+  },
   /** Model used for the ask tool's agentic Q&A loop */
-  ask: 'claude-sonnet-4-20250514',
-} as const satisfies Record<string, keyof typeof MODEL_REGISTRY>;
+  get ask(): string {
+    return getModelFromEnv('KAHUNA_MODEL_ASK', 'ask', DEFAULT_MODELS.ask);
+  },
+  /** Model used for contradiction check during kahuna_learn */
+  get contradiction(): string {
+    return getModelFromEnv(
+      'KAHUNA_MODEL_CONTRADICTION',
+      'contradiction',
+      DEFAULT_MODELS.contradiction
+    );
+  },
+  /** Model used for LLM-based secret verification (fast, cheap recommended) */
+  get llmVerification(): string {
+    return getModelFromEnv(
+      'KAHUNA_MODEL_LLM_VERIFICATION',
+      'llmVerification',
+      DEFAULT_MODELS.llmVerification
+    );
+  },
+};
+
+/**
+ * Get all default model assignments (ignoring env overrides).
+ * Useful for documentation and testing.
+ */
+export function getDefaultModels(): Record<string, string> {
+  return { ...DEFAULT_MODELS };
+}
+
+/**
+ * Get current model assignments (including env overrides).
+ * Useful for debugging and status display.
+ */
+export function getCurrentModels(): Record<string, string> {
+  return {
+    categorization: MODELS.categorization,
+    retrieval: MODELS.retrieval,
+    ask: MODELS.ask,
+    contradiction: MODELS.contradiction,
+    llmVerification: MODELS.llmVerification,
+  };
+}
 
 /**
  * Get configuration for a specific model.
@@ -292,7 +398,7 @@ export interface FrameworkConfig {
 
 /**
  * Registry of supported frameworks for prepare_context.
- * The framework ID maps to the template subdirectory in vck-templates.
+ * The framework ID maps to the template subdirectory in the coding copilot templates folder.
  */
 export const FRAMEWORKS: Record<string, FrameworkConfig> = {
   langgraph: {

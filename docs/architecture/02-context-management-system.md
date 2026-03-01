@@ -50,7 +50,7 @@ All domain logic lives in the `knowledge/` module under `apps/mcp/src/`. MCP too
   Task desc. ──────►│ kahuna_prepare_context│──── Retrieval Agent (Haiku) ──► selects KB files
                     └───────────────────────┘         │
                                                       ▼
-                                               Context Writer ──► project/.context-guide.md
+                                               Context Writer ──► project/.kahuna/context-guide.md
 
                     ┌───────────────┐
   Question ────────►│ kahuna_ask    │──── Q&A Agent (Sonnet) ──► reads KB files ──► synthesized answer
@@ -61,9 +61,10 @@ All domain logic lives in the `knowledge/` module under `apps/mcp/src/`. MCP too
 
 | Tool | When Called | Side Effects | Agent Model |
 |------|------------|--------------|-------------|
-| `kahuna_learn` | User shares files | Writes `.mdc` to KB | Haiku (categorization) |
-| `kahuna_prepare_context` | Task start (once) | Writes `.context-guide.md` to project root | Haiku (retrieval) |
+| `kahuna_learn` | User shares files | Writes `.mdc` to KB, detects contradictions | Haiku (categorization) |
+| `kahuna_prepare_context` | Task start (once) | Writes `.kahuna/context-guide.md` to project root | Haiku (retrieval) |
 | `kahuna_ask` | Mid-task questions | None (read-only) | Sonnet (Q&A synthesis) |
+| `kahuna_delete` | After user approval | Deletes `.mdc` from KB | None (direct operation) |
 
 ---
 
@@ -78,13 +79,13 @@ All domain logic lives in the `knowledge/` module under `apps/mcp/src/`. MCP too
 | D5 | **`KAHUNA_KNOWLEDGE_DIR` env var**, defaults to `~/.kahuna/knowledge/` | Flexible, design-aligned. |
 | D6 | **Slug-based file naming** | Human-readable, debuggable. LLM titles make collisions rare. |
 | D7 | **Natural language topics** | LLM produces readable phrases. Agents handle fuzzy matching. |
-| D8 | **`.context-guide.md` gets file paths** | Files stay in KB as source of truth. File paths shared so the copilot can read. |
-| D9 | **`ask` searches KB directly**, not `.context-guide.md` | If it's in the guide, copilot already has it. Ask handles what's *not* there. |
+| D8 | **`.kahuna/context-guide.md` gets file paths** | Files stay in KB as source of truth. File paths shared so the copilot can read. |
+| D9 | **`ask` searches KB directly**, not `.kahuna/context-guide.md` | If it's in the guide, copilot already has it. Ask handles what's *not* there. |
 | D10 | **`ask` agent told which KB files are in guide** | Agent knows what copilot already has; avoids redundancy. |
 | D11 | **Enriched `list_knowledge_files`** — summary + category + topics | Better agent decisions without separate search tool. |
 | D12 | **Haiku for retrieval, Sonnet for Q&A** | Retrieval is file selection (cheap). Q&A is synthesis (needs quality). |
 | D13 | **All agent models in `config.ts`** | Easy to swap without code changes. |
-| D14 | **Overwrite `.context-guide.md`** on each prepare_context call | Simple. Single file approach. |
+| D14 | **Overwrite `.kahuna/context-guide.md`** on each prepare_context call | Simple. Single file approach. |
 | D15 | **Shared Anthropic client in ToolContext** | One client at server startup, injected into all handlers. |
 | D16 | **`knowledge/` subfolder** grouping all KB logic | Clean separation: `tools/` = MCP interface, `knowledge/` = domain logic. |
 
@@ -163,22 +164,23 @@ The runner handles message loop management, tool call routing, iteration countin
 
 ### Agent Tools (Shared)
 
-Both `prepare_context` and `ask` use common KB access tools:
+Agent tools used across different MCP tools:
 
-| Tool | Purpose | Output |
-|------|---------|--------|
-| `list_knowledge_files` | Browse KB with summaries | Slug, title, category, summary, topics per entry |
-| `read_knowledge_file` | Read full content by slug | `# {title}\n\n{content}` |
-| `select_files_for_context` | Structured file selection (prepare_context only) | `[{slug, reason}]` |
-| `categorize_file` | Structured classification (learn only) | Category, confidence, reasoning, title, summary, topics |
+| Tool | Purpose | Used By | Output |
+|------|---------|---------|--------|
+| `list_knowledge_files` | Browse KB with summaries | learn, prepare_context, ask | Slug, title, category, summary, topics per entry |
+| `read_knowledge_file` | Read full content by slug | learn, prepare_context, ask | `# {title}\n\n{content}` |
+| `select_files_for_context` | Structured file selection | prepare_context | `[{slug, reason}]` |
+| `categorize_file` | Structured classification | learn | Category, confidence, reasoning, title, summary, topics |
+| `report_contradictions` | Report contradicting files | learn | `[{slug, explanation}]` |
 
 ### Context Writer
 
-The surfacing module handles `.context-guide.md` generation:
+The surfacing module handles `.kahuna/context-guide.md` generation:
 
 1. **Compile content** — For each selected slug: read `.mdc`
 2. **Generate guide** — Single markdown file with navigation, file summaries, and full content
-3. **Write file** — Output as `.context-guide.md` in project root
+3. **Write file** — Output as `.kahuna/context-guide.md` in project root
 
 ---
 
@@ -203,13 +205,14 @@ apps/mcp/src/
 │   │   └── utils.ts                       # Slugify, frontmatter parsing, MDC generation
 │   └── surfacing/
 │       ├── index.ts
-│       └── context-writer.ts              # Write .context-guide.md to project root
+│       └── context-writer.ts              # Write .kahuna/context-guide.md to project root
 │
 ├── tools/                                 # MCP tool handlers (thin wrappers)
 │   ├── types.ts                           # ToolContext, MCPToolResponse, markdownResponse()
 │   ├── learn.ts
 │   ├── prepare-context.ts
 │   ├── ask.ts
+│   ├── delete.ts
 │   ├── health-check.ts
 │   └── initialize.ts
 ```

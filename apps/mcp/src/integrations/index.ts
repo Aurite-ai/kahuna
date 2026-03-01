@@ -71,3 +71,15 @@ export * from './execution/index.js';
 
 // Verification - Re-export from verification module
 export * from './verification/index.js';
+
+// Credential Prompting
+export {
+  checkMissingCredentials,
+  generateCredentialPrompt,
+  generateCredentialStatusSummary,
+  getCredentialRequirements,
+} from './credential-prompts.js';
+
+// Integration Templates (credential configuration data)
+export { CREDENTIAL_INFO } from './integration-templates.js';
+export type { CredentialRequirement } from './integration-templates.js';

@@ -28,9 +28,13 @@
 
 // Types
 export type {
+  CompactUsageLine,
   CostBreakdown,
   LLMCall,
   ModelUsage,
+  ProjectToolUsage,
+  ProjectUsageData,
+  ProjectUsageTotals,
   RecordCallInput,
   SessionSummary,
   TokenUsage,
@@ -68,5 +72,14 @@ export {
 export {
   createUsageTrackerFromEnv,
   extractTokenUsage,
+  generateAgentUsageLine,
+  generateCompactUsageLine,
+  getProjectStorage,
+  getProjectUsageData,
+  getProjectUsageTotals,
+  recordProjectUsage,
   UsageTracker,
 } from './tracker.js';
+
+// Project Storage
+export { createProjectUsageStorage, ProjectUsageStorage } from './project-storage.js';

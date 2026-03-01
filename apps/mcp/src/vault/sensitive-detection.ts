@@ -14,6 +14,8 @@
  * See: docs/design/secure-integrations.md
  */
 
+import { MODELS } from '../config.js';
+
 /**
  * Confidence level for sensitive data detection
  */
@@ -32,7 +34,6 @@ export type SensitiveDataType =
   | 'slack_webhook'
   | 'github_token'
   | 'stripe_api_key'
-  | 'twilio_api_key'
   | 'sendgrid_api_key'
   | 'oauth_client_secret'
   | 'oauth_refresh_token'
@@ -188,16 +189,6 @@ const SENSITIVE_PATTERNS: SensitivePattern[] = [
     description: 'Stripe API key',
     valueGroup: 1,
     vaultPathPrefix: 'stripe',
-  },
-
-  // Twilio API Key
-  {
-    type: 'twilio_api_key',
-    pattern: /\b(SK[a-f0-9]{32})\b/g,
-    confidence: 'high',
-    description: 'Twilio API key',
-    valueGroup: 1,
-    vaultPathPrefix: 'twilio',
   },
 
   // SendGrid API Key
@@ -709,7 +700,7 @@ export async function verifySecretWithLLM(
   context: string,
   options: LLMVerificationOptions
 ): Promise<LLMVerificationResult> {
-  const { anthropic, model = 'claude-3-haiku-20240307' } = options;
+  const { anthropic, model = MODELS.llmVerification } = options;
 
   // Build the prompt
   const prompt = VERIFICATION_PROMPT.replace('{{type}}', match.type)

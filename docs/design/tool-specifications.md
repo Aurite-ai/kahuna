@@ -10,10 +10,12 @@
 
 | Tool | Purpose |
 |------|---------|
-| `kahuna_initialize` | Initialize new project |
-| `kahuna_learn` | Send files for Kahuna to learn from |
-| `kahuna_prepare_context` | Prepare .context-guide.md for a task |
+| `kahuna_initialize` | Deploy agent-dev rules and run onboarding |
+| `kahuna_provide_context` | Store org/user context from onboarding or conversation |
+| `kahuna_learn` | Send files for Kahuna to learn from (detects contradictions) |
+| `kahuna_prepare_context` | Prepare .kahuna/context-guide.md for a task |
 | `kahuna_ask` | Quick Q&A |
+| `kahuna_delete` | Remove outdated files from knowledge base |
 | `kahuna_sync` | Sync all changes (deferred) |
 
 ---
@@ -43,28 +45,29 @@ Each tool spec includes:
 ### Tool Description
 
 ```
-Initialize a new LangGraph agent project with Kahuna integration.
+Deploy agent-dev rules and optionally run onboarding to collect org/user context.
 
 USE THIS TOOL WHEN:
-- User wants to start a new agent project
-- User says "create", "initialize", "setup", "start", "new project", or similar
-- An empty directory needs to be set up for LangGraph development
+- User says "set up Kahuna", "initialize", "get started with Kahuna"
+- Starting to use Kahuna in a new project
+- User wants to configure their copilot with Kahuna integration
+
+This tool does TWO things:
+1. Deploys agent-dev rules to .claude/ in the project directory
+2. Returns onboarding instructions if org/user context doesn't exist yet
 
 <examples>
-### Basic setup
-kahuna_initialize(project_name="customer-support-agent")
+### Basic initialization
+kahuna_initialize()
 
-### With description
-kahuna_initialize(
-  project_name="support-agent",
-  description="AI agent that answers customer questions from our docs"
-)
+### With explicit project path
+kahuna_initialize(project_path="/home/user/my-project")
 </examples>
 
 <hints>
-- Just a project name is enough to get started
-- Description helps Kahuna provide better initial context
-- After setup, read CLAUDE.md for project instructions
+- No parameters required - defaults to current working directory
+- After initialization, follow the onboarding instructions in the response
+- Restart Claude Code after onboarding to apply the deployed rules
 </hints>
 ```
 
@@ -72,83 +75,181 @@ kahuna_initialize(
 
 ```typescript
 {
-  project_name: string,      // Required: Name for the project
-  description?: string       // Optional: What the agent will do
+  project_path?: string       // Optional: Path to project (defaults to cwd)
 }
 ```
 
+### State Detection
+
+Before returning, the tool checks for existing context files:
+
+| File | Purpose |
+|------|---------|
+| `~/.kahuna/knowledge/org-context.mdc` | Organization context |
+| `~/.kahuna/knowledge/user-context.mdc` | User context |
+
+**Validation:** File must exist AND be > 50 bytes (catches empty/corrupted files).
+
 ### Response Format
 
+**When onboarding is needed** (context files don't exist):
+
 ```markdown
-# Project Initialized: customer-support-agent
+# Kahuna Configured
 
-Created LangGraph agent project structure with Kahuna integration.
+Rules deployed to `.claude/`. **Complete onboarding before restarting.**
 
-## What's Ready
+---
 
-### Copilot Configuration
-- **CLAUDE.md** - Project instructions (read this first)
-- **.mcp.json** - Kahuna MCP server connection
-- **.claude/** - Copilot settings, rules, and skills
+## Onboarding Instructions
 
-### Knowledge Base
-- **.context-guide.md** - Knowledge guide (starts with LangGraph patterns)
-
-### Project Structure
-- **src/agent/** - LangGraph boilerplate (graph.py, state.py, tools.py)
-
-## Getting Started
-
-1. Read CLAUDE.md for project-specific instructions
-2. Describe what you want your agent to do
-3. Kahuna will help with patterns and context as you build
+[Full onboarding guidance with phases for situational assessment,
+document discovery, targeted follow-ups, and storing context via
+kahuna_provide_context. See user-interaction-model.md for full format.]
 
 <hints>
-- Start by describing your agent's purpose
-- Use `kahuna_prepare_context` before beginning implementation
-- Context folder has LangGraph patterns to follow
+- Be conversational, not interrogative
+- Read files before learning to understand what's in them
+- Only ask questions that would change recommendations
+- Don't need to collect everything - context grows over time
+</hints>
+```
+
+**When onboarding is already complete** (context files exist):
+
+```markdown
+# Kahuna Configured
+
+Rules deployed to `.claude/`.
+
+Your organization and user context are already set up.
+
+**Next step:** Restart Claude Code (Ctrl+C and run `claude` again) to apply the rules.
+
+<hints>
+- After restart, rules will be loaded automatically
+- Use `kahuna_prepare_context` to get relevant knowledge for tasks
+- Use `kahuna_learn` to add new documents to the knowledge base
 </hints>
 ```
 
 ### Output Structure
 
-`kahuna_initialize` creates the following project structure:
+`kahuna_initialize` deploys the following to the project directory:
 
 ```
-project-name/
-├── CLAUDE.md                 # Project instructions for Claude Code
-├── .mcp.json                 # MCP server configuration
-├── .claude/
-│   ├── settings.json         # Claude Code settings
-│   ├── settings.local.json   # Local overrides (gitignored)
-│   ├── rules/                # Copilot behavior rules
-│   └── skills/               # Sub-agent capabilities
-├── .context-guide.md          # Knowledge navigation guide
-└── src/agent/
-    ├── graph.py              # LangGraph graph definition
-    ├── state.py              # State schema
-    └── tools.py              # Tool definitions
+project-path/
+├── CLAUDE.md                 # System prompt for agent development
+└── .claude/
+    ├── rules/                # Behavioral rules
+    ├── skills/               # Reusable sub-agent capabilities
+    └── agents/               # Specialized subagent definitions
 ```
 
-**Copilot Configuration Details:** See [copilot-configuration.md](./copilot-configuration.md)
+These are collectively called "agent-dev rules" - text that structures the agent development process. They do NOT contain onboarding logic (onboarding is transient, rules are permanent).
 
 ### MVP Scope
 
 **Build first:**
-- Create project structure (all folders and files above)
-- Write CLAUDE.md with Kahuna tool instructions
-- Copy static copilot config files (.mcp.json, .claude/)
-- Initialize .context-guide.md with starter content
+- Deploy agent-dev rules to project directory
+- Check for existing context files (org-context.mdc, user-context.mdc)
+- Return appropriate response (with or without onboarding instructions)
 
 **Future enhancements:**
-- Template selection (basic, rag, multi-agent)
-- Pre-populated LangGraph patterns in .context-guide.md
-- Detect existing project and offer to add Kahuna
-- Project-specific customization of copilot config
+- Health check integration (report onboarding status)
+- Partial context handling (only org or only user missing)
+- Update detection (newer rules available than deployed)
 
 ---
 
-## 2. kahuna_learn
+## 2. kahuna_provide_context
+
+### Tool Description
+
+```
+Store org or user context in the knowledge base.
+
+USE THIS TOOL WHEN:
+- Completing onboarding (storing synthesized org or user context)
+- User describes their organization, preferences, or constraints
+- Synthesizing context from a conversation (without creating temp files)
+
+This tool stores free-form markdown content as context files. Use it to capture
+synthesized understanding, not raw file content (use kahuna_learn for files).
+
+<examples>
+### Organization context
+kahuna_provide_context(
+  type="org",
+  content="# Organization Context\n\nHealthcare startup building patient portals.\n\n## Constraints\n- HIPAA compliance required\n- Must integrate with Epic EHR"
+)
+
+### User context
+kahuna_provide_context(
+  type="user",
+  content="# User Context\n\nSenior developer, 10 years experience.\n\n## Preferences\n- Detailed explanations over brief answers\n- Prefers TDD approach"
+)
+</examples>
+
+<hints>
+- Content should be markdown format
+- Org context = domain, constraints, patterns (spans projects)
+- User context = preferences, working style (personal)
+- Use kahuna_learn for file-based knowledge; this tool is for synthesized context
+- Calling again with same type replaces previous content
+</hints>
+```
+
+### Input Schema
+
+```typescript
+{
+  type: 'org' | 'user',       // Required: Type of context
+  content: string             // Required: Markdown content
+}
+```
+
+### Context Types
+
+| Type | File | Contents |
+|------|------|----------|
+| `org` | `~/.kahuna/knowledge/org-context.mdc` | Domain, industry, technical constraints, patterns that apply across projects |
+| `user` | `~/.kahuna/knowledge/user-context.mdc` | Personal preferences, experience level, working style |
+
+**Org context** is organizational knowledge that doesn't require knowing about the specific user. It's stable and rarely changes.
+
+**User context** is personal and may change more frequently. The distinction enables future features like team context sharing.
+
+### Response Format
+
+```markdown
+# Context Stored
+
+Saved **organization context** to knowledge base.
+
+<hints>
+- Context will be included in future `kahuna_prepare_context` results
+- You can update context by calling this tool again (replaces previous)
+- Continue onboarding or tell user to restart Claude Code
+</hints>
+```
+
+### MVP Scope
+
+**Build first:**
+- Validate input (type must be 'org' or 'user', content must be non-empty)
+- Generate filename: `org-context.mdc` or `user-context.mdc`
+- Write to `~/.kahuna/knowledge/` with standard .mdc frontmatter
+- Return confirmation
+
+**Future enhancements:**
+- Partial updates (merge with existing content)
+- Validation of content structure
+- Version history for context changes
+
+---
+
+## 3. kahuna_learn
 
 ### Tool Description
 
@@ -163,8 +264,9 @@ USE THIS TOOL WHEN:
 
 Kahuna's agents will:
 1. Classify what kind of knowledge each file contains
-2. Store in ~/.kahuna knowledge base with metadata
-3. Files will be available for future context surfacing
+2. Detect contradictions with existing knowledge base files
+3. Store in ~/.kahuna knowledge base with metadata
+4. Files will be available for future context surfacing
 
 <examples>
 ### Single file
@@ -189,7 +291,7 @@ kahuna_learn(
 <hints>
 - Accepts both files AND folders - folders are processed recursively
 - Description helps classification but isn't required
-- Files go to ~/.kahuna knowledge base, NOT directly to .context-guide.md
+- Files go to ~/.kahuna knowledge base, NOT directly to .kahuna/context-guide.md
 - Use kahuna_prepare_context to surface learned knowledge
 </hints>
 ```
@@ -205,29 +307,58 @@ kahuna_learn(
 
 ### Response Format
 
+**Without contradictions:**
+
 ```markdown
 # Context Received
 
-Processed **2 files**:
+Processed **2 files** — 2 added:
 
-| File | What Kahuna Found |
-|------|-------------------|
-| `docs/api-guidelines.md` | API design standards - added to context |
-| `requirements.txt` | Dependencies only - no knowledge extracted |
+| File | Category | What Kahuna Found |
+|------|----------|-------------------|
+| `api-guidelines.md` | policy | REST API design standards covering naming conventions and auth |
+| `security-policy.md` | policy | Security requirements for API authentication |
 
-## Added to Knowledge Base
+## Key Topics Learned
 
-**API Design Standards**
-- REST naming conventions
-- Error response format
-- Authentication requirements
-
-*Stored in ~/.kahuna knowledge base*
+- **API Design Guidelines** — REST API design standards covering naming conventions and auth
+- **Security Policy** — Security requirements for API authentication
 
 <hints>
-- Review .context-guide.md to verify accuracy
+- Use `kahuna_prepare_context` to surface this knowledge for a specific task
+- Send more files anytime — Kahuna handles classification automatically
+</hints>
+```
+
+**With contradictions detected:**
+
+```markdown
+# Context Received
+
+Processed **1 files** — 1 added:
+
+| File | Category | What Kahuna Found |
+|------|----------|-------------------|
+| `new-api-guidelines.md` | policy | Updated REST API design standards with JWT authentication |
+
+## Key Topics Learned
+
+- **New API Guidelines** — Updated REST API design standards with JWT authentication
+
+## ⚠️ Contradictions Detected
+
+The following existing files contradict the new file(s). Consider removing outdated information:
+
+- **old-api-guidelines** (from `old-api-guidelines.md`)
+  The new file specifies JWT authentication while the old file requires OAuth2
+
+<hints>
+- Review .kahuna/context-guide.md to verify accuracy
 - The API standards will be used in future recommendations
 - Send more files anytime with this tool
+- Use `kahuna_prepare_context` to surface this knowledge for a specific task
+- Send more files anytime — Kahuna handles classification automatically
+- Review contradicting files and use `kahuna_delete` to remove outdated information after user approval
 </hints>
 ```
 
@@ -236,18 +367,22 @@ Processed **2 files**:
 **Build first:**
 - Accept files and description
 - Basic classification (policy vs code vs config)
-- Write raw content to .context-guide.md with metadata
-- Update .context-guide.md
+- Write raw content to .kahuna/context-guide.md with metadata
+- Update .kahuna/context-guide.md
+
+**Implemented:**
+- LLM-powered categorization (Haiku)
+- Contradiction detection with existing KB files
+- Metadata extraction (title, summary, topics)
 
 **Future enhancements:**
-- LLM-powered knowledge extraction
-- Duplicate/conflict detection
 - Smart merging with existing context
 - Pattern extraction from code
+- Semantic similarity detection
 
 ---
 
-## 3. kahuna_sync
+## 4. kahuna_sync
 
 ### Tool Description
 
@@ -310,8 +445,8 @@ Chose keyword-based search over embeddings because simpler infrastructure, suffi
 *Extracted from conversation + code*
 
 <hints>
-- Review .context-guide.md for accuracy
-- Commit .context-guide.md to preserve team knowledge
+- Review .kahuna/context-guide.md for accuracy
+- Commit .kahuna/context-guide.md to preserve team knowledge
 - Next sync will capture new changes
 </hints>
 ```
@@ -332,12 +467,12 @@ Chose keyword-based search over embeddings because simpler infrastructure, suffi
 
 ---
 
-## 4. kahuna_prepare_context
+## 5. kahuna_prepare_context
 
 ### Tool Description
 
 ```
-Prepare the .context-guide.md file with relevant knowledge for a task.
+Prepare the .kahuna/context-guide.md file with relevant knowledge for a task.
 
 USE THIS TOOL WHEN:
 - Starting any new task or feature
@@ -345,7 +480,7 @@ USE THIS TOOL WHEN:
 - Before beginning implementation work
 - User asks "what do we know about X"
 
-This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from .context-guide.md.
+This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from .kahuna/context-guide.md.
 
 <examples>
 ### Starting a task
@@ -366,9 +501,9 @@ kahuna_prepare_context(
 </examples>
 
 <hints>
-- Call ONCE at task start, then work from .context-guide.md
+- Call ONCE at task start, then work from .kahuna/context-guide.md
 - Natural language task description works best
-- After calling, read .context-guide.md for navigation
+- After calling, read .kahuna/context-guide.md for navigation
 - If you need more context mid-task, use kahuna_ask instead
 </hints>
 ```
@@ -399,7 +534,7 @@ kahuna_prepare_context(
 
 ## Start Here
 
-1. **Read .context-guide.md** - Full navigation and content
+1. **Read .kahuna/context-guide.md** - Full navigation and content
 2. **Check API Standards section** - Has rate limiting requirements
 3. **Review Error Patterns section** - Follow existing patterns
 
@@ -416,7 +551,7 @@ kahuna_prepare_context(
 - Accept task description
 - Search existing knowledge base for relevant content
 - Return list of relevant sections with summaries
-- Generate .context-guide.md with task-specific content
+- Generate .kahuna/context-guide.md with task-specific content
 
 **Future enhancements:**
 - LLM-powered relevance scoring
@@ -426,7 +561,84 @@ kahuna_prepare_context(
 
 ---
 
-## 5. kahuna_ask
+## 6. kahuna_delete
+
+### Tool Description
+
+```
+Delete files from the Kahuna knowledge base.
+
+⚠️ IMPORTANT: This tool should ONLY be called after:
+1. kahuna_learn reports contradictions with existing files
+2. You ask the user for permission to delete the outdated files
+3. The user explicitly approves the deletion
+
+USE THIS TOOL WHEN:
+- kahuna_learn output indicates contradictions with existing KB files
+- User confirms they want to remove the outdated/contradicting files
+- You need to clean up superseded policies, outdated decisions, or conflicting information
+
+DO NOT USE THIS TOOL:
+- Without explicit user permission
+- Based solely on your own judgment
+- For files that are complementary rather than contradictory
+
+<examples>
+### After user approves deletion
+kahuna_delete(slugs=["old-api-guidelines", "deprecated-security-policy"])
+</examples>
+
+<hints>
+- Always confirm with the user before calling this tool
+- Provide context about why files should be deleted
+- Deletion is permanent - files cannot be recovered
+- Use kahuna_learn to add updated versions after deletion
+</hints>
+```
+
+### Input Schema
+
+```typescript
+{
+  slugs: string[]            // Required: Slugs of KB files to delete
+}
+```
+
+### Response Format
+
+```markdown
+# Files Deleted from Knowledge Base
+
+Processed **2 files** — 2 deleted, 0 failed:
+
+| Slug | Title |
+|------|-------|
+| `old-api-guidelines` | Old API Guidelines |
+| `deprecated-security-policy` | Deprecated Security Policy |
+
+<hints>
+- Files have been permanently removed from the knowledge base
+- Use `kahuna_learn` to add updated versions if needed
+- Use `kahuna_prepare_context` to refresh context for your current task
+</hints>
+```
+
+### MVP Scope
+
+**Implemented:**
+- Delete files by slug from knowledge base
+- Retrieve file title before deletion for confirmation
+- Handle partial failures gracefully
+- Permanent deletion (no soft delete/archive)
+
+**Future enhancements:**
+- Soft delete with archive status
+- Batch operations with rollback
+- Deletion history/audit log
+
+---
+
+## 7. kahuna_ask
 
 ### Tool Description
 
@@ -439,7 +651,7 @@ USE THIS TOOL WHEN:
 - Need clarification on a decision or pattern
 - Context guide doesn't have what you need
 
-Searches .context-guide.md first (if exists), then falls back to ~/.kahuna knowledge base.
+Searches .kahuna/context-guide.md first (if exists), then falls back to ~/.kahuna knowledge base.
 
 <examples>
 ### Direct question
@@ -453,10 +665,10 @@ kahuna_ask(question="Do we have rate limiting requirements documented?")
 </examples>
 
 <hints>
-- Searches project .context-guide.md first, then knowledge base
+- Searches project .kahuna/context-guide.md first, then knowledge base
 - Use for quick questions mid-task
 - For comprehensive context setup, use kahuna_prepare_context instead
-- Returns text directly, doesn't modify .context-guide.md
+- Returns text directly, doesn't modify .kahuna/context-guide.md
 </hints>
 ```
 
@@ -482,10 +694,10 @@ The project uses keyword-based search for these reasons:
 3. **Cost** - No embedding API costs
 4. **Sufficient** - Corpus is small enough for keyword matching
 
-**Source:** .context-guide.md (Search Decision section)
+**Source:** .kahuna/context-guide.md (Search Decision section)
 
 <hints>
-- Full details in .context-guide.md
+- Full details in .kahuna/context-guide.md
 - Related: "What would trigger switching to embeddings?"
 - If you need broader context, use kahuna_prepare
 </hints>
@@ -495,7 +707,7 @@ The project uses keyword-based search for these reasons:
 
 **Build first:**
 - Accept question
-- Search .context-guide.md for relevant content
+- Search .kahuna/context-guide.md for relevant content
 - Return synthesized answer with source citations
 
 **Future enhancements:**
@@ -573,3 +785,7 @@ Tool descriptions contain full steering context. The agent always knows when to 
 - v4.2 (2026-02-05): Fixed kahuna_learn response to correctly show storage location (~/.kahuna)
 - v5.0 (2026-02-05): Promoted to docs/design/; updated links and status to Final
 - v6.0 (2026-02-09): Renamed kahuna_setup → kahuna_initialize; removed kahuna_review (now skill-based verification); 4 active tools + 1 deferred
+- v7.0 (2026-02-24): Onboarding design updates:
+  - Rewrote kahuna_initialize: now deploys agent-dev rules + returns onboarding instructions (no longer scaffolds projects)
+  - Added kahuna_provide_context: stores org/user context from onboarding or conversation
+  - Updated tool count: 5 active tools + 1 deferred

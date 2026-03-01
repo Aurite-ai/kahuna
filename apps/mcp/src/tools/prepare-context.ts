@@ -2,7 +2,7 @@
  * Kahuna Prepare Context Tool - Agentic context retrieval
  *
  * Searches the knowledge base for files relevant to a task using an LLM agent,
- * then writes their file paths to the project's .context-guide.md.
+ * then writes their file paths to the project's .kahuna/context-guide.md.
  * Can also scaffold framework boilerplate when the agent selects a framework.
  *
  * See: docs/internal/designs/context-management-system.md
@@ -10,6 +10,7 @@
 
 import { z } from 'zod';
 import { MODELS } from '../config.js';
+import { type IntegrationSummary, listIntegrationSummaries } from '../integrations/index.js';
 import {
   type AgentResult,
   type FrameworkCopyResult,
@@ -27,12 +28,7 @@ import {
   runAgent,
   writeContextReadme,
 } from '../knowledge/index.js';
-import { formatCost, formatTokens } from '../usage/index.js';
-import {
-  buildMissingOrgContextMarkdown,
-  buildMissingProjectContextMarkdown,
-  checkOnboardingStatus,
-} from './onboarding-check.js';
+import { generateAgentUsageLine } from '../usage/index.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -40,7 +36,7 @@ import { type MCPToolResponse, type ToolContext, markdownResponse } from './type
  */
 export const prepareContextToolDefinition = {
   name: 'kahuna_prepare_context',
-  description: `Prepare the .context-guide.md with relevant knowledge for a task.
+  description: `Prepare the .kahuna/context-guide.md with relevant knowledge for a task.
 
 USE THIS TOOL WHEN:
 - Starting any new task or feature
@@ -48,7 +44,7 @@ USE THIS TOOL WHEN:
 - Before beginning implementation work
 - User asks "what do we know about X"
 
-This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from .context-guide.md.
+This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from .kahuna/context-guide.md.
 
 <examples>
 ### Starting a task
@@ -62,9 +58,9 @@ kahuna_prepare_context(task="Understand our API design patterns")
 </examples>
 
 <hints>
-- Call ONCE at task start, then read the files referenced in .context-guide.md
+- Call ONCE at task start, then read the files referenced in .kahuna/context-guide.md
 - Natural language task description works best
-- After calling, read .context-guide.md for navigation
+- After calling, read .kahuna/context-guide.md for navigation
 - If you need more context mid-task, use kahuna_ask instead
 </hints>`,
 
@@ -218,7 +214,7 @@ function buildContextReadyMarkdown(
     stepNum++;
   }
 
-  parts.push(`${stepNum}. **Read .context-guide.md** — Full navigation`);
+  parts.push(`${stepNum}. **Read .kahuna/context-guide.md** — Full navigation`);
   stepNum++;
 
   // Include top KB files
@@ -240,7 +236,7 @@ function buildContextReadyMarkdown(
   }
 
   parts.push('\n<hints>');
-  parts.push('- .context-guide.md contains file references');
+  parts.push('- .kahuna/context-guide.md contains file references');
   parts.push('- KB files are referenced by their knowledge base paths');
   if (referencedFiles && referencedFiles.length > 0) {
     parts.push('- Some entries reference local project files');
@@ -277,6 +273,51 @@ The knowledge base has ${totalFiles} files, but none are relevant to: "${task}"
 - Use kahuna_learn to add files related to this task
 - Use kahuna_ask to check if the knowledge base has related information
 </hints>`;
+}
+
+/**
+ * Build markdown section for available integrations.
+ * Returns empty string if no integrations are available.
+ */
+function buildIntegrationsMarkdown(integrations: IntegrationSummary[]): string {
+  if (integrations.length === 0) {
+    return '';
+  }
+
+  const statusIcon = (status: string) => {
+    switch (status) {
+      case 'verified':
+        return '✅';
+      case 'configured':
+        return '🔧';
+      case 'error':
+        return '❌';
+      default:
+        return '🔍';
+    }
+  };
+
+  const parts: string[] = [];
+  parts.push('## Available Integrations\n');
+  parts.push('These integrations are configured and ready to use:\n');
+  parts.push('| Integration | Type | Operations | Status |');
+  parts.push('|-------------|------|------------|--------|');
+
+  for (const integration of integrations) {
+    const ops = integration.operationNames.slice(0, 3).join(', ');
+    const opsDisplay = integration.operationNames.length > 3 ? `${ops}, ...` : ops;
+    parts.push(
+      `| ${integration.displayName} | ${integration.type} | ${opsDisplay} | ${statusIcon(integration.status)} ${integration.status} |`
+    );
+  }
+
+  parts.push('');
+  parts.push(
+    'Use `kahuna_use_integration(integration="<id>", operation="<op>", params={...})` to call them.'
+  );
+  parts.push('');
+
+  return parts.join('\n');
 }
 
 // =============================================================================
@@ -320,17 +361,6 @@ export async function prepareContextToolHandler(
       return markdownResponse(buildEmptyKBMarkdown());
     }
 
-    // Check for org/project context (hard gate)
-    const onboardingStatus = await checkOnboardingStatus(storage);
-
-    if (!onboardingStatus.hasOrgContext) {
-      return markdownResponse(buildMissingOrgContextMarkdown());
-    }
-
-    if (!onboardingStatus.hasProjectContext) {
-      return markdownResponse(buildMissingProjectContextMarkdown());
-    }
-
     // Generate project file tree for the retrieval agent
     const fileTree = await generateFileTree({ maxDepth: 4, maxEntries: 200 });
 
@@ -352,6 +382,21 @@ export async function prepareContextToolHandler(
     // Extract file selections and framework selection
     const selections = extractSelections(agentResult);
     const frameworkSelection = extractFrameworkSelection(agentResult);
+
+    // Always include foundation context (org-context, user-context) if they exist
+    // These are injected at code level, not relying on agent selection
+    const foundationSlugs = ['org-context', 'user-context'];
+    for (const slug of foundationSlugs) {
+      if (!selections.some((s) => s.slug === slug)) {
+        const entry = await storage.get(slug);
+        if (entry) {
+          selections.unshift({
+            slug,
+            reason: 'Foundation context (always included)',
+          });
+        }
+      }
+    }
 
     if (selections.length === 0 && !frameworkSelection) {
       return markdownResponse(buildNoRelevantFilesMarkdown(task, allEntries.length));
@@ -422,7 +467,7 @@ export async function prepareContextToolHandler(
       }
     }
 
-    // Write .context-guide.md with KB file references, local file references, and framework result
+    // Write .kahuna/context-guide.md with KB file references, local file references, and framework result
     await writeContextReadme(
       contextDir,
       task,
@@ -439,13 +484,30 @@ export async function prepareContextToolHandler(
       frameworkResult
     );
 
-    // Add usage summary if tracking is enabled
+    // Fetch and surface available integrations
+    try {
+      const integrations = await listIntegrationSummaries();
+      const integrationsMarkdown = buildIntegrationsMarkdown(integrations);
+      if (integrationsMarkdown) {
+        markdown += `\n${integrationsMarkdown}`;
+      }
+    } catch {
+      // Don't fail if integration fetching fails - just skip the section
+      console.error('Failed to fetch integrations for context surfacing');
+    }
+
+    // Add compact usage line with project totals
     const { usage } = agentResult;
-    if (usageTracker.shouldIncludeInResponses() && usage.llmCallCount > 0) {
+    if (usage.llmCallCount > 0) {
+      const usageLine = await generateAgentUsageLine(
+        usage.totalInputTokens,
+        usage.totalOutputTokens,
+        usage.totalCost
+      );
       markdown += `
 
 ---
-📊 **Usage:** ${MODELS.retrieval} | ${formatTokens(usage.totalInputTokens)} in + ${formatTokens(usage.totalOutputTokens)} out | ${formatCost(usage.totalCost)} | ${usage.llmCallCount} call(s)`;
+${usageLine}`;
     }
 
     return markdownResponse(markdown);

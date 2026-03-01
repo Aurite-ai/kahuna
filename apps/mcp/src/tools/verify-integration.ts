@@ -5,6 +5,8 @@
  * and can connect to their external services.
  */
 
+import { generateCredentialPrompt } from '../integrations/credential-prompts.js';
+import { loadIntegration } from '../integrations/storage.js';
 import { createVerifier } from '../integrations/verification/index.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
@@ -82,13 +84,25 @@ export async function verifyIntegrationToolHandler(
 | Connection | ${connIcon} ${result.details.connectionSuccess ? 'Success' : 'Failed'} |`;
 
       if (result.details.missingCredentials.length > 0) {
-        markdown += `
+        // Load the integration to get full details for credential prompting
+        const integration = await loadIntegration(integrationId);
+
+        if (integration) {
+          // Generate detailed credential prompt
+          const credentialPrompt = generateCredentialPrompt(
+            integration,
+            result.details.missingCredentials
+          );
+          markdown += `\n\n${credentialPrompt}`;
+        } else {
+          markdown += `
 
 ## Missing Credentials
 
 ${result.details.missingCredentials.map((c) => `- \`${c}\``).join('\n')}
 
 **Tip:** Set these credentials as environment variables or in your vault.`;
+        }
       }
 
       if (result.details.connectionError) {

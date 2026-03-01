@@ -28,7 +28,46 @@ export const CATEGORIZATION_PROMPT = `You are a file analyzer. Classify this fil
 - Use **integration** when the primary purpose is describing connections to external systems, APIs, or data sources
 - Use **context** as fallback when no other category clearly fits
 
-Use the 'categorize_file' tool to provide your analysis.`;
+**Process:**
+Use the 'categorize_file' tool to provide your analysis with category, confidence, reasoning, title, summary, and topics.`;
+
+/**
+ * System prompt for the contradiction checking agent (used by kahuna_learn).
+ * Checks if a newly categorized file contradicts existing knowledge base entries.
+ */
+export const CONTRADICTION_CHECK_PROMPT = `You are a contradiction detection agent. Your job is to check if a newly categorized file contradicts any existing files in the knowledge base.
+
+**What is a contradiction?**
+A contradiction means the files contain conflicting information that cannot both be true. Examples:
+- Different values for the same configuration setting
+- Conflicting business rules or policies
+- Superseded decisions or requirements
+- Incompatible technical specifications
+- An updated version of the same file
+
+**What is NOT a contradiction?**
+- Files that are simply related or complementary
+- Files covering different aspects of the same topic
+- Files at different levels of detail
+
+**Process:**
+1. Review the new file's metadata (title, summary, category, topics)
+2. Use 'list_knowledge_files' to see what's already in the knowledge base
+3. Identify files that might contradict the new file (same topic area, similar category)
+4. Read those files to check for actual contradictions
+5. If you find contradictions, use 'report_contradictions' to flag them with clear explanations
+6. If no contradictions exist, use 'report_contradictions' with an empty array
+7. You MUST use the 'report_contradictions' tool for your final output
+
+**Guidelines:**
+- Be conservative: only report actual conflicts, not related content
+- Provide clear explanations of how the files contradict each other
+- Focus on contradictions that would confuse or mislead a copilot
+- Always use the 'report_contradictions' tool to report your findings
+
+**Note:**
+You have 10 max iterations. Make sure to use the 'report_contradictions' tool to report your findings before 10 iterations are up.
+`;
 
 /**
  * System prompt for the retrieval agent (used by kahuna_prepare_context).
@@ -41,15 +80,25 @@ You have tools to:
 3. Select files to surface for the task
 4. Select a framework to scaffold (if appropriate)
 
+Foundation Context (Auto-Included):
+The system automatically includes these files if they exist — you do NOT need to select them:
+- "org-context" — organization constraints, domain, and patterns
+- "user-context" — user preferences and working style
+
+Read these files FIRST (if they exist) to understand what context is already available. This helps you:
+- Avoid selecting files that duplicate information in foundation context
+- Make better relevance decisions based on org constraints and user needs
+
 Process:
-1. First, review the project file tree (if provided) to understand the project structure
-2. List all knowledge base files to see what's available
-3. Review the titles, summaries, and topics against the task description
-4. Consider what the project structure tells you about technologies in use
-5. If any files look promising but you're unsure, read them for more detail
-6. Select the files that are relevant to the task using the select_files_for_context tool
-7. For each selected file, provide a brief reason why it's relevant
-8. If the task involves building an agent, workflow, or LLM-powered application, use select_framework to scaffold the appropriate framework
+1. First, read "org-context" and "user-context" if they exist in the KB (to understand what's auto-included)
+2. Review the project file tree (if provided) to understand the project structure
+3. List all knowledge base files to see what's available
+4. Review the titles, summaries, and topics against the task description
+5. Consider what the project structure tells you about technologies in use
+6. If any files look promising but you're unsure, read them for more detail
+7. Select ONLY task-specific files using the select_files_for_context tool (skip org-context/user-context)
+8. For each selected file, provide a brief reason why it's relevant
+9. If the task involves building an agent, workflow, or LLM-powered application, use select_framework to scaffold the appropriate framework
 
 Framework Selection:
 - Use select_framework when the task involves building agents, workflows, or LLM-powered applications
@@ -59,9 +108,10 @@ Framework Selection:
 
 Guidelines:
 - Select 3-10 KB files (fewer is better if only a few are relevant)
+- DO NOT select "org-context" or "user-context" — these are auto-included
 - Prefer files that directly relate to the task
-- Consider the task description, working files, and project structure when making selections
-- If nothing is relevant, select nothing — don't force matches`;
+- Avoid selecting files that merely repeat foundation context information
+- Consider the task description, working files, and project structure when making selections`;
 
 /**
  * Template for the Q&A agent system prompt (used by kahuna_ask).
@@ -141,14 +191,14 @@ export function buildRetrievalUserMessage(
 /**
  * Build the full Q&A system prompt with referenced files section.
  *
- * @param referencedKBFiles - List of KB file paths currently referenced in .context-guide.md
+ * @param referencedKBFiles - List of KB file paths currently referenced in .kahuna/context-guide.md
  */
 export function buildQASystemPrompt(referencedKBFiles: string[]): string {
   let referencedFilesSection = '';
 
   if (referencedKBFiles.length > 0) {
     const fileList = referencedKBFiles.map((f) => `- ${f}`).join('\n');
-    referencedFilesSection = `The copilot already has these KB files referenced in their .context-guide.md:
+    referencedFilesSection = `The copilot already has these KB files referenced in their .kahuna/context-guide.md:
 ${fileList}
 
 These files are already accessible to the copilot. Focus on providing information that isn't covered by these files, or that provides additional detail beyond what they contain.`;

@@ -162,7 +162,7 @@ Assume the entire agent development will be completed within this conversation u
 
 ### Context and Documentation
 
-All context and existing documentation will be referenced by file path in `.context-guide.md`. Reference these files when creating subagent prompts to provide necessary background information.
+All context and existing documentation will be referenced by file path in `.kahuna/context-guide.md`. Reference these files when creating subagent prompts to provide necessary background information.
 
 If the user gives new context during the development process, either in the form of messages or uploaded files, add this new information to the knowledge base with the **kahuna_learn** tool.
 
@@ -174,8 +174,6 @@ Skills are triggered by user requests or specific conditions. Reference these wh
 
 | Skill | Trigger | Purpose |
 |-------|---------|---------|
-| **org-onboarding** | "set up org context" | Capture organization-wide context (industry, team, constraints, priorities) |
-| **project-onboarding** | "set up project context" | Capture project-specific business context and success criteria |
 | **verification** | "verify my agent" | Check agent code against organizational policies and framework best practices |
 | **documentation** | Internal use | Search guidance for finding external documentation |
 
@@ -189,7 +187,7 @@ Skills are located in `.claude/skills/[skill-name]/SKILL.md`.
 
 ### Step 0: Prepare Context
 
-Call **kahuna_prepare_context** with the user request as the task. The tool will surface relevant context and provide onboarding hints if needed.
+Call **kahuna_prepare_context** with the user request as the task. The tool will surface relevant context for the task.
 
 ### Step 1: Delegate to Architect
 

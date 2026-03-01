@@ -10,7 +10,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { Tool, ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages';
 import type { UsageTracker } from '../../usage/index.js';
-import { extractTokenUsage } from '../../usage/index.js';
+import { extractTokenUsage, recordProjectUsage } from '../../usage/index.js';
 import type { KnowledgeStorageService } from '../storage/types.js';
 import { executeKnowledgeTool } from './knowledge-tools.js';
 
@@ -63,6 +63,7 @@ const STRUCTURED_TOOL_NAMES = new Set([
   'select_files_for_context',
   'categorize_file',
   'select_framework',
+  'report_contradictions',
 ]);
 
 /**
@@ -142,6 +143,9 @@ export async function runAgent(
         latencyMs,
       });
       agentUsage.totalCost += call.cost.totalCost;
+
+      // Persist to project-level storage (await to ensure it completes)
+      await recordProjectUsage(toolName, tokenUsage, call.cost);
     }
 
     // Check if we're done (no more tool use)

@@ -35,7 +35,7 @@ The primary instruction file that Claude Code reads at session start.
 
 **Purpose:**
 - Orient the copilot to the project structure
-- Direct copilot to read `.context-guide.md` for knowledge
+- Direct copilot to read `.kahuna/context-guide.md` for knowledge
 - Instruct when/how to use Kahuna MCP tools
 
 **MVP Content:** Static template explaining project structure and Kahuna tool usage.
@@ -76,11 +76,11 @@ Copilot rules that enforce structured development.
 
 **Purpose:**
 - Guide copilot behavior (when to use context, how to approach tasks)
-- Enforce patterns like "check .context-guide.md before implementing"
+- Enforce patterns like "check .kahuna/context-guide.md before implementing"
 - Static best practices for agent development
 
 **MVP Content:** Rules directing copilot to:
-- Read `.context-guide.md` at task start
+- Read `.kahuna/context-guide.md` at task start
 - Use `kahuna_prepare_context` before implementation
 - Use `kahuna_ask` for mid-task questions
 - Invoke verification skill before commits
@@ -104,15 +104,15 @@ The copilot configuration and knowledge base work together but are distinct:
 
 | Aspect | Copilot Config | Knowledge Base |
 |--------|----------------|----------------|
-| **Location** | Project root (`.claude/`, `CLAUDE.md`) | `~/.kahuna/` and `.context-guide.md` |
+| **Location** | Project root (`.claude/`, `CLAUDE.md`) | `~/.kahuna/` and `.kahuna/context-guide.md` |
 | **Purpose** | How copilot behaves | What copilot knows |
 | **Scope** | Per-project | Global + per-task |
 | **Dynamic?** | Static (MVP) | Dynamic (learns, surfaces) |
 
 **How they interact:**
-1. Rules tell copilot to **read** `.context-guide.md`
+1. Rules tell copilot to **read** `.kahuna/context-guide.md`
 2. Rules tell copilot **when** to call Kahuna tools
-3. Kahuna tools **populate** `.context-guide.md` with relevant knowledge
+3. Kahuna tools **populate** `.kahuna/context-guide.md` with relevant knowledge
 4. Copilot **uses** surfaced knowledge during tasks
 
 ---
