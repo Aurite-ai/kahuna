@@ -24,3 +24,16 @@ export {
   searchIntegrationInfoTool,
   type WebSearchResult,
 } from './research-tools.js';
+
+// Perplexity search integration
+export {
+  createPerplexityUrlFetch,
+  createPerplexityWebSearch,
+  fetchUrlWithPerplexity,
+  isPerplexityAvailable,
+  searchApiDocs,
+  searchAuthDetails,
+  searchEndpoints,
+  searchRateLimits,
+  searchWithPerplexity,
+} from './perplexity-search.js';

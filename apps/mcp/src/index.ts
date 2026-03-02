@@ -104,6 +104,7 @@ import { listIntegrationsTool } from './tools/list-integrations.js';
 import { prepareContextTool } from './tools/prepare-context.js';
 import { provideContextTool } from './tools/provide-context.js';
 import type { ToolContext } from './tools/types.js';
+import { updateConnectorTool } from './tools/update-connector.js';
 import { usageTool } from './tools/usage.js';
 import { useIntegrationTool } from './tools/use-integration.js';
 import { verifyIntegrationTool } from './tools/verify-integration.js';
@@ -131,6 +132,7 @@ const allTools = [
   useIntegrationTool.definition,
   verifyIntegrationTool.definition,
   discoverIntegrationTool.definition,
+  updateConnectorTool.definition,
 ];
 
 /**
@@ -179,6 +181,9 @@ async function routeToolCall(
 
     case 'kahuna_discover_integration':
       return discoverIntegrationTool.handler(args, ctx);
+
+    case 'kahuna_update_connector':
+      return updateConnectorTool.handler(args, ctx);
 
     default:
       return {

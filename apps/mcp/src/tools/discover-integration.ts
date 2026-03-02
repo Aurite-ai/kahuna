@@ -11,6 +11,11 @@ import type { ContentBlock, Message, ToolUseBlock } from '@anthropic-ai/sdk/reso
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
 import { MODELS } from '../config.js';
 import {
+  createPerplexityUrlFetch,
+  createPerplexityWebSearch,
+  isPerplexityAvailable,
+} from '../connectors/agents/perplexity-search.js';
+import {
   INTEGRATION_RESEARCH_PROMPT,
   buildResearchUserMessage,
 } from '../connectors/agents/research-prompts.js';
@@ -59,14 +64,7 @@ After discovery, use \`kahuna_verify_integration\` to test credentials.`,
   },
 };
 
-// =============================================================================
-// INPUT TYPE
-// =============================================================================
-
-interface DiscoverIntegrationInput {
-  service_name: string;
-  hints?: string;
-}
+// Note: Input types documented in schema above, using Record<string, unknown> in handler
 
 // =============================================================================
 // TOOL HANDLER
@@ -123,12 +121,18 @@ If you need a different version or to update operations, you can ask to update t
   // Initialize Anthropic client
   const anthropic = new Anthropic();
 
-  // Build research context
+  // Build research context with Perplexity if available
   const researchContext: ResearchToolContext = {
     registry,
-    // Web search could be added here with Tavily/Perplexity
-    // fetchUrl could be added here for documentation fetching
+    webSearch: isPerplexityAvailable() ? createPerplexityWebSearch() : undefined,
+    fetchUrl: isPerplexityAvailable() ? createPerplexityUrlFetch() : undefined,
   };
+
+  // Log whether Perplexity is being used
+  const usingPerplexity = isPerplexityAvailable();
+  console.error(
+    `[discover-integration] Research mode: ${usingPerplexity ? 'Perplexity (real-time web search)' : 'Claude knowledge only'}`
+  );
 
   // Build user message
   const userMessage = buildResearchUserMessage(service_name, hints);
