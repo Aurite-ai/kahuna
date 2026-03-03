@@ -100,6 +100,8 @@ export interface SaveKnowledgeEntryInput {
   confidence: number;
   reasoning: string;
   topics: string[];
+  /** Optional subdirectory within the knowledge base (e.g., project hash for project-specific storage) */
+  subdirectory?: string;
 }
 
 /**
@@ -162,18 +164,25 @@ export interface KnowledgeStorageService {
 
   /**
    * Get a single entry by slug.
+   * @param slug - The entry slug
+   * @param subdirectory - Optional subdirectory within the knowledge base
    */
-  get(slug: string): Promise<KnowledgeEntry | null>;
+  get(slug: string, subdirectory?: string): Promise<KnowledgeEntry | null>;
 
   /**
    * Check if an entry exists.
+   * @param slug - The entry slug
+   * @param subdirectory - Optional subdirectory within the knowledge base
    */
-  exists(slug: string): Promise<boolean>;
+  exists(slug: string, subdirectory?: string): Promise<boolean>;
 
   /**
    * Delete an entry (or mark as archived).
+   * @param slug - The entry slug
+   * @param subdirectory - Optional subdirectory within the knowledge base
+   * @param permanent - If true, delete file; if false, set status to archived
    */
-  delete(slug: string, permanent?: boolean): Promise<void>;
+  delete(slug: string, subdirectory?: string, permanent?: boolean): Promise<void>;
 
   /**
    * Check if the knowledge base directory exists and is accessible.

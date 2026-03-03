@@ -446,6 +446,10 @@ export async function learnToolHandler(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<MCPToolResponse> {
+  // TEMPORARY: Hardcoded flag to test project-specific storage
+  // TODO: Replace with actual logic to determine if content is project-specific
+  const isProjectContext = true;
+
   const { storage, anthropic, usageTracker } = ctx;
 
   // Validate input with Zod
@@ -702,6 +706,8 @@ export async function learnToolHandler(
           ? `${catResult.reasoning} (User note: ${description})`
           : catResult.reasoning,
         topics: catResult.topics,
+        // Add subdirectory if this is project-specific context
+        subdirectory: isProjectContext ? projectHash : undefined,
       };
 
       const entry = await storage.save(saveInput);

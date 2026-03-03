@@ -192,8 +192,8 @@ export async function deleteToolHandler(
         continue;
       }
 
-      // Delete the file
-      await storage.delete(slug, true);
+      // Delete the file (permanent delete, no subdirectory)
+      await storage.delete(slug, undefined, true);
 
       results.push({
         slug,

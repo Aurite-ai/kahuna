@@ -71,7 +71,7 @@ describe('deleteToolHandler', () => {
       expect(ctx.storage.get).toHaveBeenCalledWith('old-api-guidelines');
 
       // Verify storage.delete was called
-      expect(ctx.storage.delete).toHaveBeenCalledWith('old-api-guidelines', true);
+      expect(ctx.storage.delete).toHaveBeenCalledWith('old-api-guidelines', undefined, true);
 
       // Verify markdown response
       expect(result.isError).toBeUndefined();
@@ -101,8 +101,8 @@ describe('deleteToolHandler', () => {
       const result = await deleteToolHandler({ slugs: ['old-policy', 'deprecated-doc'] }, ctx);
 
       expect(ctx.storage.delete).toHaveBeenCalledTimes(2);
-      expect(ctx.storage.delete).toHaveBeenCalledWith('old-policy', true);
-      expect(ctx.storage.delete).toHaveBeenCalledWith('deprecated-doc', true);
+      expect(ctx.storage.delete).toHaveBeenCalledWith('old-policy', undefined, true);
+      expect(ctx.storage.delete).toHaveBeenCalledWith('deprecated-doc', undefined, true);
 
       const text = result.content[0].text;
       expect(text).toContain('2 files');

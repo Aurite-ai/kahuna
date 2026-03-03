@@ -270,7 +270,7 @@ describe('FileKnowledgeStorageService', () => {
 
     it('filters by status', async () => {
       // Archive one entry
-      await storage.delete('api-guidelines', false);
+      await storage.delete('api-guidelines', undefined, false);
 
       const activeEntries = await storage.list({ status: 'active' });
       const archivedEntries = await storage.list({ status: 'archived' });
@@ -349,7 +349,7 @@ describe('FileKnowledgeStorageService', () => {
     it('hard deletes entry (permanent=true)', async () => {
       await storage.save(createTestInput({ title: 'Delete Me' }));
 
-      await storage.delete('delete-me', true);
+      await storage.delete('delete-me', undefined, true);
 
       const exists = await storage.exists('delete-me');
       expect(exists).toBe(false);
@@ -361,7 +361,7 @@ describe('FileKnowledgeStorageService', () => {
     it('soft deletes entry (permanent=false)', async () => {
       await storage.save(createTestInput({ title: 'Archive Me' }));
 
-      await storage.delete('archive-me', false);
+      await storage.delete('archive-me', undefined, false);
 
       const entry = await storage.get('archive-me');
       expect(entry).not.toBeNull();
@@ -374,27 +374,31 @@ describe('FileKnowledgeStorageService', () => {
       // Small delay to ensure different timestamp
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      await storage.delete('archive-timestamp', false);
+      await storage.delete('archive-timestamp', undefined, false);
 
       const entry = await storage.get('archive-timestamp');
       expect(entry?.updated_at).not.toBe(saved.updated_at);
     });
 
     it('throws NOT_FOUND for non-existent entry (hard delete)', async () => {
-      await expect(storage.delete('non-existent', true)).rejects.toThrow(KnowledgeStorageError);
+      await expect(storage.delete('non-existent', undefined, true)).rejects.toThrow(
+        KnowledgeStorageError
+      );
 
       try {
-        await storage.delete('non-existent', true);
+        await storage.delete('non-existent', undefined, true);
       } catch (error) {
         expect((error as KnowledgeStorageError).code).toBe('NOT_FOUND');
       }
     });
 
     it('throws NOT_FOUND for non-existent entry (soft delete)', async () => {
-      await expect(storage.delete('non-existent', false)).rejects.toThrow(KnowledgeStorageError);
+      await expect(storage.delete('non-existent', undefined, false)).rejects.toThrow(
+        KnowledgeStorageError
+      );
 
       try {
-        await storage.delete('non-existent', false);
+        await storage.delete('non-existent', undefined, false);
       } catch (error) {
         expect((error as KnowledgeStorageError).code).toBe('NOT_FOUND');
       }
