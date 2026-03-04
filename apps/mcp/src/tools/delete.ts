@@ -54,6 +54,11 @@ kahuna_delete(slugs=["old-api-guidelines", "deprecated-security-policy"])
         },
         minItems: 1,
       },
+      subdirectory: {
+        type: 'string',
+        description:
+          'Optional subdirectory within the knowledge base (e.g., project hash for project-specific files)',
+      },
     },
     required: ['slugs'],
   },
@@ -66,6 +71,7 @@ const deleteInputSchema = z.object({
   slugs: z
     .array(z.string(), { error: 'Missing or empty slugs array' })
     .min(1, { message: 'slugs array cannot be empty' }),
+  subdirectory: z.string().optional(),
 });
 
 /**
@@ -169,7 +175,7 @@ export async function deleteToolHandler(
     );
   }
 
-  const { slugs } = parseResult.data;
+  const { slugs, subdirectory } = parseResult.data;
 
   if (slugs.length === 0) {
     return markdownResponse(buildDeleteNoFilesMarkdown(), true);
@@ -181,7 +187,7 @@ export async function deleteToolHandler(
   for (const slug of slugs) {
     try {
       // Get the file first to retrieve its title for the response
-      const entry = await storage.get(slug);
+      const entry = await storage.get(slug, subdirectory);
 
       if (!entry) {
         results.push({
@@ -192,8 +198,8 @@ export async function deleteToolHandler(
         continue;
       }
 
-      // Delete the file (permanent delete, no subdirectory)
-      await storage.delete(slug, undefined, true);
+      // Delete the file (permanent delete)
+      await storage.delete(slug, subdirectory, true);
 
       results.push({
         slug,

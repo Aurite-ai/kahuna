@@ -134,7 +134,8 @@ export const categorizeFileTool: Tool = {
  */
 export const reportContradictionsTool: Tool = {
   name: 'report_contradictions',
-  description: 'Report files in the knowledge base that contradict the new file being categorized',
+  description:
+    'Report files in the knowledge base that contradict the new file being categorized. Use the full path (subdirectory/slug) from the list_knowledge_files output.',
   input_schema: {
     type: 'object' as const,
     properties: {
@@ -145,7 +146,13 @@ export const reportContradictionsTool: Tool = {
           properties: {
             slug: {
               type: 'string',
-              description: 'Slug of the contradicting file',
+              description:
+                'Slug of the contradicting file (just the slug part, not including subdirectory)',
+            },
+            subdirectory: {
+              type: 'string',
+              description:
+                'Subdirectory of the contradicting file (if any). Extract from the full path shown in list_knowledge_files.',
             },
             explanation: {
               type: 'string',
@@ -261,6 +268,7 @@ const reportContradictionsInputSchema = z.object({
   contradictions: z.array(
     z.object({
       slug: z.string(),
+      subdirectory: z.string().optional(),
       explanation: z.string(),
     })
   ),
@@ -288,13 +296,14 @@ export async function executeKnowledgeTool(
         return 'No files in knowledge base.';
       }
 
-      // Enriched format: slug, title, category, summary, topics
+      // Enriched format: slug, title, category, summary, topics, subdirectory
       const lines = entries.map((e) => {
+        const location = e.subdirectory ? `${e.subdirectory}/${e.slug}` : e.slug;
         const topicsStr =
           e.classification.topics.length > 0
             ? `  Topics: ${e.classification.topics.join(', ')}`
             : '';
-        return `- ${e.slug} [${e.classification.category}]\n  "${e.summary}"${topicsStr ? `\n${topicsStr}` : ''}`;
+        return `- ${location} [${e.classification.category}]\n  "${e.summary}"${topicsStr ? `\n${topicsStr}` : ''}`;
       });
 
       return `Knowledge base files (${entries.length} entries):\n\n${lines.join('\n\n')}`;

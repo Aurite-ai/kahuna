@@ -84,6 +84,8 @@ export interface KnowledgeEntry extends KnowledgeEntryFrontmatter {
   /** Derived from filename (e.g., "api-design-guidelines" from "api-design-guidelines.mdc") */
   slug: string;
   content: string;
+  /** Optional subdirectory within the knowledge base (e.g., project hash for project-specific storage) */
+  subdirectory?: string;
 }
 
 /**

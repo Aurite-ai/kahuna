@@ -216,7 +216,12 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
           const slug = filename.replace(/\.mdc$/, '');
           const content = await fs.readFile(path.join(dirPath, filename), 'utf-8');
           const parsed = parseMdcFile(content);
-          entries.push({ ...parsed.frontmatter, slug, content: parsed.body });
+          entries.push({
+            ...parsed.frontmatter,
+            slug,
+            content: parsed.body,
+            subdirectory,
+          });
         } catch (error) {
           // Log warning but don't fail the entire operation
           const displayPath = subdirectory ? `${subdirectory}/${filename}` : filename;
