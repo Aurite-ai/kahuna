@@ -1,6 +1,6 @@
 # Architecture: Context Management System
 
-**Date:** 2026-02-10
+**Date:** 2026-03-04
 **Status:** Approved (implemented)
 **Prior art:** [Technical spec (working doc)](../internal/designs/context-management-system.md), [Post-rebuild review](../internal/analyses/post-rebuild-review.md)
 
@@ -141,6 +141,9 @@ status: active
 | `decision` | Choices with rationale | Architecture decisions, trade-off analyses |
 | `pattern` | Reusable approaches | Code patterns, config files |
 | `context` | General background / unclear fit | Overviews, onboarding docs |
+| `integration` | External services and connectors | API connections, database configs |
+
+> **Note:** The `integration` category is defined but has a validation bug. Integration detection uses pattern matching instead.
 
 ---
 
@@ -173,14 +176,23 @@ Agent tools used across different MCP tools:
 | `select_files_for_context` | Structured file selection | prepare_context | `[{slug, reason}]` |
 | `categorize_file` | Structured classification | learn | Category, confidence, reasoning, title, summary, topics |
 | `report_contradictions` | Report contradicting files | learn | `[{slug, explanation}]` |
+| `select_framework` | Select framework scaffold | prepare_context | `{framework, reason}` |
 
 ### Context Writer
 
 The surfacing module handles `.kahuna/context-guide.md` generation:
 
 1. **Compile content** — For each selected slug: read `.mdc`
-2. **Generate guide** — Single markdown file with navigation, file summaries, and full content
-3. **Write file** — Output as `.kahuna/context-guide.md` in project root
+2. **Generate guide** — Single markdown file with navigation, file paths (not copies), and summaries
+3. **Include foundation context** — `org-context` and `user-context` auto-included
+4. **Write file** — Output as `.kahuna/context-guide.md` in project root
+
+### Supporting Modules
+
+| Module | Purpose |
+|--------|---------|
+| `file-tree.ts` | Generates ASCII tree of project directory for retrieval agent |
+| `framework-copier.ts` | Copies framework boilerplate from templates to project |
 
 ---
 
@@ -195,7 +207,7 @@ apps/mcp/src/
 │   ├── index.ts                           # Public exports (barrel)
 │   ├── agents/
 │   │   ├── index.ts
-│   │   ├── knowledge-tools.ts             # Enriched list, read, select_files, categorize tools
+│   │   ├── knowledge-tools.ts             # Enriched list, read, select_files, categorize, select_framework tools
 │   │   ├── run-agent.ts                   # Shared agentic loop runner
 │   │   └── prompts.ts                     # All agent system prompts
 │   ├── storage/
@@ -205,16 +217,28 @@ apps/mcp/src/
 │   │   └── utils.ts                       # Slugify, frontmatter parsing, MDC generation
 │   └── surfacing/
 │       ├── index.ts
-│       └── context-writer.ts              # Write .kahuna/context-guide.md to project root
+│       ├── context-writer.ts              # Write .kahuna/context-guide.md to project root
+│       ├── file-tree.ts                   # Generate project directory tree for agents
+│       └── framework-copier.ts            # Copy framework boilerplate to project
+│
+├── integrations/                          # Integration discovery and execution
+│   ├── index.ts
+│   ├── storage.ts                         # Integration persistence
+│   ├── verification/                      # Integration health checks
+│   └── execution/                         # Integration operation execution
 │
 ├── tools/                                 # MCP tool handlers (thin wrappers)
 │   ├── types.ts                           # ToolContext, MCPToolResponse, markdownResponse()
+│   ├── initialize.ts
+│   ├── provide-context.ts
 │   ├── learn.ts
 │   ├── prepare-context.ts
 │   ├── ask.ts
 │   ├── delete.ts
 │   ├── health-check.ts
-│   └── initialize.ts
+│   ├── list-integrations.ts
+│   ├── use-integration.ts
+│   └── verify-integration.ts
 ```
 
 ---

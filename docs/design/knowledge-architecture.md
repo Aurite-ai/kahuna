@@ -1,7 +1,7 @@
 # Kahuna MCP - Knowledge Architecture
 
 **Status:** Final
-**Date:** 2026-02-05
+**Date:** 2026-03-04
 **Parent:** [README.md](./README.md)
 
 ---
@@ -64,167 +64,77 @@ The global knowledge base lives at `~/.kahuna/`. This folder is:
 
 ```
 ~/.kahuna/
-├── config.json               # Global Kahuna configuration
-├── state.json                # Processing state, sync tracking
-│
 ├── knowledge/                # Classified knowledge entries (.mdc files)
-│   ├── [uuid-1].mdc          # Knowledge entry with frontmatter
-│   ├── [uuid-2].mdc
+│   ├── api-design-guidelines.mdc    # Slug-based naming
+│   ├── org-context.mdc              # Organization context
+│   ├── user-context.mdc             # User preferences
 │   └── ...
 │
-├── conversations/            # Processed conversation summaries (.mdc files)
-│   ├── [session-id-1].mdc
-│   ├── [session-id-2].mdc
-│   └── ...
-│
-└── prepared/                 # Staged context for projects (future)
-    └── [project-hash]/       # Prepared context ready to copy
-        └── ...
+└── integrations/             # Discovered integration descriptors
+    └── ...
 ```
 
 ### .mdc Format (Markdown with Context)
 
-All knowledge entries use the `.mdc` format - a single file combining YAML frontmatter metadata with markdown content. This is simpler than folder+JSON and consistent with how conversation logs are stored.
+All knowledge entries use the `.mdc` format - a single file combining YAML frontmatter metadata with markdown content.
 
-**Example knowledge entry:** `~/.kahuna/knowledge/uuid-1234.mdc`
-
-```markdown
----
-id: uuid-1234
-type: policy
-title: API Design Guidelines
-source:
-  file: /path/to/original/api-guidelines.md
-  project: customer-support-agent
-  date: 2026-02-05T14:30:00Z
-classification:
-  category: policy
-  subcategory: api-design
-  tags:
-    - rest
-    - api
-    - guidelines
-  confidence: 0.92
-status: active
----
-
-# API Design Guidelines
-
-**Original file:** /projects/support-agent/docs/api-guidelines.md
-
-## Summary
-
-REST API design standards for the organization.
-
-## Key Points
-
-- Use resource nouns, not verbs
-- Standard error response format
-- JWT authentication required
-- Rate limiting: 100 req/min
-
-## Full Content
-
-[Original file content or reference]
-```
-
-### Classification Categories
-
-MVP categories (agents determine during learn):
-
-| Category | Description | Examples |
-|----------|-------------|----------|
-| **policy** | Business rules, constraints, organizational standards, domain knowledge | API guidelines, security policies, business plans |
-| **requirement** | Requirements, specifications, user stories, acceptance criteria | PRDs, user stories, feature specs |
-| **reference** | Technical documentation, API specs, architecture docs, schemas | API docs, database schemas, architecture diagrams |
-| **decision** | Decision records, rationale, trade-off analyses | ADRs, design decisions, technology choices |
-| **pattern** | Source code, implementation patterns, reusable examples, config files | Python files, TypeScript files, config templates |
-| **context** | General background, overviews, onboarding docs, or unclear fit | README files, onboarding docs, project overviews |
-| **integration** | Data sources, external services, APIs, tools, connectors, authentication methods, workflows | Gmail setup, HubSpot API, database connections, Slack webhooks |
-
-### Integration Detection (Cross-Category)
-
-**Integration metadata is extracted from ANY file where external systems are mentioned** - not just `integration` category files. This is crucial for:
-- Auto-generating tool scaffolding in VCKs
-- Surfacing relevant integrations during `kahuna_prepare_context`
-- Enabling "Connector Discovery" - when users describe their needs in any context, Kahuna identifies what connections are required
-
-**When to use `integration` category:**
-- Use when the PRIMARY purpose of the file is describing integrations, connectors, data sources, or external services
-- Example: A dedicated "integrations.md" file listing all external systems, API connection docs, database setup guides
-
-**When integrations are extracted from other categories:**
-- A `policy` file about customer support that mentions "send email via Gmail" → Gmail captured as connected service
-- A `reference` API doc that describes HubSpot integration → HubSpot captured as data source
-- A `pattern` file that imports Stripe SDK → Stripe captured as connected service
-
-**Integration Metadata Structure:**
-
-| Field | Description | Example Values |
-|-------|-------------|----------------|
-| **triggers** | What starts the workflow | webhook, schedule, manual, event, api-call |
-| **dataSources** | Where data comes from | database, api, crm, spreadsheet, email |
-| **outputs** | Where results/actions go | email, notification, api-call, database-write |
-| **aiTasks** | What AI needs to do | generate-email, analyze-sentiment, classify-ticket |
-| **authentication** | How to connect to systems | oauth2, api-key, basic-auth, jwt |
-| **connectedServices** | All external services mentioned | Gmail, HubSpot, PostgreSQL, Slack |
-
-**Example Integration Entry:**
+**Example knowledge entry:** `~/.kahuna/knowledge/api-design-guidelines.mdc`
 
 ```markdown
 ---
 type: knowledge
-title: Customer Pickup Notification Workflow
-summary: Gmail-based notification system triggered by web form when customer orders are ready
-created_at: 2026-02-09T14:30:00Z
-updated_at: 2026-02-09T14:30:00Z
+title: API Design Guidelines
+summary: >
+  REST API design standards covering naming conventions, error response format,
+  and authentication requirements.
+created_at: 2026-02-10T00:00:00Z
+updated_at: 2026-02-10T00:00:00Z
+
 source:
-  file: /path/to/original/notification-workflow.md
-  project: customer-support-agent
-  path: docs/workflows
+  file: api-guidelines.md
+  path: /home/user/my-project/docs/api-guidelines.md
+  project: /home/user/my-project
+
 classification:
-  category: integration
-  confidence: 0.95
-  reasoning: File describes external service connections and workflow automation
+  category: policy
+  confidence: 0.92
+  reasoning: Contains organizational rules and constraints for API design
   topics:
-    - gmail
-    - notification
-    - email-automation
-    - webhook
-    - postgresql
+    - API Design
+    - REST Conventions
+    - Authentication
+
 status: active
 ---
 
-# Customer Pickup Notification Workflow
-
-## Connected Services
-- **Gmail** - OAuth2 authentication for sending emails
-- **PostgreSQL** - API key authentication for customer database
-
-## Triggers
-- Manual trigger via web form when worker enters customer name
-
-## Data Sources
-- Customer database: emails and order notes
-
-## Outputs
-- Personalized pickup notification email via Gmail
-
-## AI Tasks
-- Generate personalized email content using customer notes and order history
-
-## Authentication
-| Service | Method |
-|---------|--------|
-| Gmail | OAuth2 |
-| Customer DB | API Key |
-
-## Usage for Agents
-This integration enables agents to:
-- Look up customer contact information
-- Generate personalized notification emails
-- Send automated communications when orders are ready
+[Original file content here]
 ```
+
+### Classification Categories
+
+Categories determined by LLM agent during `kahuna_learn`:
+
+| Category | Description | Examples |
+|----------|-------------|----------|
+| **policy** | Business rules, constraints, organizational standards | API guidelines, security policies |
+| **requirement** | Requirements, specifications, user stories | PRDs, feature specs |
+| **reference** | Technical documentation, API specs, schemas | API docs, architecture docs |
+| **decision** | Decision records, rationale, trade-off analyses | ADRs, technology choices |
+| **pattern** | Implementation patterns, reusable examples | Code patterns, config templates |
+| **context** | General background, overviews, or unclear fit | README files, onboarding docs |
+
+> **Note:** The `integration` category is defined in the type system but currently has a bug preventing its use. Integration detection is handled separately via pattern matching during `kahuna_learn`.
+
+### Integration Discovery
+
+Integrations (external services, APIs, databases) are discovered during `kahuna_learn` through:
+1. **Pattern matching** - Detecting service names, connection strings, SDK imports
+2. **1Password references** - Extracting credentials references
+
+Discovered integrations are stored in `~/.kahuna/integrations/` and can be:
+- Listed via `kahuna_list_integrations`
+- Verified via `kahuna_verify_integration`
+- Executed via `kahuna_use_integration`
 
 ---
 
@@ -281,18 +191,18 @@ Surfaced from Kahuna knowledge base on 2026-02-05.
 
 | Category | Tools | Data Flow |
 |----------|-------|-----------|
-| **Building KB** | learn, sync | Files → ~/.kahuna |
+| **Building KB** | learn | Files → ~/.kahuna/knowledge/ |
 | **Environment** | initialize, prepare_context | ~/.kahuna → .kahuna/context-guide.md |
-| **Assistance** | ask | .kahuna/context-guide.md + ~/.kahuna → response |
+| **Assistance** | ask | ~/.kahuna/knowledge/ → response |
+| **Integrations** | list_integrations, use_integration, verify_integration | ~/.kahuna/integrations/ |
 
 ### kahuna_initialize (Environment)
 
 **Creates:**
-- `project/.kahuna/context-guide.md` (minimal initial version)
+- Copilot configuration in project `.claude/` directory
+- Seeds knowledge base with initial `.mdc` files
 
-**Does not create:** Knowledge base entries (that's `kahuna_learn`)
-
-> **Note:** Verification/review functionality is handled by a copilot skill rather than an MCP tool. See [copilot-configuration.md](./copilot-configuration.md).
+**Does not create:** `context-guide.md` (that's `kahuna_prepare_context`)
 
 ### kahuna_learn (Building KB)
 
@@ -300,9 +210,10 @@ Surfaced from Kahuna knowledge base on 2026-02-05.
 - User-provided files/folders (recursive)
 
 **Writes to ~/.kahuna/:**
-- New `.mdc` file in `knowledge/[uuid].mdc`
+- New `.mdc` file in `knowledge/[slug].mdc` (slug-based naming, not UUIDs)
 - YAML frontmatter with classification metadata
 - Markdown content below frontmatter
+- Integration descriptors to `integrations/` if detected
 
 **Does NOT write to:** `project/.kahuna/context-guide.md`
 
@@ -311,34 +222,24 @@ Surfaced from Kahuna knowledge base on 2026-02-05.
 **Reads:**
 - Task description
 - `~/.kahuna/knowledge/` entries
-- `~/.kahuna/conversations/` summaries
 
 **Writes to project/.kahuna/context-guide.md:**
-- Surfaced knowledge entries
+- File paths referencing KB entries (not copies)
+- Foundation context (`org-context`, `user-context`) auto-included
 
 ### kahuna_ask (Assistance)
 
-**Reads (in order):**
-1. `project/.kahuna/context-guide.md` (if exists) - checked first
-2. `~/.kahuna/knowledge/` - fallback/additional
+**Reads:**
+1. `project/.kahuna/context-guide.md` (if exists) - to know what's already surfaced
+2. `~/.kahuna/knowledge/` - searches for answer
 
 **Writes:** Nothing (returns text response)
 
-### kahuna_sync (Building KB)
-
-**Reads:**
-- Conversation logs
-- Git diff (future)
-
-**Writes to ~/.kahuna/:**
-- Processed conversations to `conversations/`
-- Extracted knowledge to `knowledge/`
-
 ---
 
-## Classification Flow (MVP)
+## Classification Flow
 
-For `kahuna_learn`, the MVP classification process:
+For `kahuna_learn`, the classification is LLM-powered:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -349,25 +250,26 @@ For `kahuna_learn`, the MVP classification process:
 │      └── Get file path + optional description                                │
 │                                                                              │
 │   2. READ CONTENT                                                            │
-│      └── Load file, detect format (md, txt, code, etc.)                      │
+│      └── Load file content                                                   │
 │                                                                              │
-│   3. CLASSIFY (heuristics first, LLM if needed)                              │
-│      ├── Check filename patterns (policy, spec, requirements)                │
-│      ├── Check content patterns (headings, structure)                        │
-│      └── Use LLM for ambiguous cases                                         │
+│   3. CLASSIFY (LLM Agent - Haiku)                                            │
+│      └── Agent uses categorize_file tool to determine:                       │
+│          ├── Category (policy, requirement, reference, etc.)                 │
+│          ├── Confidence score                                                │
+│          ├── Reasoning                                                       │
+│          ├── Title (LLM-generated)                                           │
+│          ├── Summary                                                         │
+│          └── Topics (natural language phrases)                               │
 │                                                                              │
-│   4. EXTRACT METADATA                                                        │
-│      ├── Title (from content or filename)                                    │
-│      ├── Tags (from content analysis)                                        │
-│      └── Summary (LLM-generated if needed)                                   │
+│   4. DETECT CONTRADICTIONS                                                   │
+│      └── Agent compares with existing KB files                               │
 │                                                                              │
 │   5. STORE                                                                   │
-│      └── Write single .mdc file to ~/.kahuna/knowledge/[uuid].mdc            │
+│      └── Write single .mdc file to ~/.kahuna/knowledge/[slug].mdc            │
 │          (YAML frontmatter + markdown content)                               │
 │                                                                              │
-│                                                                              │
 │   6. REPORT                                                                  │
-│      └── Return summary of what was learned                                  │
+│      └── Return summary with contradictions if found                         │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -460,30 +362,36 @@ The knowledge architecture evolves from simple to sophisticated:
 
 ---
 
-## MVP Scope
+## Implementation Status
 
-### Build First
+### Implemented
 
 1. **Knowledge base structure**
-   - `~/.kahuna/knowledge/` folder structure
-   - `~/.kahuna/conversations/` for processed conversation logs
-   - `metadata.json` format
-   - Basic file storage
+   - `~/.kahuna/knowledge/` with flat `.mdc` files
+   - Slug-based naming (human-readable)
+   - YAML frontmatter with simplified metadata
 
 2. **Classification (kahuna_learn)**
-   - Accept files
-   - Basic category classification (heuristics)
-   - Store original content with metadata
+   - LLM-powered categorization (Haiku)
+   - Contradiction detection
+   - Integration discovery via pattern matching
+   - Sensitive data redaction
 
 3. **Surfacing (kahuna_prepare_context)**
-   - Accept task description
-   - Simple keyword search
-   - Compile relevant entries into .kahuna/context-guide.md
-   - Generate navigation and section headers
+   - LLM agent selects relevant KB files
+   - Foundation context auto-inclusion (org-context, user-context)
+   - Framework selection and boilerplate copying
+   - Writes file paths to `.kahuna/context-guide.md`
 
-4. **Conversation integration**
-   - Processed conversation logs (existing format) are searchable
-   - Surfaced when relevant to task
+4. **Q&A (kahuna_ask)**
+   - LLM agent synthesizes answers from KB (Sonnet)
+   - Aware of already-surfaced context
+
+### Not Implemented
+
+- `kahuna_sync` (conversation processing, git diff)
+- Conversation log storage and retrieval
+- `~/.kahuna/prepared/` staging directory
 
 ---
 
@@ -532,66 +440,19 @@ The knowledge architecture evolves from simple to sophisticated:
 
 ---
 
-## Conversation Log Format
-
-Processed conversation logs use the same `.mdc` format, stored in `~/.kahuna/conversations/`.
-
-**Example:** `~/.kahuna/conversations/c1e44692-bca2-4899-974e-cd272d8ea936.mdc`
-
-```markdown
----
-title: Build TechFlow AI Customer Support Agent
-session_id: c1e44692-bca2-4899-974e-cd272d8ea936
-source: /path/to/original.jsonl
-date: 2026-01-29
-task_type: implementation
-outcome: completed
-confidence: 0.95
----
-
-# Build TechFlow AI Customer Support Agent
-
-## Summary
-
-[What was accomplished in this session]
-
-## Decisions Made
-
-1. **Decision title** - Rationale
-2. **Another decision** - Rationale
-
-## Files Created
-
-- /path/to/file1.md
-- /path/to/file2.py
-
-## Files Modified
-
-- /path/to/existing1.py
-- /path/to/existing2.py
-
----
-*Generated by Kahuna conversation processor*
-```
-
-**Key frontmatter fields:**
-- `task_type`: implementation, design, debugging, research, refactoring
-- `outcome`: completed, blocked, in-progress, abandoned
-- `confidence`: How confident the processor is in the summary
-
----
-
 ## Open Questions
 
 1. **Multi-project knowledge:** Should knowledge be tagged by project? Global search or project-scoped?
-
-2. **Prepared staging:** Should context be prepared in `~/.kahuna/prepared/` first, then copied?
 
 ## Resolved Questions
 
 **Context regeneration (resolved):** When preparing context for a new task:
 - **Overwrite** `.kahuna/context-guide.md` - Entire file is regenerated each time
 - This ensures task context is always fresh and relevant
+
+**Foundation context (resolved):**
+- `org-context` and `user-context` KB entries are auto-included in every `prepare_context`
+- No agent selection required for these foundation entries
 
 ---
 
@@ -605,4 +466,12 @@ confidence: 0.95
 - v2.4 (2026-02-05): Fixed Tool Interactions to use .mdc; resolved context merging question
 - v3.0 (2026-02-05): Promoted to docs/design/; updated links and status to Final
 - v3.1 (2026-02-09): Renamed kahuna_setup → kahuna_initialize; removed kahuna_review (now skill-based)
-- v3.2 (2026-02-09): Added `integration` category for data sources, tools, and external services; aligned categories with implementation
+- v3.2 (2026-02-09): Added `integration` category for data sources, tools, and external services
+- v4.0 (2026-03-04): Synced with implementation:
+  - Fixed folder structure (removed unimplemented config.json, state.json, conversations/, prepared/)
+  - Fixed file naming (slug-based, not UUID)
+  - Fixed metadata format (simplified: category, confidence, reasoning, title, summary, topics)
+  - Fixed classification flow (LLM-only, no heuristics)
+  - Removed conversation log format section (not implemented)
+  - Updated tool interactions to match implementation
+  - Added foundation context auto-inclusion

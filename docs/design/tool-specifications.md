@@ -1,7 +1,7 @@
 # Kahuna MCP - Tool Specifications
 
 **Status:** Final
-**Date:** 2026-02-05
+**Date:** 2026-03-04
 **Parent:** [README.md](./README.md)
 
 ---
@@ -10,12 +10,16 @@
 
 | Tool | Purpose |
 |------|---------|
-| `kahuna_initialize` | Deploy agent-dev rules and run onboarding |
+| `kahuna_initialize` | Deploy copilot config, seed KB, run onboarding |
 | `kahuna_provide_context` | Store org/user context from onboarding or conversation |
-| `kahuna_learn` | Send files for Kahuna to learn from (detects contradictions) |
+| `kahuna_learn` | Send files for Kahuna to learn from (detects contradictions, integrations) |
 | `kahuna_prepare_context` | Prepare .kahuna/context-guide.md for a task |
-| `kahuna_ask` | Quick Q&A |
+| `kahuna_ask` | Quick Q&A using knowledge base |
 | `kahuna_delete` | Remove outdated files from knowledge base |
+| `kahuna_health_check` | Verify MCP server connectivity |
+| `kahuna_list_integrations` | List discovered integrations and status |
+| `kahuna_use_integration` | Execute operations on integrations |
+| `kahuna_verify_integration` | Test integration connectivity |
 | `kahuna_sync` | Sync all changes (deferred) |
 
 ---
@@ -45,29 +49,31 @@ Each tool spec includes:
 ### Tool Description
 
 ```
-Deploy agent-dev rules and optionally run onboarding to collect org/user context.
+Deploy copilot configuration, seed knowledge base, and run onboarding.
 
 USE THIS TOOL WHEN:
 - User says "set up Kahuna", "initialize", "get started with Kahuna"
 - Starting to use Kahuna in a new project
 - User wants to configure their copilot with Kahuna integration
 
-This tool does TWO things:
-1. Deploys agent-dev rules to .claude/ in the project directory
-2. Returns onboarding instructions if org/user context doesn't exist yet
+This tool does THREE things:
+1. Deploys copilot configuration to .claude/ in the project directory
+2. Seeds the knowledge base with initial .mdc files
+3. Returns onboarding instructions if org/user context doesn't exist yet
 
 <examples>
-### Basic initialization
-kahuna_initialize()
+### Initialize a project
+kahuna_initialize(targetPath="/home/user/my-project")
 
-### With explicit project path
-kahuna_initialize(project_path="/home/user/my-project")
+### Overwrite existing configuration
+kahuna_initialize(targetPath="/home/user/my-project", overwrite=true)
 </examples>
 
 <hints>
-- No parameters required - defaults to current working directory
+- targetPath is REQUIRED - specify the project directory
 - After initialization, follow the onboarding instructions in the response
 - Restart Claude Code after onboarding to apply the deployed rules
+- Use overwrite=true to replace existing configuration files
 </hints>
 ```
 
@@ -75,7 +81,8 @@ kahuna_initialize(project_path="/home/user/my-project")
 
 ```typescript
 {
-  project_path?: string       // Optional: Path to project (defaults to cwd)
+  targetPath: string,         // Required: Target directory to initialize
+  overwrite?: boolean         // Optional: Overwrite existing files (default: false)
 }
 ```
 
@@ -135,8 +142,9 @@ Your organization and user context are already set up.
 
 ### Output Structure
 
-`kahuna_initialize` deploys the following to the project directory:
+`kahuna_initialize` deploys the following:
 
+**To the project directory:**
 ```
 project-path/
 ├── CLAUDE.md                 # System prompt for agent development
@@ -146,7 +154,12 @@ project-path/
     └── agents/               # Specialized subagent definitions
 ```
 
-These are collectively called "agent-dev rules" - text that structures the agent development process. They do NOT contain onboarding logic (onboarding is transient, rules are permanent).
+**To the knowledge base:**
+```
+~/.kahuna/knowledge/          # Seeded with initial .mdc files from templates
+```
+
+The copilot configuration files structure the agent development process. The KB seed files provide starter knowledge entries.
 
 ### MVP Scope
 
@@ -643,7 +656,7 @@ Processed **2 files** — 2 deleted, 0 failed:
 ### Tool Description
 
 ```
-Quick Q&A using both project context and knowledge base.
+Quick Q&A using the knowledge base.
 
 USE THIS TOOL WHEN:
 - Mid-task and need specific information
@@ -651,7 +664,8 @@ USE THIS TOOL WHEN:
 - Need clarification on a decision or pattern
 - Context guide doesn't have what you need
 
-Searches .kahuna/context-guide.md first (if exists), then falls back to ~/.kahuna knowledge base.
+Searches the ~/.kahuna knowledge base and synthesizes an answer with source citations.
+Uses .kahuna/context-guide.md (if exists) to understand what context is already available.
 
 <examples>
 ### Direct question
@@ -665,7 +679,8 @@ kahuna_ask(question="Do we have rate limiting requirements documented?")
 </examples>
 
 <hints>
-- Searches project .kahuna/context-guide.md first, then knowledge base
+- Searches the knowledge base directly (not the context guide)
+- Uses context guide to know what you already have available
 - Use for quick questions mid-task
 - For comprehensive context setup, use kahuna_prepare_context instead
 - Returns text directly, doesn't modify .kahuna/context-guide.md
@@ -694,27 +709,326 @@ The project uses keyword-based search for these reasons:
 3. **Cost** - No embedding API costs
 4. **Sufficient** - Corpus is small enough for keyword matching
 
-**Source:** .kahuna/context-guide.md (Search Decision section)
+**Source:** api-design-guidelines.mdc
 
 <hints>
 - Full details in .kahuna/context-guide.md
 - Related: "What would trigger switching to embeddings?"
-- If you need broader context, use kahuna_prepare
+- If you need broader context, use kahuna_prepare_context
 </hints>
 ```
 
 ### MVP Scope
 
-**Build first:**
+**Implemented:**
 - Accept question
-- Search .kahuna/context-guide.md for relevant content
-- Return synthesized answer with source citations
+- Read context guide to understand already-surfaced context
+- Search knowledge base for relevant content
+- Synthesize answer with source citations (Sonnet model)
+- Include onboarding status warnings if KB is sparse
 
 **Future enhancements:**
-- LLM-powered answer synthesis
 - Search conversation history
 - Suggest related questions
 - Remember questions for knowledge gaps
+
+---
+
+## 8. kahuna_health_check
+
+### Tool Description
+
+```
+Check if the Kahuna MCP server is running correctly.
+
+USE THIS TOOL WHEN:
+- Verifying MCP connection is working
+- Troubleshooting Kahuna issues
+- Confirming server version
+
+<examples>
+### Basic health check
+kahuna_health_check(action="ping")
+</examples>
+
+<hints>
+- Use to verify MCP server connectivity
+- Returns server name, version, and timestamp
+</hints>
+```
+
+### Input Schema
+
+```typescript
+{
+  action: 'ping'             // Required: Type of health check (currently only 'ping')
+}
+```
+
+### Response Format
+
+```markdown
+# Kahuna MCP Server
+
+**Status:** Running ✅
+**Server:** kahuna-mcp
+**Version:** 0.1.0
+**Timestamp:** 2026-03-04T12:00:00Z
+```
+
+---
+
+## 9. kahuna_list_integrations
+
+### Tool Description
+
+```
+List all discovered integrations and their status.
+
+USE THIS TOOL WHEN:
+- Need to see what integrations are available
+- Before using kahuna_use_integration
+- Checking integration status (discovered, configured, verified, error)
+
+<examples>
+### List all integrations
+kahuna_list_integrations()
+
+### Filter by type
+kahuna_list_integrations(type="database")
+
+### Filter by status
+kahuna_list_integrations(status="verified")
+</examples>
+
+<hints>
+- Use before kahuna_use_integration to know what's available
+- Integrations are discovered via kahuna_learn
+- Use kahuna_verify_integration to test connectivity
+</hints>
+```
+
+### Input Schema
+
+```typescript
+{
+  type?: string,             // Optional: Filter by integration type (database, api, messaging, etc.)
+  status?: 'discovered' | 'configured' | 'verified' | 'error',  // Optional: Filter by status
+  format?: 'summary' | 'detailed'  // Optional: Output format (default: summary)
+}
+```
+
+### Response Format
+
+```markdown
+# Discovered Integrations
+
+**Total:** 3 integrations
+
+| Name | Type | Operations | Auth | Status |
+|------|------|------------|------|--------|
+| PostgreSQL | database | query, insert | api-key | ✅ verified |
+| Slack | messaging | send-message | oauth2 | 🔧 configured |
+| OpenAI | api | chat-completion | api-key | 🔍 discovered |
+
+## Usage
+
+To use an integration:
+\`\`\`
+kahuna_use_integration(
+  integration: "<integration-id>",
+  operation: "<operation-name>",
+  params: { ... }
+)
+\`\`\`
+```
+
+---
+
+## 10. kahuna_use_integration
+
+### Tool Description
+
+```
+Execute an operation on a discovered integration.
+
+USE THIS TOOL WHEN:
+- Need to interact with external services (APIs, databases, etc.)
+- The integration was discovered via kahuna_learn
+
+The tool handles:
+- Credential resolution from vault/environment
+- Retry logic with exponential backoff
+- Circuit breaker to prevent cascading failures
+- Request/response logging
+
+<examples>
+### Query a database
+kahuna_use_integration(
+  integration="postgresql",
+  operation="query",
+  params={sql: "SELECT * FROM users LIMIT 10"}
+)
+
+### Send a message
+kahuna_use_integration(
+  integration="slack",
+  operation="send-message",
+  params={channel: "#general", text: "Hello from Kahuna!"}
+)
+
+### Call an API
+kahuna_use_integration(
+  integration="openai",
+  operation="chat-completion",
+  params={messages: [{role: "user", content: "Hello"}]}
+)
+</examples>
+
+<hints>
+- Integration must be discovered via kahuna_learn first
+- Use kahuna_list_integrations to see available operations
+- Credentials are resolved automatically from environment or vault
+- Use kahuna_verify_integration to test before first use
+</hints>
+```
+
+### Input Schema
+
+```typescript
+{
+  integration: string,       // Required: Integration ID to use
+  operation: string,         // Required: Operation to perform
+  params?: object,           // Optional: Parameters for the operation
+  timeout?: number,          // Optional: Timeout in milliseconds (default: 30000)
+  skipRetry?: boolean        // Optional: Skip retry logic (default: false)
+}
+```
+
+### Response Format
+
+**Success:**
+```markdown
+# ✅ Operation Successful
+
+**Integration:** postgresql
+**Operation:** query
+**Duration:** 145ms
+**Attempts:** 1
+
+## Result
+
+\`\`\`json
+[{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+\`\`\`
+```
+
+**Failure:**
+```markdown
+# ❌ Operation Failed
+
+**Integration:** postgresql
+**Operation:** query
+**Error Code:** CREDENTIALS_NOT_FOUND
+**Duration:** 12ms
+**Attempts:** 1
+
+## Error
+
+Missing required credentials for postgresql integration.
+
+## Tip
+
+Make sure the required credentials are set as environment variables or in your vault.
+```
+
+---
+
+## 11. kahuna_verify_integration
+
+### Tool Description
+
+```
+Verify that an integration is correctly configured and can connect.
+
+USE THIS TOOL WHEN:
+- Testing if an integration is working before using it
+- Troubleshooting integration issues
+- Verifying credentials are configured
+
+<examples>
+### Verify single integration
+kahuna_verify_integration(integration="postgresql")
+
+### Verify all integrations
+kahuna_verify_integration()
+
+### Skip connection test (just check credentials)
+kahuna_verify_integration(integration="postgresql", skipConnectionTest=true)
+</examples>
+
+<hints>
+- Run before first use of an integration
+- Checks credentials and attempts a test operation
+- Use without integration parameter to verify all
+</hints>
+```
+
+### Input Schema
+
+```typescript
+{
+  integration?: string,      // Optional: Integration ID (omit to verify all)
+  skipConnectionTest?: boolean  // Optional: Skip actual connection test (default: false)
+}
+```
+
+### Response Format
+
+**Single integration:**
+```markdown
+# ✅ Verification: postgresql
+
+**Status:** verified
+**Message:** Connection successful
+**Duration:** 234ms
+
+## Details
+
+| Check | Result |
+|-------|--------|
+| Credentials | ✅ Resolved |
+| Connection | ✅ Success |
+
+## Test Operation
+
+- **Operation:** ping
+- **Success:** Yes
+```
+
+**All integrations:**
+```markdown
+# ✅ Integration Verification
+
+**Overall Status:** healthy
+**Total Integrations:** 3
+
+## Summary
+
+| Metric | Count |
+|--------|-------|
+| ✅ Verified | 2 |
+| 🔧 Configured | 1 |
+| ❌ Errors | 0 |
+
+## Results
+
+| Integration | Status | Message |
+|-------------|--------|---------|
+| postgresql | ✅ verified | Connection successful |
+| slack | ✅ verified | Connection successful |
+| openai | 🔧 configured | Credentials found, not tested |
+```
 
 ---
 
@@ -724,7 +1038,9 @@ The project uses keyword-based search for these reasons:
 |----------|-------|---------|
 | **Building Knowledge Base** | `kahuna_learn`, `kahuna_sync` | Populate ~/.kahuna |
 | **Environment Setup** | `kahuna_initialize`, `kahuna_prepare_context` | Prepare project |
-| **Assistance** | `kahuna_ask` | Help copilot (uses context + KB) |
+| **Assistance** | `kahuna_ask` | Help copilot (uses KB) |
+| **Integrations** | `kahuna_list_integrations`, `kahuna_use_integration`, `kahuna_verify_integration` | Execute external operations |
+| **Diagnostics** | `kahuna_health_check` | Server status |
 
 ## Implementation Priority
 
@@ -733,12 +1049,14 @@ Based on vibe coder workflow and MVP constraints:
 | Priority | Tool | Why |
 |----------|------|-----|
 | 1 | **kahuna_initialize** | Required to start any project |
-| 2 | **kahuna_learn** | Builds knowledge base (already in progress) |
+| 2 | **kahuna_learn** | Builds knowledge base |
 | 3 | **kahuna_prepare_context** | Core value prop - surfacing context |
-| 4 | **kahuna_ask** | Assistance using context + KB |
-| 5 | **kahuna_sync** | Nice-to-have automation (deferred) |
+| 4 | **kahuna_ask** | Assistance using KB |
+| 5 | **kahuna_health_check** | Diagnostics |
+| 6 | **Integration tools** | External service interaction |
+| 7 | **kahuna_sync** | Nice-to-have automation (deferred) |
 
-**MVP Target:** Tools 1-4 working, tool 5 deferred.
+**MVP Target:** Tools 1-6 implemented, tool 7 deferred.
 
 ---
 
@@ -789,3 +1107,9 @@ Tool descriptions contain full steering context. The agent always knows when to 
   - Rewrote kahuna_initialize: now deploys agent-dev rules + returns onboarding instructions (no longer scaffolds projects)
   - Added kahuna_provide_context: stores org/user context from onboarding or conversation
   - Updated tool count: 5 active tools + 1 deferred
+- v8.0 (2026-03-04): Documentation sync with implementation:
+  - Fixed kahuna_initialize: parameter `project_path` → `targetPath` (required), added `overwrite`
+  - Fixed kahuna_ask: corrected search behavior description (searches KB, uses context-guide for relevance)
+  - Added 4 undocumented tools: kahuna_health_check, kahuna_list_integrations, kahuna_use_integration, kahuna_verify_integration
+  - Added Integrations and Diagnostics tool categories
+  - Updated tool count: 10 active tools + 1 deferred

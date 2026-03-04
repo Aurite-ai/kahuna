@@ -121,8 +121,9 @@ apps/
     │   ├── knowledge/      # Knowledge base domain logic
     │   │   ├── agents/     # Agent prompts, tools, shared runner
     │   │   ├── storage/    # KB storage service, types, utilities
-    │   │   └── surfacing/  # Context writer
-    │   ├── tools/          # MCP tool handlers (learn, ask, prepare-context, health-check, initialize)
+    │   │   └── surfacing/  # Context writer, file tree, framework copier
+    │   ├── integrations/   # Integration discovery, verification, execution
+    │   ├── tools/          # MCP tool handlers (10 tools: initialize, learn, ask, etc.)
     │   ├── config.ts       # Centralized configuration (models, server constants)
     │   └── index.ts        # Server entry point
     └── templates/          # VCK templates (bundled with MCP server)
