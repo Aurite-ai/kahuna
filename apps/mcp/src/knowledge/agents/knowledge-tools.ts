@@ -10,6 +10,7 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import { z } from 'zod';
 import { getFrameworkIds } from '../../config.js';
+import { generateProjectHash } from '../../tools/onboarding-check.js';
 import type { KnowledgeStorageService } from '../storage/types.js';
 
 // =============================================================================
@@ -280,7 +281,9 @@ export async function executeKnowledgeTool(
 ): Promise<string> {
   switch (toolName) {
     case 'list_knowledge_files': {
-      const entries = await storage.list({ status: 'active' });
+      // Only include files from base directory and current project's subdirectory
+      const projectHash = generateProjectHash(process.cwd());
+      const entries = await storage.list({ status: 'active' }, [projectHash]);
       if (entries.length === 0) {
         return 'No files in knowledge base.';
       }
@@ -304,7 +307,16 @@ export async function executeKnowledgeTool(
         return `Invalid input: ${issues}`;
       }
       const { slug } = parseResult.data;
-      const entry = await storage.get(slug);
+
+      // Try base directory first
+      let entry = await storage.get(slug);
+
+      // If not found, try project subdirectory
+      if (!entry) {
+        const projectHash = generateProjectHash(process.cwd());
+        entry = await storage.get(slug, projectHash);
+      }
+
       if (!entry) {
         return `File not found: ${slug}`;
       }

@@ -177,43 +177,79 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
   /**
    * List all knowledge entries with optional filtering.
    *
-   * Reads all .mdc files from the directory, parses them,
+   * Reads all .mdc files from the directory and subdirectories, parses them,
    * and applies filters in memory. No tag-based filtering (tags removed).
+   *
+   * @param filter - Optional filter criteria
+   * @param subdirectories - Optional array of subdirectories to include. If null/undefined, scans ALL subdirectories. Pass empty array [] to scan only base directory.
    */
-  async list(filter?: KnowledgeEntryFilter): Promise<KnowledgeEntry[]> {
+  async list(
+    filter?: KnowledgeEntryFilter,
+    subdirectories?: string[] | null
+  ): Promise<KnowledgeEntry[]> {
     await this.ensureDir();
 
-    // Read directory contents
-    let files: string[];
-    try {
-      files = await fs.readdir(this.baseDir);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return [];
-      }
-      throw new KnowledgeStorageError(
-        `Failed to read knowledge directory: ${this.baseDir}`,
-        'DIR_ERROR',
-        error instanceof Error ? error : undefined
-      );
-    }
-
-    // Filter for .mdc files
-    const mdcFiles = files.filter((f) => f.endsWith('.mdc'));
-
-    // Parse all files
     const entries: KnowledgeEntry[] = [];
-    for (const filename of mdcFiles) {
+
+    // Helper function to read .mdc files from a directory
+    const readMdcFiles = async (dirPath: string, subdirectory?: string): Promise<void> => {
+      let files: string[];
       try {
-        const slug = filename.replace(/\.mdc$/, '');
-        const content = await fs.readFile(path.join(this.baseDir, filename), 'utf-8');
-        const parsed = parseMdcFile(content);
-        entries.push({ ...parsed.frontmatter, slug, content: parsed.body });
+        files = await fs.readdir(dirPath);
       } catch (error) {
-        // Log warning but don't fail the entire operation
-        console.warn(`Failed to parse ${filename}:`, error);
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          return;
+        }
+        throw new KnowledgeStorageError(
+          `Failed to read directory: ${dirPath}`,
+          'DIR_ERROR',
+          error instanceof Error ? error : undefined
+        );
+      }
+
+      // Filter for .mdc files
+      const mdcFiles = files.filter((f) => f.endsWith('.mdc'));
+
+      // Parse all files
+      for (const filename of mdcFiles) {
+        try {
+          const slug = filename.replace(/\.mdc$/, '');
+          const content = await fs.readFile(path.join(dirPath, filename), 'utf-8');
+          const parsed = parseMdcFile(content);
+          entries.push({ ...parsed.frontmatter, slug, content: parsed.body });
+        } catch (error) {
+          // Log warning but don't fail the entire operation
+          const displayPath = subdirectory ? `${subdirectory}/${filename}` : filename;
+          console.warn(`Failed to parse ${displayPath}:`, error);
+        }
+      }
+    };
+
+    // Read from base directory
+    await readMdcFiles(this.baseDir);
+
+    // Determine which subdirectories to scan
+    if (subdirectories === null || subdirectories === undefined) {
+      // Scan ALL subdirectories
+      try {
+        const allFiles = await fs.readdir(this.baseDir, { withFileTypes: true });
+        const subdirs = allFiles.filter((f) => f.isDirectory()).map((f) => f.name);
+        for (const subdir of subdirs) {
+          const subdirPath = path.join(this.baseDir, subdir);
+          await readMdcFiles(subdirPath, subdir);
+        }
+      } catch (error) {
+        // If we can't read subdirectories, just continue with base directory files
+        console.warn('Failed to scan subdirectories:', error);
+      }
+    } else if (subdirectories.length > 0) {
+      // Scan specific subdirectories
+      for (const subdir of subdirectories) {
+        const subdirPath = path.join(this.baseDir, subdir);
+        await readMdcFiles(subdirPath, subdir);
       }
     }
+    // If subdirectories is empty array [], only base directory is scanned (already done above)
 
     // Apply filters if provided
     if (!filter) return entries;

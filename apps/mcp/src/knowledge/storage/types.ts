@@ -159,8 +159,10 @@ export interface KnowledgeStorageService {
 
   /**
    * List all knowledge entries (with optional filtering).
+   * @param filter - Optional filter criteria
+   * @param subdirectories - Optional array of subdirectories to include. If null/undefined, scans ALL subdirectories. Pass empty array [] to scan only base directory.
    */
-  list(filter?: KnowledgeEntryFilter): Promise<KnowledgeEntry[]>;
+  list(filter?: KnowledgeEntryFilter, subdirectories?: string[] | null): Promise<KnowledgeEntry[]>;
 
   /**
    * Get a single entry by slug.

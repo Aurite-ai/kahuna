@@ -107,7 +107,8 @@ describe('executeKnowledgeTool', () => {
 
       await executeKnowledgeTool('list_knowledge_files', {}, storage);
 
-      expect(storage.list).toHaveBeenCalledWith({ status: 'active' });
+      // Now includes project hash as second parameter
+      expect(storage.list).toHaveBeenCalledWith({ status: 'active' }, expect.any(Array));
     });
 
     it('handles entry with empty topics', async () => {
