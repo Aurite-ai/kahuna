@@ -1,6 +1,6 @@
-# Kahuna MCP - Knowledge Architecture
+# Kahuna - Knowledge Architecture
 
-**Status:** Final
+**Status:** Draft
 **Date:** 2026-03-04
 **Parent:** [README.md](./README.md)
 
@@ -8,470 +8,265 @@
 
 ## Overview
 
-Kahuna maintains a **global knowledge base** at `~/.kahuna/` that stores classified files from all projects. When a copilot needs context for a task, Kahuna surfaces relevant entries from the knowledge base to the project's `.kahuna/context-guide.md` file.
+Kahuna's knowledge architecture is a **Context Management System (CMS)** that enables copilots to learn from user-provided information and surface relevant context for tasks. The system handles knowledge at multiple scope levels (user, organization, project) and manages the flow of context between them.
 
-### Two-Stage Architecture
+### Core Principles
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                           KNOWLEDGE FLOW                                     │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   STAGE 1: LEARN                                                             │
-│   ──────────────                                                             │
-│                                                                              │
-│   User files ────► kahuna_learn ────► ~/.kahuna/                             │
-│   (policies, specs,                   (classified, stored)                   │
-│    conversations)                                                            │
-│                                                                              │
-│   - Files are classified by type                                             │
-│   - Metadata added (source, date, project)                                   │
-│   - Stored in knowledge base                                                 │
-│   - NOT written to project .kahuna/context-guide.md yet                              │
-│                                                                              │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   STAGE 2: PREPARE                                                           │
-│   ────────────────                                                           │
-│                                                                              │
-│   Task description ────► kahuna_prepare_context ────► .kahuna/context-guide.md       │
-│                                                       (task-relevant)        │
-│                                                                              │
-│   - Searches knowledge base for relevant entries                             │
-│   - Surfaces subset to project's .kahuna/context-guide.md                            │
-│   - Copilot reads .kahuna/context-guide.md during task                               │
-│                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Key Principle: Separation of Storage and Surfacing
-
-| Stage | Tool | What Happens | Output Location |
-|-------|------|--------------|-----------------|
-| **Learn** | `kahuna_learn` | Classify and store | `~/.kahuna/` |
-| **Prepare** | `kahuna_prepare_context` | Search and surface | `project/.kahuna/context-guide.md` |
+1. **Separation of Learning and Surfacing** — Knowledge ingestion and context retrieval are distinct operations with different goals
+2. **Project Isolation by Default** — Knowledge learned in a project stays in that project unless explicitly promoted
+3. **Confidence-Based Promotion** — Cross-project knowledge requires high confidence; uncertain knowledge stays project-scoped
+4. **Foundation Context Always Available** — User and organization context is always included regardless of project
 
 ---
 
-## Knowledge Base: ~/.kahuna/
+## System Architecture
 
-The global knowledge base lives at `~/.kahuna/`. This folder is:
-- **Persistent** - Survives across sessions
-- **Global** - Shared across all projects
-- **Hidden** - User doesn't interact directly
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         CONTEXT MANAGEMENT SYSTEM                               │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  ┌─────────────────────────────────┐    ┌─────────────────────────────────┐    │
+│  │  CONTEXT LEARNING SYSTEM        │    │  CONTEXT SURFACING SYSTEM       │    │
+│  │                                 │    │                                 │    │
+│  │  Ingests new knowledge          │    │  Retrieves relevant context     │    │
+│  │  Maintains existing knowledge   │    │  for copilot tasks              │    │
+│  │                                 │    │                                 │    │
+│  │  Tools:                         │    │  Tools:                         │    │
+│  │  - kahuna_learn                 │    │  - kahuna_prepare_context       │    │
+│  │  - kahuna_provide_context       │    │  - kahuna_ask                   │    │
+│  │                                 │    │                                 │    │
+│  └─────────────────────────────────┘    └─────────────────────────────────┘    │
+│                                                                                 │
+│                        ┌─────────────────────────────────────────┐              │
+│                        │           KNOWLEDGE BASE                │              │
+│                        │           ~/.kahuna/                    │              │
+│                        │                                         │              │
+│                        │   Global knowledge + Project knowledge  │              │
+│                        │   Scoped by level                       │              │
+│                        └─────────────────────────────────────────┘              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
 
-### Folder Structure
+---
+
+## Context Levels
+
+Knowledge exists at different scope levels, forming a hierarchy:
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                         USER CONTEXT                              │
+│   Personal preferences, working style, individual patterns        │
+│   Always included. Never project-specific.                        │
+├───────────────────────────────────────────────────────────────────┤
+│                     ORGANIZATION CONTEXT                          │
+│   Company policies, domain knowledge, tech stack preferences      │
+│   Always included. Applies across all projects.                   │
+├───────────────────────────────────────────────────────────────────┤
+│                 MULTI-PROJECT KNOWLEDGE                           │
+│   Patterns, policies, decisions applicable to multiple projects   │
+│   Surfaced when relevant. Not always project-specific.            │
+├───────────────────────────────────────────────────────────────────┤
+│                       PROJECT CONTEXT                             │
+│   Project-specific decisions, architecture, implementation        │
+│   Isolated by default. Primary storage location for new knowledge │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### Foundation Context
+
+**User context** and **organization context** are **foundation context** — they are always included when surfacing context, without agent selection. These represent stable, cross-cutting information that applies regardless of the specific task or project.
+
+### Project Isolation
+
+New knowledge is stored at the **project level by default**. This prevents context bleed between unrelated projects. Knowledge can be promoted to higher levels (multi-project or org) when there's high confidence it applies broadly.
+
+---
+
+## Context Learning System
+
+The Context Learning System handles knowledge ingestion and maintenance. It has two internal flows:
+
+### Learn Flow
+
+When new information arrives via `kahuna_learn`:
+
+1. **Classify** — Determine category, topics, and scope applicability
+2. **Evaluate Scope** — Assess whether this is project-specific or broadly applicable
+3. **Store** — Write to appropriate location based on scope decision
+4. **Report** — Return summary to copilot, including any contradictions detected
+
+### Maintenance Flow
+
+After the learn flow completes, the maintenance flow reviews existing knowledge:
+
+1. **Triggered by** — Completion of learn flow (new knowledge provides additional context)
+2. **Reviews** — Existing project-level entries for potential promotion
+3. **Evaluates** — Cross-project patterns, staleness, contradictions
+4. **Actions** — Promote, archive, flag for user attention, or leave as-is
+
+### Scope Decision Logic
+
+When determining where to store knowledge:
+
+| Confidence | Scope Assessment | Action |
+|------------|------------------|--------|
+| **High** | Clearly org-wide | Store at org level |
+| **High** | Clearly multi-project | Store at multi-project level |
+| **Low/Medium** | Uncertain | Store at project level, flag for later review |
+| **Any** | Clearly project-specific | Store at project level |
+
+The bias is toward **project-level storage** when uncertain. This is conservative — it prevents over-sharing while allowing promotion later when more evidence accumulates.
+
+---
+
+## Context Surfacing System
+
+The Context Surfacing System retrieves relevant knowledge for copilot tasks.
+
+### Prepare Context Flow
+
+When `kahuna_prepare_context` is called:
+
+1. **Receive** — Task description and optional hints
+2. **Include Foundation** — Always add user-context and org-context
+3. **Search** — Find relevant entries across appropriate scope levels
+4. **Select** — Choose most relevant entries for the task
+5. **Surface** — Write to project's `.kahuna/context-guide.md`
+
+### Search Scope Logic
+
+The surfacing system searches across scope levels with different priorities:
+
+| Level | Priority | When Searched |
+|-------|----------|---------------|
+| Foundation (user, org) | Always | Every prepare_context call |
+| Current Project | High | Always for current project |
+| Multi-Project | Medium | When task might benefit from cross-project patterns |
+| Other Projects | Low | When explicitly relevant (related projects, predecessors) |
+
+### Cross-Project Retrieval
+
+Rather than requiring all useful knowledge to be promoted, the surfacing system can search **sideways** across related projects when appropriate. This handles cases like:
+
+- **Related projects** — Frontend and backend of the same product
+- **Predecessor projects** — Abandoned attempt, lessons learned
+- **Shared libraries** — Common code used across multiple projects
+
+---
+
+## Project Identity
+
+A "project" in Kahuna is the **workspace where `kahuna_initialize` was run**. This is the simplest useful definition.
+
+### Identity Mechanism
+
+- **Current approach:** Workspace path (e.g., `/home/user/my-project`)
+- **Storage:** Project knowledge stored in project-specific subfolder within KB
+
+### Trade-offs
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| Path-based | Simple, unambiguous | Breaks if project moved |
+| Name-based | Survives moves | Collision risk |
+| Git remote | Survives clone/move | Not all projects have git |
+| Hybrid | Flexible | Complex |
+
+For now, **path-based identity** is sufficient. More sophisticated identity can be added when real problems emerge.
+
+---
+
+## Knowledge Base Structure
 
 ```
 ~/.kahuna/
-├── knowledge/                # Classified knowledge entries (.mdc files)
-│   ├── api-design-guidelines.mdc    # Slug-based naming
-│   ├── org-context.mdc              # Organization context
-│   ├── user-context.mdc             # User preferences
-│   └── ...
+├── knowledge/                    # Org-level and multi-project knowledge
+│   ├── org-context.mdc          # Organization context (foundation)
+│   ├── user-context.mdc         # User preferences (foundation)
+│   └── [slug].mdc               # Other org-level entries
 │
-└── integrations/             # Discovered integration descriptors
-    └── ...
+└── projects/                     # Project-specific knowledge
+    ├── [project-id]/
+    │   └── knowledge/
+    │       └── [slug].mdc
+    └── [project-id]/
+        └── knowledge/
+            └── [slug].mdc
 ```
 
-### .mdc Format (Markdown with Context)
+### .mdc Format
 
-All knowledge entries use the `.mdc` format - a single file combining YAML frontmatter metadata with markdown content.
+All knowledge entries use the `.mdc` format — markdown with YAML frontmatter:
 
-**Example knowledge entry:** `~/.kahuna/knowledge/api-design-guidelines.mdc`
-
-```markdown
+```yaml
 ---
 type: knowledge
-title: API Design Guidelines
-summary: >
-  REST API design standards covering naming conventions, error response format,
-  and authentication requirements.
-created_at: 2026-02-10T00:00:00Z
-updated_at: 2026-02-10T00:00:00Z
+title: Entry Title
+summary: Brief description
+created_at: 2026-03-04T00:00:00Z
+updated_at: 2026-03-04T00:00:00Z
 
 source:
-  file: api-guidelines.md
-  path: /home/user/my-project/docs/api-guidelines.md
-  project: /home/user/my-project
+  file: original-filename.md
+  path: /full/path/to/file.md
+  project: /workspace/path
 
 classification:
-  category: policy
-  confidence: 0.92
-  reasoning: Contains organizational rules and constraints for API design
+  category: policy | requirement | reference | decision | pattern | context
+  confidence: 0.0-1.0
+  reasoning: Why this classification
   topics:
-    - API Design
-    - REST Conventions
-    - Authentication
+    - Natural language topic phrases
 
-status: active
+scope:
+  level: user | org | multi-project | project
+  promotion_candidate: true | false
+
+status: active | archived
 ---
 
-[Original file content here]
+[Content here]
 ```
-
-### Classification Categories
-
-Categories determined by LLM agent during `kahuna_learn`:
-
-| Category | Description | Examples |
-|----------|-------------|----------|
-| **policy** | Business rules, constraints, organizational standards | API guidelines, security policies |
-| **requirement** | Requirements, specifications, user stories | PRDs, feature specs |
-| **reference** | Technical documentation, API specs, schemas | API docs, architecture docs |
-| **decision** | Decision records, rationale, trade-off analyses | ADRs, technology choices |
-| **pattern** | Implementation patterns, reusable examples | Code patterns, config templates |
-| **context** | General background, overviews, or unclear fit | README files, onboarding docs |
-
-> **Note:** The `integration` category is defined in the type system but currently has a bug preventing its use. Integration detection is handled separately via pattern matching during `kahuna_learn`.
-
-### Integration Discovery
-
-Integrations (external services, APIs, databases) are discovered during `kahuna_learn` through:
-1. **Pattern matching** - Detecting service names, connection strings, SDK imports
-2. **1Password references** - Extracting credentials references
-
-Discovered integrations are stored in `~/.kahuna/integrations/` and can be:
-- Listed via `kahuna_list_integrations`
-- Verified via `kahuna_verify_integration`
-- Executed via `kahuna_use_integration`
-
----
-
-## Project Context: .kahuna/context-guide.md
-
-Each project has a `.kahuna/context-guide.md` file that receives surfaced knowledge.
-
-### Folder Structure
-
-```
-project/
-└── .kahuna/context-guide.md
-```
-
-### How .kahuna/context-guide.md Gets Populated
-
-`kahuna_prepare_context` populates `.kahuna/context-guide.md` with task-relevant entries:
-
-1. **Receives** task description
-2. **Searches** `~/.kahuna/knowledge/` for relevant entries
-3. **Generates** `.kahuna/context-guide.md` with navigation
-
-### README.md Format
-
-```markdown
-# Context for: Add rate limiting to the search tool
-
-Surfaced from Kahuna knowledge base on 2026-02-05.
-
-## Relevant Context
-
-| File | Why Relevant |
-|------|--------------|
-| [api-guidelines.md](./api-guidelines.md) | Contains rate limiting requirements |
-| [error-handling.md](./error-handling.md) | Error handling patterns to follow |
-| [search-decision.md](./search-decision.md) | Existing search implementation context |
-
-## Getting Started
-
-1. Review the API guidelines for rate limiting requirements
-2. Follow error handling patterns for rate limit errors
-3. Consider existing search implementation when adding rate limiting
-
----
-
-*Prepared by Kahuna | Use `kahuna_ask` for additional questions*
-```
-
----
-
-## Tool Interactions
-
-### Tool Categories
-
-| Category | Tools | Data Flow |
-|----------|-------|-----------|
-| **Building KB** | learn | Files → ~/.kahuna/knowledge/ |
-| **Environment** | initialize, prepare_context | ~/.kahuna → .kahuna/context-guide.md |
-| **Assistance** | ask | ~/.kahuna/knowledge/ → response |
-| **Integrations** | list_integrations, use_integration, verify_integration | ~/.kahuna/integrations/ |
-
-### kahuna_initialize (Environment)
-
-**Creates:**
-- Copilot configuration in project `.claude/` directory
-- Seeds knowledge base with initial `.mdc` files
-
-**Does not create:** `context-guide.md` (that's `kahuna_prepare_context`)
-
-### kahuna_learn (Building KB)
-
-**Reads:**
-- User-provided files/folders (recursive)
-
-**Writes to ~/.kahuna/:**
-- New `.mdc` file in `knowledge/[slug].mdc` (slug-based naming, not UUIDs)
-- YAML frontmatter with classification metadata
-- Markdown content below frontmatter
-- Integration descriptors to `integrations/` if detected
-
-**Does NOT write to:** `project/.kahuna/context-guide.md`
-
-### kahuna_prepare_context (Environment)
-
-**Reads:**
-- Task description
-- `~/.kahuna/knowledge/` entries
-
-**Writes to project/.kahuna/context-guide.md:**
-- File paths referencing KB entries (not copies)
-- Foundation context (`org-context`, `user-context`) auto-included
-
-### kahuna_ask (Assistance)
-
-**Reads:**
-1. `project/.kahuna/context-guide.md` (if exists) - to know what's already surfaced
-2. `~/.kahuna/knowledge/` - searches for answer
-
-**Writes:** Nothing (returns text response)
-
----
-
-## Classification Flow
-
-For `kahuna_learn`, the classification is LLM-powered:
-
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        CLASSIFICATION FLOW                                   │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   1. RECEIVE FILE                                                            │
-│      └── Get file path + optional description                                │
-│                                                                              │
-│   2. READ CONTENT                                                            │
-│      └── Load file content                                                   │
-│                                                                              │
-│   3. CLASSIFY (LLM Agent - Haiku)                                            │
-│      └── Agent uses categorize_file tool to determine:                       │
-│          ├── Category (policy, requirement, reference, etc.)                 │
-│          ├── Confidence score                                                │
-│          ├── Reasoning                                                       │
-│          ├── Title (LLM-generated)                                           │
-│          ├── Summary                                                         │
-│          └── Topics (natural language phrases)                               │
-│                                                                              │
-│   4. DETECT CONTRADICTIONS                                                   │
-│      └── Agent compares with existing KB files                               │
-│                                                                              │
-│   5. STORE                                                                   │
-│      └── Write single .mdc file to ~/.kahuna/knowledge/[slug].mdc            │
-│          (YAML frontmatter + markdown content)                               │
-│                                                                              │
-│   6. REPORT                                                                  │
-│      └── Return summary with contradictions if found                         │
-│                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Surfacing Flow (MVP)
-
-For `kahuna_prepare_context`, the MVP surfacing process:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         SURFACING FLOW                                      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   1. RECEIVE TASK                                                           │
-│      └── Get task description + optional file hints                         │
-│                                                                             │
-│   2. PARSE INTENT                                                           │
-│      ├── Extract keywords                                                   │
-│      ├── Identify topic areas                                               │
-│      └── Note file references                                               │
-│                                                                             │
-│   3. SEARCH KNOWLEDGE BASE                                                  │
-│      ├── Scan ~/.kahuna/knowledge/ metadata                                 │
-│      ├── Score relevance by:                                                │
-│      │   ├── Tag matches                                                    │
-│      │   ├── Category matches                                               │
-│      │   ├── Title/content keyword matches                                  │
-│      │   └── Project relevance (same project = higher)                      │
-│      └── Rank results                                                       │
-│                                                                             │
-│   4. SELECT TOP N                                                           │
-│      └── Take most relevant entries (configurable, default: 5-10)           │
-│                                                                             │
-│   5. SURFACE TO .kahuna/context-guide.md                                            │
-│      ├── Clear .kahuna/context-guide.md (task-specific, replaced each task)         │
-│      ├── Store paths to relevant entries in .kahuna/context-guide.md                │
-│                                                                             │
-│   6. REPORT                                                                 │
-│      └── Return summary of what was surfaced                                │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Evolution Path
-
-The knowledge architecture evolves from simple to sophisticated:
-
-### Phase 1: Classify and Copy (MVP)
-
-**kahuna_learn:**
-- Accept files
-- Basic category classification
-- Store original content with metadata
-
-**kahuna_prepare_context:**
-- Accept task description
-- Simple keyword search on metadata/content
-- Compile relevant entries into .kahuna/context-guide.md
-- Generate navigation and section headers
-
-**Value:** Files are organized and searchable. Context is surfaced per-task.
-
-### Phase 2: Agent-Enhanced Content
-
-**kahuna_learn improvements:**
-- Agents rewrite files into structured markdown
-- Extract key points, summaries
-- Normalize format for consistency
-
-**kahuna_prepare_context improvements:**
-- Agents synthesize new documents from multiple sources
-- Pull relevant portions from several files into one context doc
-- Prepare context in `~/.kahuna/prepared/`, then copy to project
-
-**Value:** Context is higher quality, more focused.
-
-### Phase 3: Intelligent Knowledge Management
-
-- Semantic search (embeddings)
-- Automatic relationship detection
-- Conflict/duplicate resolution
-- Staleness tracking
-- Knowledge graph
-
-**Value:** Knowledge base becomes truly intelligent.
-
----
-
-## Implementation Status
-
-### Implemented
-
-1. **Knowledge base structure**
-   - `~/.kahuna/knowledge/` with flat `.mdc` files
-   - Slug-based naming (human-readable)
-   - YAML frontmatter with simplified metadata
-
-2. **Classification (kahuna_learn)**
-   - LLM-powered categorization (Haiku)
-   - Contradiction detection
-   - Integration discovery via pattern matching
-   - Sensitive data redaction
-
-3. **Surfacing (kahuna_prepare_context)**
-   - LLM agent selects relevant KB files
-   - Foundation context auto-inclusion (org-context, user-context)
-   - Framework selection and boilerplate copying
-   - Writes file paths to `.kahuna/context-guide.md`
-
-4. **Q&A (kahuna_ask)**
-   - LLM agent synthesizes answers from KB (Sonnet)
-   - Aware of already-surfaced context
-
-### Not Implemented
-
-- `kahuna_sync` (conversation processing, git diff)
-- Conversation log storage and retrieval
-- `~/.kahuna/prepared/` staging directory
-
----
-
-## Design Decisions
-
-### Why Global Knowledge Base (~/.kahuna)?
-
-**Decision:** Store knowledge globally at `~/.kahuna/` rather than per-project.
-
-**Rationale:**
-- Knowledge can apply across projects
-- Policies and patterns often shared
-- Avoids duplicating common knowledge
-- Simpler mental model for users
-
-### Why Separate Learn from Prepare?
-
-**Decision:** Two-stage process: learn (store) then prepare (surface).
-
-**Rationale:**
-- Not everything learned is relevant to every task
-- Surfacing can be task-specific
-- Knowledge base grows over time
-- Prepare can be smart about what's relevant
-
-### Why Single File Instead of Multiple Files?
-
-**Decision:** Generate single `.kahuna/context-guide.md` file rather than multiple files.
-
-**Rationale:**
-- Copilots read files directly
-- No dependency on Kahuna at read time
-- Context is portable (can be committed)
-- Simpler debugging
-
-### Why .mdc Format Over Folder+JSON?
-
-**Decision:** Use single `.mdc` files (markdown with YAML frontmatter) instead of folders with separate `metadata.json` and `content.md`.
-
-**Rationale:**
-- **Simpler structure** - One file instead of two
-- **Consistent** - Same format for knowledge entries and conversation logs
-- **Self-contained** - Metadata and content together
-- **Standard format** - YAML frontmatter is widely understood
-- **Easier debugging** - Can read/edit with any text editor
 
 ---
 
 ## Open Questions
 
-1. **Multi-project knowledge:** Should knowledge be tagged by project? Global search or project-scoped?
+### Scope & Boundaries
+- What specific criteria make knowledge "obviously org-level" vs "uncertain"?
+- How does the maintenance flow decide when to promote?
 
-## Resolved Questions
+### Cross-Project
+- How does the system identify "related projects"?
+- What signals indicate that cross-project search would be valuable?
 
-**Context regeneration (resolved):** When preparing context for a new task:
-- **Overwrite** `.kahuna/context-guide.md` - Entire file is regenerated each time
-- This ensures task context is always fresh and relevant
+### Identity Lifecycle
+- How are projects renamed or merged?
+- What happens to orphaned project folders?
 
-**Foundation context (resolved):**
-- `org-context` and `user-context` KB entries are auto-included in every `prepare_context`
-- No agent selection required for these foundation entries
+---
+
+## Design Decisions
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| D1 | **Project isolation by default** | Prevents context pollution between unrelated projects |
+| D2 | **Confidence-based promotion** | Conservative approach — uncertain knowledge stays local |
+| D3 | **Foundation context always included** | User and org context applies everywhere |
+| D4 | **Learn triggers maintenance** | Fresh context helps maintenance make better decisions |
+| D5 | **Path-based project identity** | Simplest approach that works; can evolve later |
+| D6 | **Cross-project search over eager promotion** | Don't move knowledge up; search sideways when needed |
 
 ---
 
 ## Changelog
 
-- v1.0 (2026-02-05): Initial knowledge architecture specification
-- v2.0 (2026-02-05): Revised to two-stage model: learn → ~/.kahuna, prepare → .kahuna/context-guide.md
-- v2.1 (2026-02-05): Added evolution path, conversation log format, prepared staging
-- v2.2 (2026-02-05): Tool categories; assistance tools use .kahuna/context-guide.md + KB; learn accepts folders
-- v2.3 (2026-02-05): Changed to .mdc format (YAML frontmatter + markdown) instead of folder+JSON
-- v2.4 (2026-02-05): Fixed Tool Interactions to use .mdc; resolved context merging question
-- v3.0 (2026-02-05): Promoted to docs/design/; updated links and status to Final
-- v3.1 (2026-02-09): Renamed kahuna_setup → kahuna_initialize; removed kahuna_review (now skill-based)
-- v3.2 (2026-02-09): Added `integration` category for data sources, tools, and external services
-- v4.0 (2026-03-04): Synced with implementation:
-  - Fixed folder structure (removed unimplemented config.json, state.json, conversations/, prepared/)
-  - Fixed file naming (slug-based, not UUID)
-  - Fixed metadata format (simplified: category, confidence, reasoning, title, summary, topics)
-  - Fixed classification flow (LLM-only, no heuristics)
-  - Removed conversation log format section (not implemented)
-  - Updated tool interactions to match implementation
-  - Added foundation context auto-inclusion
+- v5.0 (2026-03-04): Complete rewrite as abstract design document
+  - Introduced CMS architecture with CLS/CSS subsystems
+  - Added context levels hierarchy
+  - Added scope decision logic with confidence model
+  - Added maintenance flow concept
+  - Removed implementation-specific details (moved to architecture doc)
