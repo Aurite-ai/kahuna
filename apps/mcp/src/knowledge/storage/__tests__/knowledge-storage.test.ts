@@ -534,4 +534,156 @@ describe('FileKnowledgeStorageService', () => {
       expect(list).toHaveLength(3);
     });
   });
+
+  describe('subdirectory filtering', () => {
+    it('lists only base directory files when subdirectories is empty array', async () => {
+      // Create files in base directory
+      await storage.save(createTestInput({ title: 'Base File 1' }));
+      await storage.save(createTestInput({ title: 'Base File 2' }));
+
+      // Create files in subdirectories
+      await storage.save(createTestInput({ title: 'Project A File', subdirectory: 'abc123' }));
+      await storage.save(createTestInput({ title: 'Project B File', subdirectory: 'def456' }));
+
+      // List with empty array should only return base directory files
+      const entries = await storage.list({}, []);
+
+      expect(entries).toHaveLength(2);
+      expect(entries.map((e) => e.title).sort()).toEqual(['Base File 1', 'Base File 2']);
+    });
+
+    it('lists base directory and specific subdirectory files', async () => {
+      // Create files in base directory
+      await storage.save(createTestInput({ title: 'Base File' }));
+
+      // Create files in multiple subdirectories
+      await storage.save(createTestInput({ title: 'Project A File', subdirectory: 'abc123' }));
+      await storage.save(createTestInput({ title: 'Project B File', subdirectory: 'def456' }));
+      await storage.save(createTestInput({ title: 'Project C File', subdirectory: 'ghi789' }));
+
+      // List with specific subdirectory should return base + that subdirectory
+      const entries = await storage.list({}, ['abc123']);
+
+      expect(entries).toHaveLength(2);
+      expect(entries.map((e) => e.title).sort()).toEqual(['Base File', 'Project A File']);
+    });
+
+    it('lists base directory and multiple specific subdirectories', async () => {
+      // Create files in base directory
+      await storage.save(createTestInput({ title: 'Base File' }));
+
+      // Create files in multiple subdirectories
+      await storage.save(createTestInput({ title: 'Project A File', subdirectory: 'abc123' }));
+      await storage.save(createTestInput({ title: 'Project B File', subdirectory: 'def456' }));
+      await storage.save(createTestInput({ title: 'Project C File', subdirectory: 'ghi789' }));
+
+      // List with multiple subdirectories
+      const entries = await storage.list({}, ['abc123', 'ghi789']);
+
+      expect(entries).toHaveLength(3);
+      expect(entries.map((e) => e.title).sort()).toEqual([
+        'Base File',
+        'Project A File',
+        'Project C File',
+      ]);
+    });
+
+    it('lists all subdirectories when subdirectories parameter is null', async () => {
+      // Create files in base directory
+      await storage.save(createTestInput({ title: 'Base File' }));
+
+      // Create files in multiple subdirectories
+      await storage.save(createTestInput({ title: 'Project A File', subdirectory: 'abc123' }));
+      await storage.save(createTestInput({ title: 'Project B File', subdirectory: 'def456' }));
+      await storage.save(createTestInput({ title: 'Project C File', subdirectory: 'ghi789' }));
+
+      // List with null should scan all subdirectories
+      const entries = await storage.list({}, null);
+
+      expect(entries).toHaveLength(4);
+      expect(entries.map((e) => e.title).sort()).toEqual([
+        'Base File',
+        'Project A File',
+        'Project B File',
+        'Project C File',
+      ]);
+    });
+
+    it('lists all subdirectories when subdirectories parameter is undefined', async () => {
+      // Create files in base directory
+      await storage.save(createTestInput({ title: 'Base File' }));
+
+      // Create files in multiple subdirectories
+      await storage.save(createTestInput({ title: 'Project A File', subdirectory: 'abc123' }));
+      await storage.save(createTestInput({ title: 'Project B File', subdirectory: 'def456' }));
+
+      // List with undefined (default) should scan all subdirectories
+      const entries = await storage.list({}, undefined);
+
+      expect(entries).toHaveLength(3);
+      expect(entries.map((e) => e.title).sort()).toEqual([
+        'Base File',
+        'Project A File',
+        'Project B File',
+      ]);
+    });
+
+    it('applies filters when listing with subdirectory restriction', async () => {
+      // Create files in base directory
+      await storage.save(
+        createTestInput({ title: 'Base Policy', category: 'policy', content: 'Policy content' })
+      );
+      await storage.save(
+        createTestInput({
+          title: 'Base Reference',
+          category: 'reference',
+          content: 'Reference content',
+        })
+      );
+
+      // Create files in subdirectory
+      await storage.save(
+        createTestInput({
+          title: 'Project Policy',
+          category: 'policy',
+          content: 'Project policy',
+          subdirectory: 'abc123',
+        })
+      );
+      await storage.save(
+        createTestInput({
+          title: 'Project Reference',
+          category: 'reference',
+          content: 'Project reference',
+          subdirectory: 'abc123',
+        })
+      );
+
+      // Create file in different subdirectory
+      await storage.save(
+        createTestInput({
+          title: 'Other Project Policy',
+          category: 'policy',
+          subdirectory: 'def456',
+        })
+      );
+
+      // List with category filter and subdirectory restriction
+      const entries = await storage.list({ category: 'policy' }, ['abc123']);
+
+      expect(entries).toHaveLength(2);
+      expect(entries.map((e) => e.title).sort()).toEqual(['Base Policy', 'Project Policy']);
+    });
+
+    it('handles non-existent subdirectory gracefully', async () => {
+      // Create files in base directory
+      await storage.save(createTestInput({ title: 'Base File' }));
+
+      // List with non-existent subdirectory should only return base files
+      const entries = await storage.list({}, ['nonexistent']);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].title).toBe('Base File');
+    });
+  });
 });
