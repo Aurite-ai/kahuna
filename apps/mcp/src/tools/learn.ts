@@ -456,9 +456,8 @@ export async function learnToolHandler(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<MCPToolResponse> {
-  // TEMPORARY: Hardcoded flag to test project-specific storage
-  // TODO: Replace with actual logic to determine if content is project-specific
-  const isProjectContext = true;
+  // Read project context flag from environment variable (defaults to false)
+  const isProjectContext = process.env.KB_PROJECT_CONTEXT === 'true';
 
   const { storage, anthropic, usageTracker } = ctx;
 
