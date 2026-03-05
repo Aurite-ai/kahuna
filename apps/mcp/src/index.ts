@@ -96,6 +96,7 @@ import {
 import { FileKnowledgeStorageService } from './knowledge/index.js';
 import { askTool } from './tools/ask.js';
 import { deleteTool } from './tools/delete.js';
+import { discoverIntegrationTool } from './tools/discover-integration.js';
 import { healthCheckTool } from './tools/health-check.js';
 import { initializeTool } from './tools/initialize.js';
 import { learnTool } from './tools/learn.js';
@@ -103,6 +104,7 @@ import { listIntegrationsTool } from './tools/list-integrations.js';
 import { prepareContextTool } from './tools/prepare-context.js';
 import { provideContextTool } from './tools/provide-context.js';
 import type { ToolContext } from './tools/types.js';
+import { updateConnectorTool } from './tools/update-connector.js';
 import { usageTool } from './tools/usage.js';
 import { useIntegrationTool } from './tools/use-integration.js';
 import { verifyIntegrationTool } from './tools/verify-integration.js';
@@ -129,6 +131,8 @@ const allTools = [
   listIntegrationsTool.definition,
   useIntegrationTool.definition,
   verifyIntegrationTool.definition,
+  discoverIntegrationTool.definition,
+  updateConnectorTool.definition,
 ];
 
 /**
@@ -174,6 +178,12 @@ async function routeToolCall(
 
     case 'kahuna_verify_integration':
       return verifyIntegrationTool.handler(args, ctx);
+
+    case 'kahuna_discover_integration':
+      return discoverIntegrationTool.handler(args, ctx);
+
+    case 'kahuna_update_connector':
+      return updateConnectorTool.handler(args, ctx);
 
     default:
       return {
