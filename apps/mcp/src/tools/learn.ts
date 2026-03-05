@@ -664,7 +664,7 @@ export async function learnToolHandler(
       const uniqueTitle = `${catResult.title} [${projectHash}]`;
 
       // Check if an entry with this title already exists
-      const existingEntries = await storage.list({ status: 'active' });
+      const existingEntries = await storage.list({ status: 'active' }, [projectHash]);
       const existingEntry = existingEntries?.find((e) => e.title === uniqueTitle);
       const existingSlug = existingEntry?.slug;
 
