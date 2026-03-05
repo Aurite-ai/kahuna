@@ -9,6 +9,24 @@
  */
 
 // =============================================================================
+// FEATURE FLAGS
+// =============================================================================
+
+/**
+ * Feature flags to control which features are enabled in the build.
+ * In the future, these may be loaded from a plugin system.
+ */
+export const FEATURE_FLAGS = {
+  /**
+   * Enable Perplexity web search for integration discovery.
+   * Default: false (disabled)
+   *
+   * To enable, set ENABLE_PERPLEXITY_INTEGRATION=true and PERPLEXITY_API_KEY.
+   */
+  ENABLE_PERPLEXITY_INTEGRATION: process.env.ENABLE_PERPLEXITY_INTEGRATION === 'true',
+} as const;
+
+// =============================================================================
 // MODEL CONFIGURATION
 // =============================================================================
 

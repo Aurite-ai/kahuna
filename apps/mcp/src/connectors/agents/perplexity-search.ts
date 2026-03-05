@@ -5,8 +5,11 @@
  * Uses Perplexity's online models which have access to current web information.
  *
  * API Reference: https://docs.perplexity.ai/api-reference/chat-completions
+ *
+ * This integration is behind a feature flag (ENABLE_PERPLEXITY_INTEGRATION).
  */
 
+import { FEATURE_FLAGS } from '../../config.js';
 import type { WebSearchResult } from './research-tools.js';
 
 // =============================================================================
@@ -275,7 +278,19 @@ Include:
 
 /**
  * Check if Perplexity API is configured and available.
+ *
+ * Returns true only if:
+ * 1. ENABLE_PERPLEXITY_INTEGRATION feature flag is set to 'true'
+ * 2. PERPLEXITY_API_KEY environment variable is set
+ *
+ * When this returns false, integration discovery falls back to Claude's training knowledge.
  */
 export function isPerplexityAvailable(): boolean {
+  // Feature flag must be explicitly enabled
+  if (!FEATURE_FLAGS.ENABLE_PERPLEXITY_INTEGRATION) {
+    return false;
+  }
+
+  // API key must also be present
   return !!process.env.PERPLEXITY_API_KEY;
 }
