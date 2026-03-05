@@ -3,11 +3,6 @@
  *
  * MCP tool for executing operations on discovered integrations.
  * This is the "action" part of Kahuna - actually using the integrations.
-<<<<<<< Updated upstream
- */
-
-import { createSimpleExecutor } from '../integrations/execution/index.js';
-=======
  *
  * Supports three execution modes:
  * - simulation: No network calls, returns mock responses (safe, free)
@@ -30,7 +25,6 @@ import {
   logExecution,
 } from '../integrations/execution/modes/index.js';
 import { loadIntegration } from '../integrations/storage.js';
->>>>>>> Stashed changes
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -91,6 +85,12 @@ The tool handles:
         type: 'boolean',
         description: 'Optional: skip retry logic (default: false)',
       },
+      dry_run: {
+        type: 'boolean',
+        description:
+          'Optional: preview the request without executing it (default: false). ' +
+          'Shows the exact URL, headers, and body that would be sent.',
+      },
     },
     required: ['integration', 'operation'],
   },
@@ -109,6 +109,7 @@ export async function useIntegrationToolHandler(
   const mode = args.mode as string | undefined;
   const timeout = args.timeout as number | undefined;
   const skipRetry = args.skipRetry as boolean | undefined;
+  const dryRun = args.dry_run as boolean | undefined;
 
   if (!integrationId) {
     return markdownResponse('Error: integration ID is required', true);
@@ -118,8 +119,6 @@ export async function useIntegrationToolHandler(
     return markdownResponse('Error: operation is required', true);
   }
 
-<<<<<<< Updated upstream
-=======
   // Validate mode if provided
   if (mode && !isValidExecutionMode(mode)) {
     return markdownResponse(
@@ -135,7 +134,6 @@ export async function useIntegrationToolHandler(
     return handleDryRun(integrationId, operation, params);
   }
 
->>>>>>> Stashed changes
   try {
     // Execute using mode-aware executor
     const result = await executeWithMode({
@@ -232,6 +230,173 @@ ${result.error}${errorTips}`,
   } catch (error) {
     return markdownResponse(
       `Error executing integration operation: ${error instanceof Error ? error.message : String(error)}`,
+      true
+    );
+  }
+}
+
+// =============================================================================
+// DRY RUN HANDLER
+// =============================================================================
+
+/**
+ * Handle dry run mode - show what WOULD be sent without executing
+ */
+async function handleDryRun(
+  integrationId: string,
+  operationName: string,
+  params: Record<string, unknown>
+): Promise<MCPToolResponse> {
+  try {
+    // Load integration descriptor
+    const integration = await loadIntegration(integrationId);
+
+    if (!integration) {
+      return markdownResponse(
+        `# 🔍 Dry Run Failed
+
+**Integration not found:** ${integrationId}
+
+Make sure the integration has been discovered using \`kahuna_discover_integration\` or exists in the built-in integrations.`,
+        true
+      );
+    }
+
+    // Find the operation
+    const operation = integration.operations.find((op) => op.name === operationName);
+
+    if (!operation) {
+      const availableOps = integration.operations.map((op) => op.name).join(', ');
+      return markdownResponse(
+        `# 🔍 Dry Run Failed
+
+**Operation not found:** ${operationName}
+
+**Available operations:** ${availableOps}`,
+        true
+      );
+    }
+
+    // Resolve credentials (show which ones are configured)
+    const credentials: Record<string, string> = {};
+    const missingCreds: string[] = [];
+
+    for (const credKey of integration.authentication.requiredCredentials) {
+      // Try multiple env var formats
+      const envKey = credKey.toUpperCase().replace(/[/-]/g, '_');
+      const value = process.env[envKey];
+      if (value) {
+        credentials[credKey] = value;
+      } else {
+        missingCreds.push(credKey);
+      }
+    }
+
+    // Get base URL
+    const baseUrl =
+      credentials.base_url ?? credentials.baseUrl ?? credentials.url ?? '<base_url_required>';
+
+    // Determine HTTP config for this operation
+    const opConfig = DEFAULT_HTTP_OPERATION_CONFIGS[operationName] ?? {
+      method: 'POST',
+      pathTemplate: `/${operationName}`,
+      bodyParams: Object.keys(params),
+    };
+
+    // Build path
+    const path = buildPathFromTemplate(opConfig.pathTemplate, params);
+
+    // Build query parameters
+    const query: Record<string, string | number | boolean> = {};
+    if (opConfig.queryParams) {
+      for (const key of opConfig.queryParams) {
+        if (params[key] !== undefined) {
+          query[key] = params[key] as string | number | boolean;
+        }
+      }
+    }
+
+    // Build body
+    let body: unknown;
+    if (opConfig.bodyParams && ['POST', 'PUT', 'PATCH'].includes(opConfig.method)) {
+      if (opConfig.bodyParams.length === 1 && opConfig.bodyParams[0] === 'data' && params.data) {
+        body = params.data;
+      } else {
+        body = {};
+        for (const key of opConfig.bodyParams) {
+          if (params[key] !== undefined) {
+            (body as Record<string, unknown>)[key] = params[key];
+          }
+        }
+      }
+    }
+
+    // Build URL
+    const url = buildUrl(baseUrl, path, Object.keys(query).length > 0 ? query : undefined);
+
+    // Build auth headers (with masked credentials)
+    const authHeaders = buildAuthHeaders(integration.authentication.method, credentials);
+    const maskedAuthHeaders: Record<string, string> = {};
+    for (const [key, value] of Object.entries(authHeaders)) {
+      maskedAuthHeaders[key] = `${value.substring(0, 10)}***${value.substring(value.length - 4)}`;
+    }
+
+    // Build response
+    const credentialStatus =
+      missingCreds.length > 0
+        ? `⚠️ **Missing credentials:** ${missingCreds.join(', ')}`
+        : '✅ All credentials configured';
+
+    return markdownResponse(`# 🔍 Dry Run - Request Preview
+
+> **No actual API call was made**
+
+## Request Details
+
+**Method:** \`${opConfig.method}\`
+**URL:** \`${url}\`
+
+### Headers
+
+\`\`\`json
+${JSON.stringify(
+  {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    ...maskedAuthHeaders,
+  },
+  null,
+  2
+)}
+\`\`\`
+
+### Body
+
+${body ? `\`\`\`json\n${JSON.stringify(body, null, 2)}\n\`\`\`` : '_No body for this request_'}
+
+## Credential Status
+
+${credentialStatus}
+
+**Auth Method:** ${integration.authentication.method}
+**Required Credentials:** ${integration.authentication.requiredCredentials.join(', ')}
+
+## To Execute
+
+Remove \`dry_run=true\` to execute this request:
+
+\`\`\`
+kahuna_use_integration(
+  integration="${integrationId}",
+  operation="${operationName}",
+  params=${JSON.stringify(params)}
+)
+\`\`\``);
+  } catch (error) {
+    return markdownResponse(
+      `# 🔍 Dry Run Error
+
+${error instanceof Error ? error.message : String(error)}`,
       true
     );
   }
