@@ -28,8 +28,27 @@ export const CATEGORIZATION_PROMPT = `You are a file analyzer. Classify this fil
 - Use **integration** when the primary purpose is describing connections to external systems, APIs, or data sources
 - Use **context** as fallback when no other category clearly fits
 
+**Project Context vs General Context:**
+
+Determine if this file is **project-specific** or **generally applicable**:
+
+- **Project Context (isProjectContext: true)**: Information specific to THIS project only
+  - Project-specific code, configurations, or implementations
+  - This project's architecture, decisions, or requirements
+  - Project-specific business rules or domain knowledge
+  - Files that reference specific project files, directories, or structures
+  - Information that would NOT be useful for other projects
+
+- **General Context (isProjectContext: false)**: Information applicable across multiple projects
+  - General best practices, patterns, or principles
+  - Framework documentation or guides (React, LangGraph, etc.)
+  - General API documentation or integration guides
+  - Reusable templates or boilerplate
+  - Universal coding standards or conventions
+  - Information that WOULD be useful for other projects
+
 **Process:**
-Use the 'categorize_file' tool to provide your analysis with category, confidence, reasoning, title, summary, and topics.`;
+Use the 'categorize_file' tool to provide your analysis with category, confidence, reasoning, title, summary, topics, and isProjectContext.`;
 
 /**
  * System prompt for the contradiction checking agent (used by kahuna_learn).

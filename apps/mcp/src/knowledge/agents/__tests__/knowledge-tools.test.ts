@@ -236,6 +236,7 @@ describe('executeKnowledgeTool', () => {
           title: 'API Design Guidelines',
           summary: 'REST API design standards and naming conventions.',
           topics: ['API Design', 'REST', 'Authentication'],
+          isProjectContext: false,
         },
         storage
       );
@@ -247,6 +248,7 @@ describe('executeKnowledgeTool', () => {
       expect(parsed.title).toBe('API Design Guidelines');
       expect(parsed.summary).toBe('REST API design standards and naming conventions.');
       expect(parsed.topics).toEqual(['API Design', 'REST', 'Authentication']);
+      expect(parsed.isProjectContext).toBe(false);
     });
 
     it('returns error for invalid input', async () => {

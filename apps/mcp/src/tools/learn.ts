@@ -221,6 +221,7 @@ function extractCategorizationResult(agentResult: AgentResult): {
   title: string;
   summary: string;
   topics: string[];
+  isProjectContext: boolean;
 } | null {
   const catResult = agentResult.toolResults.find(
     (r) => (r as Record<string, unknown>).tool === 'categorize_file'
@@ -234,6 +235,7 @@ function extractCategorizationResult(agentResult: AgentResult): {
     title: r.title as string,
     summary: r.summary as string,
     topics: r.topics as string[],
+    isProjectContext: r.isProjectContext as boolean,
   };
 }
 
@@ -456,9 +458,6 @@ export async function learnToolHandler(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<MCPToolResponse> {
-  // Read project context flag from environment variable (defaults to false)
-  const isProjectContext = process.env.KB_PROJECT_CONTEXT === 'true';
-
   const { storage, anthropic, usageTracker } = ctx;
 
   // Validate input with Zod
@@ -721,8 +720,8 @@ export async function learnToolHandler(
           ? `${catResult.reasoning} (User note: ${description})`
           : catResult.reasoning,
         topics: catResult.topics,
-        // Add subdirectory if this is project-specific context
-        subdirectory: isProjectContext ? projectHash : undefined,
+        // Add subdirectory if this is project-specific context (determined by agent)
+        subdirectory: catResult.isProjectContext ? projectHash : undefined,
       };
 
       const entry = await storage.save(saveInput);

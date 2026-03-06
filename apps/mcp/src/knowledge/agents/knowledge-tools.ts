@@ -123,8 +123,21 @@ export const categorizeFileTool: Tool = {
         maxItems: 5,
         description: '3-5 key topics as natural language phrases',
       },
+      isProjectContext: {
+        type: 'boolean',
+        description:
+          'True if this file contains project-specific information (only relevant to this project). False if it contains general knowledge applicable to multiple projects.',
+      },
     },
-    required: ['category', 'confidence', 'reasoning', 'title', 'summary', 'topics'],
+    required: [
+      'category',
+      'confidence',
+      'reasoning',
+      'title',
+      'summary',
+      'topics',
+      'isProjectContext',
+    ],
   },
 };
 
@@ -251,6 +264,7 @@ const categorizeFileInputSchema = z.object({
   title: z.string(),
   summary: z.string(),
   topics: z.array(z.string()),
+  isProjectContext: z.boolean(),
 });
 
 /**
