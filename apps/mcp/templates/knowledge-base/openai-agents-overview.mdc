@@ -1,3 +1,30 @@
+---
+type: knowledge
+title: OpenAI Agents Overview
+summary: >
+  Comprehensive reference for building with the OpenAI Agent SDK
+created_at: "2026-03-06T00:00:00Z"
+updated_at: "2026-03-06T00:00:00Z"
+
+source:
+  file: openai-agents-overview.mdc
+  project: null
+  path: null
+
+classification:
+  category: reference
+  confidence: 1.0
+  reasoning: >
+    Seed content providing technical reference documentation for the OpenAI
+    Agents SDK.
+  topics:
+    - OpenAI
+    - Agents
+    - Python AI Agents
+
+status: active
+---
+
 # OpenAI Agents SDK - Development Overview
 
 A comprehensive guide to building AI agents with the OpenAI Agents SDK.
