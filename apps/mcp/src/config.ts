@@ -424,6 +424,11 @@ export const FRAMEWORKS: Record<string, FrameworkConfig> = {
     displayName: 'LangGraph',
     kbDocSlug: 'langgraph-best-practices',
   },
+  openai: {
+    id: 'openai',
+    displayName: 'OpenAI Agents SDK',
+    kbDocSlug: 'openai-agents-overview',
+  },
 } as const;
 
 /**

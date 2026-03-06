@@ -102,7 +102,9 @@ Process:
 
 Framework Selection:
 - Use select_framework when the task involves building agents, workflows, or LLM-powered applications
-- Available frameworks: langgraph (for agent workflows, state machines, multi-step AI pipelines)
+- Available frameworks: 
+  - langgraph (for agent workflows, state machines, multi-step AI pipelines)
+  - openai (for simple standalone agents)
 - When you select a framework, also include its best practices doc from the KB (e.g., langgraph-best-practices)
 - Only select a framework if the task clearly needs scaffolding — don't force it
 
