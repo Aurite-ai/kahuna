@@ -23,6 +23,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate version
+        run: |
+          chmod +x scripts/validate-version.sh
+          TAG="${{ inputs.tag || github.ref_name }}"
+          ./scripts/validate-version.sh "$TAG"
+
       - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
