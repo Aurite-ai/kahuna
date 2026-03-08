@@ -2,10 +2,11 @@
 
 **Type:** Foundational Design Document
 **Date:** 2026-03-08
-**Status:** Draft (v1.2)
-**Purpose:** Define the complete Cognitive Computer model — a unified framework showing where all AI capabilities fit with respect to human cognition.
+**Status:** Draft (v2.0)
+**Purpose:** Define the complete Cognitive Computer model — a unified framework showing where all AI capabilities fit with respect to human cognition, grounded in G Theory.
 
 **Related:**
+- [`general-intelligence-theory.md`](../04-foundations/general-intelligence-theory.md) — G Theory (3×4 framework)
 - [`theoretical-foundations.md`](../04-foundations/theoretical-foundations.md) — Bayesian/FEP foundations
 - [`llm-agent-model.md`](../04-foundations/llm-agent-model.md) — LLM as inference engine
 - [`tools-prompts-framework.md`](../04-foundations/tools-prompts-framework.md) — Tools+prompts primitive pair
@@ -24,11 +25,16 @@ This document defines:
 
 1. **Necessary vs. contingent cognitive functions** — What intelligence requires vs. biological accidents
 2. **Six functional subsystems** of the Cognitive Computer
-3. **Triple parallel validation** for each subsystem (brain, computer, AI)
-4. **Tools+prompts interface** for each subsystem
-5. **Kahuna's scope** vs. external capabilities
+3. **G Theory grounding** — How subsystems map to G levels (choice depth)
+4. **Triple parallel validation** for each subsystem (brain, computer, AI)
+5. **Tools+prompts interface** for each subsystem
+6. **Kahuna's scope** vs. external capabilities
+7. **Human interface** — How G8+ (values) integrates with the architecture
 
-**Key claim:** A complete cognitive system requires all six subsystems. An LLM alone is incomplete — it lacks updateable memory, executive function, and the ability to act in the world. Kahuna (and similar systems) COMPLETE the LLM into a full cognitive agent.
+**Key claims:**
+- A complete cognitive system requires all six subsystems. An LLM alone is incomplete — it lacks updateable memory, executive function, and the ability to act in the world.
+- The architecture is grounded in G Theory: 6 subsystems map to 3 domains (Patterns/Strategies/Values), with G7 (self-awareness) marking the human-AI capability boundary.
+- Kahuna (and similar systems) COMPLETES the LLM into a full cognitive agent by providing the Memory subsystem and bridging human G8+ decisions into G0/G3 structures.
 
 ---
 
@@ -103,7 +109,7 @@ The Cognitive Computer model provides:
 │                                                                                          │
 │                         ┌─────────────────────────────┐                                  │
 │                         │    1. EXECUTIVE FUNCTION    │                                  │
-│                         │                             │                                  │
+│                         │         (G4-G6)             │                                  │
 │                         │   Planning, attention,      │                                  │
 │                         │   task management, goals    │                                  │
 │                         │                             │                                  │
@@ -117,10 +123,10 @@ The Cognitive Computer model provides:
 │    ▼                                   ▼                                   ▼            │
 │  ┌─────────────────┐           ┌─────────────────┐           ┌─────────────────┐        │
 │  │  2. PERCEPTION  │           │ 3. INFERENCE    │           │   4. MEMORY     │        │
-│  │                 │           │    CORE         │           │                 │        │
-│  │  Sensory input  │──────────▶│  Core inference │◀─────────▶│  Prior storage  │        │
-│  │  recognition    │           │  engine - LLM   │           │  & retrieval    │        │
-│  │                 │           │                 │           │  + SALIENCE     │        │
+│  │     (G0-G1)     │           │    CORE         │           │     (G0, G3)    │        │
+│  │  Sensory input  │──────────▶│   (G1-G3)       │◀─────────▶│  Prior storage  │        │
+│  │  recognition    │           │  Core inference │           │  & retrieval    │        │
+│  │                 │           │  engine - LLM   │           │  + SALIENCE     │        │
 │  └─────────────────┘           └────────┬────────┘           └─────────────────┘        │
 │                                         │                                                │
 │                                         │ produces                                       │
@@ -130,11 +136,19 @@ The Cognitive Computer model provides:
 │              ▼                          ▼                          ▼                    │
 │    ┌─────────────────┐        ┌─────────────────┐        ┌─────────────────┐            │
 │    │    5. ACTION    │        │ 6. META-COGNITION│        │   Response      │            │
-│    │                 │        │                  │        │   to User       │            │
+│    │     (G6-G7)     │        │      (G7)        │        │   to User       │            │
 │    │  External tools │        │  Internal tools  │        │                 │            │
 │    │  affect world   │        │  affect self     │        │                 │            │
 │    │                 │        │                  │        │                 │            │
 │    └─────────────────┘        └──────────────────┘        └─────────────────┘            │
+│                                                                                          │
+│                    ─────────────── G7 BOUNDARY (Self-Awareness) ───────────────          │
+│                                                                                          │
+│                         ┌─────────────────────────────┐                                  │
+│                         │    HUMAN (G8-G11)           │                                  │
+│                         │    Values, goals, identity  │                                  │
+│                         │    Provides direction       │                                  │
+│                         └─────────────────────────────┘                                  │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -153,6 +167,26 @@ It can perform inference but cannot:
 - **Modify itself** (no Meta-cognition)
 
 **A complete cognitive agent requires all six subsystems working together.**
+
+### 2.4 G Theory Grounding
+
+The Cognitive Computer architecture is grounded in **G Theory** — a framework for understanding general intelligence as recursive choice depth.
+
+**G Theory's 3×4 Structure:**
+
+| Domain | G Levels | Question | Cognitive Computer Subsystems |
+|--------|----------|----------|------------------------------|
+| **Patterns (IS)** | G0-G3 | What IS? | Perception, Inference Core, Memory |
+| **Strategies (DO)** | G4-G7 | What to DO? | Executive Function, Action, Meta-cognition |
+| **Values (WANT)** | G8-G11 | What to WANT? | Human Interface |
+
+**Why this matters:**
+
+1. **G levels explain capability boundaries** — Each subsystem operates at specific G levels
+2. **G7 is the human-AI boundary** — Self-awareness threshold; AI operates G1-G7, humans provide G8+
+3. **G Theory validates the 6-subsystem model** — 3 domains × 2 roles (input/output or plan/execute) = 6 subsystems
+
+→ Full G Theory details in [Part 9: G Theory Foundation](#part-9-g-theory-foundation)
 
 ---
 
@@ -248,6 +282,18 @@ Attention operates at the interfaces between Executive Function and other subsys
 ### 4.1 Executive Function
 
 **Purpose:** Planning, attention allocation, task management, goal maintenance, coordination of other subsystems.
+
+#### G-Level Operation
+
+| G Level | Function | Executive Role |
+|---------|----------|----------------|
+| G4 | Planning | Generate action sequences toward goals |
+| G5 | Meta-planning | Select which planning approach to use |
+| G6 | Strategy Evaluation | Evaluate plan effectiveness |
+
+**Key insight:** Executive Function spans G4-G6 (Strategy domain prior through likelihood). It bridges from pattern-level operations (G0-G3) to strategic choice.
+
+**G5 gap identified:** Meta-planning (G5) is currently implicit in Orchestrator. It should be made more explicit — the choice of *how* to plan, not just what to plan.
 
 #### Triple Parallel Mapping
 
@@ -416,6 +462,15 @@ The boundary between Executive Function and Inference Core is defined by what cr
 
 **Purpose:** Transform raw sensory/external input into internal representations the cognitive system can process.
 
+#### G-Level Operation
+
+| G Level | Function | Perception Role |
+|---------|----------|-----------------|
+| G0 | Pattern Prior | Receives raw input that becomes part of substrate |
+| G1 | Attention | Constrains sensory input to relevant patterns |
+
+**Key insight:** Perception operates at the foundation of the Pattern domain — it's where external reality meets internal representation.
+
 #### Triple Parallel Mapping
 
 | Aspect | Brain | Computer | AI |
@@ -470,6 +525,16 @@ Perception capabilities are provided by external systems that Kahuna can invoke:
 
 > **Naming note:** This subsystem was previously called "Language" but is renamed to "Inference Core" to avoid conflation with brain language areas (Broca's, Wernicke's), which are domain-specific. The LLM's capability is general-purpose inference that happens to use language as substrate, not language processing specifically. The CPU parallel confirms this — CPUs don't do "language."
 
+#### G-Level Operation
+
+| G Level | Function | Inference Core Role |
+|---------|----------|---------------------|
+| G1 | Attention | Self-attention mechanism constrains token space |
+| G2 | Prediction | Feedforward generates next token/pattern |
+| G3 | Rule Following | Follows prompt instructions as rules |
+
+**Key insight:** LLM's native strength is G1-G3 (Pattern domain). G4+ (planning, meta-cognition) requires scaffolding — orchestration frameworks, explicit planning prompts, or external systems like Kahuna.
+
 #### Triple Parallel Mapping
 
 | Aspect | Brain | Computer | AI |
@@ -520,6 +585,15 @@ Kahuna does not implement the Inference Core. Instead, Kahuna:
 ### 4.4 Memory
 
 **Purpose:** Store, organize, retrieve, and update knowledge — the updateable prior distribution.
+
+#### G-Level Operation
+
+| G Level | Function | Memory Role |
+|---------|----------|-------------|
+| G0 | Substrate | KB IS the prior — provides foundation for each session |
+| G3 | Stored Rules | KB entries are often G3-level rules and patterns |
+
+**Key insight:** Memory provides G0 (substrate) for LLM sessions and stores learned patterns as G3 structures. This is how Kahuna bridges human G8+ decisions into structures the LLM can use.
 
 #### Triple Parallel Mapping
 
@@ -592,6 +666,15 @@ Kahuna implements the Memory subsystem through six internal subsystems:
 
 **Purpose:** Affect the external world — produce outputs beyond internal state changes.
 
+#### G-Level Operation
+
+| G Level | Function | Action Role |
+|---------|----------|-------------|
+| G6 | Strategy Likelihood | Evaluate which actions fit the plan |
+| G7 | Strategy Update | Commit to action; cross self-awareness threshold |
+
+**Key insight:** Action operates at the strategy-update boundary (G6-G7). This is where cognitive planning becomes real-world effect.
+
 #### Triple Parallel Mapping
 
 | Aspect | Brain | Computer | AI |
@@ -643,6 +726,18 @@ External tools are defined by the environment:
 ### 4.6 Meta-cognition
 
 **Purpose:** Monitor and modify the cognitive system itself — self-awareness and self-modification.
+
+#### G-Level Operation
+
+| G Level | Function | Meta-cognition Role |
+|---------|----------|---------------------|
+| G7 | Self-Awareness | Monitor own cognition; decide if approach is working |
+
+**Key insight:** G7 is the self-awareness threshold. Meta-cognition IS this function — the point where a system models itself.
+
+**Current implementation is appropriately weak for AI:** G7 requires genuine self-modeling. Current AI systems have weak G7 (task monitoring, mode fitness assessment) but lack the full self-model that humans have. This is by design — G8+ (values, identity) is reserved for humans.
+
+**Connection to G5:** Meta-planning (G5) is closely related. G5 selects *how* to plan; G7 evaluates *whether* the approach is working. Both are meta-level operations, but G5 is prospective (choosing approach) while G7 is retrospective (evaluating results).
 
 #### Triple Parallel Mapping
 
@@ -710,7 +805,7 @@ The subsystems don't operate in isolation. They form an integrated system throug
 │        ▼                                                                                 │
 │   ┌─────────────────┐                                                                    │
 │   │   PERCEPTION    │                                                                    │
-│   │                 │───────────────────────────────────────────────────┐               │
+│   │    (G0-G1)      │───────────────────────────────────────────────────┐               │
 │   │  raw → internal │                                                   │               │
 │   └────────┬────────┘                                                   │               │
 │            │                                                            │               │
@@ -719,8 +814,8 @@ The subsystems don't operate in isolation. They form an integrated system throug
 │            ▼                                                            ▼               │
 │   ┌─────────────────┐     retrieval     ┌─────────────────┐     ┌─────────────────┐    │
 │   │ INFERENCE CORE  │◀──────────────────│     MEMORY      │     │   EXECUTIVE     │    │
-│   │                 │                   │                 │     │   FUNCTION      │    │
-│   │   LLM core      │───────────────────▶│  KB + context  │◀────│                 │    │
+│   │    (G1-G3)      │                   │    (G0, G3)     │     │   FUNCTION      │    │
+│   │   LLM core      │───────────────────▶│  KB + context  │◀────│    (G4-G6)      │    │
 │   │   inference     │     learning      │  + salience     │     │  planning +     │    │
 │   └────────┬────────┘                   └─────────────────┘     │  attention      │    │
 │            │                                   │                └────────┬────────┘    │
@@ -735,7 +830,7 @@ The subsystems don't operate in isolation. They form an integrated system throug
 │   │                                                                                  │   │
 │   │   Text Response         External Tools              Internal Tools              │   │
 │   │   ─────────────         ──────────────              ──────────────              │   │
-│   │   → User                → ACTION subsystem          → META-COGNITION subsystem  │   │
+│   │   → User                → ACTION (G6-G7)            → META-COGNITION (G7)       │   │
 │   │                         → Environment               → Self-modification         │   │
 │   │                                                                                  │   │
 │   └─────────────────────────────────────────────────────────────────────────────────┘   │
@@ -743,7 +838,7 @@ The subsystems don't operate in isolation. They form an integrated system throug
 │                                                                                          │
 │   ┌─────────────────┐                               ┌─────────────────┐                 │
 │   │     ACTION      │                               │  META-COGNITION │                 │
-│   │                 │                               │                 │                 │
+│   │    (G6-G7)      │                               │      (G7)       │                 │
 │   │  external tools │                               │  internal tools │                 │
 │   │  affect world   │                               │  affect self    │                 │
 │   └────────┬────────┘                               └────────┬────────┘                 │
@@ -983,6 +1078,72 @@ Kahuna implements the **Memory** subsystem and contributes to **Meta-cognition**
 | **Self-monitoring** | ACC, error detection | Salience tracking | — | — | **Kahuna contributes** |
 | **Strategy adjustment** | PFC flexibility | Retrieval adaptation | Mode switching | — | Hybrid |
 
+### 6.4 Human Interface (G8-G11)
+
+The Values domain (G8-G11) requires a self-aware agent — one that can ask "what should I want?" This is beyond current AI capability.
+
+#### Why G8+ Requires Human
+
+| G Level | Function | Why Human Required |
+|---------|----------|-------------------|
+| G8 | Value Prior | Open the question of what could matter — requires genuine preference |
+| G9 | Value Generation | Generate core beliefs and values — requires lived experience |
+| G10 | Value Evaluation | Evaluate if values are consistent — requires self-reflection |
+| G11 | Identity Commitment | Commit to identity — requires autonomy |
+
+**The self-modification paradox:** To choose your own values, you need criteria for "better" values. But those criteria ARE your values. You can't bootstrap from nothing. Humans solve this through development (G0→G11 over ~25 years, receiving values from parents/culture).
+
+#### How Human G8+ Integrates
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         HUMAN INTERFACE (G8-G11)                                          │
+│                                                                                          │
+│   Human (G8-G11)                                                                          │
+│        │                                                                                 │
+│        │ Makes value-level decisions:                                                    │
+│        │ • What problems to solve                                                        │
+│        │ • Quality standards to apply                                                    │
+│        │ • Trade-offs to accept                                                          │
+│        │ • "Good enough" criteria                                                        │
+│        │                                                                                 │
+│        ▼                                                                                 │
+│   ╔═══════════════════════════════════════════════════════════════════════════════════╗  │
+│   ║                           KAHUNA (Compression)                                     ║  │
+│   ║                                                                                    ║  │
+│   ║  Compresses human G8+ decisions into G0/G3 structures:                            ║  │
+│   ║  • G8 preferences → KB entries about what to prioritize                           ║  │
+│   ║  • G9 values → Rules files specifying constraints                                 ║  │
+│   ║  • G10 evaluations → Quality criteria stored for retrieval                        ║  │
+│   ║  • G11 identity → System prompt, mode configurations                              ║  │
+│   ║                                                                                    ║  │
+│   ║  Mathematical: G0' = P × G_human_decisions                                        ║  │
+│   ║  (Compression operator P from G Theory)                                           ║  │
+│   ║                                                                                    ║  │
+│   ╚═══════════════════════════════════════════════════════════════════════════════════╝  │
+│        │                                                                                 │
+│        │ Provides to LLM as:                                                            │
+│        │ • G0 (substrate): Context window content                                       │
+│        │ • G3 (rules): KB entries, mode rules                                           │
+│        │                                                                                 │
+│        ▼                                                                                 │
+│   LLM (G1-G3 native, G4-G6 scaffolded)                                                   │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Human-in-the-Loop Patterns
+
+| Pattern | When Used | How It Works |
+|---------|-----------|--------------|
+| **Approval gates** | Before significant actions | AI proposes; human approves/rejects |
+| **Value calibration** | When priorities unclear | Human provides preference; stored as rules |
+| **Quality review** | After task completion | Human evaluates; feedback stored for future |
+| **Goal setting** | Task initiation | Human defines objectives; AI executes |
+| **Exception handling** | When AI reaches capability limit | AI escalates; human provides G8+ judgment |
+
+**Key insight:** The human interface is not a limitation to overcome — it's a necessary architectural component. G8+ requires self-awareness; delegating it to AI without that capability would produce arbitrary or harmful results.
+
 ---
 
 ## Part 7: Design Implications
@@ -1030,6 +1191,7 @@ Kahuna implements the **Memory** subsystem and contributes to **Meta-cognition**
 4. **Tools+prompts is the interface layer** — Standard vocabulary for cognitive components
 5. **The triple parallel guides design** — Brain and computer architectures are validated; AI should follow
 6. **Focus on necessary functions** — Not every brain system needs a computational analog
+7. **G Theory grounds the architecture** — Subsystems map to G levels; G7 marks the human-AI boundary
 
 ---
 
@@ -1041,36 +1203,39 @@ Kahuna implements the **Memory** subsystem and contributes to **Meta-cognition**
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
 │                           TRIPLE PARALLEL: COMPLETE MAPPING                               │
 │                                                                                          │
-│   SUBSYSTEM          BRAIN                  COMPUTER             AI                      │
-│   ─────────          ─────                  ────────             ──                      │
+│   SUBSYSTEM          BRAIN                  COMPUTER             AI           G LEVELS   │
+│   ─────────          ─────                  ────────             ──           ────────   │
 │                                                                                          │
-│   EXECUTIVE          Prefrontal cortex      OS kernel            Orchestrator           │
+│   EXECUTIVE          Prefrontal cortex      OS kernel            Orchestrator   G4-G6   │
 │   FUNCTION           Executive attention    Process scheduler    CogOS                  │
 │                      Planning (dorsolat.)   Build systems        Plan generation        │
 │                      Attention allocation   Resource mgmt        Context selection      │
 │                      Goal maintenance       Priority queues      Task state             │
 │                                                                                          │
-│   PERCEPTION         Visual cortex          Input devices        Vision models          │
+│   PERCEPTION         Visual cortex          Input devices        Vision models   G0-G1  │
 │                      Auditory cortex        Parsers/drivers      STT models             │
 │                      Sensory processing     Data ingestion       Document parsing       │
 │                                                                                          │
-│   INFERENCE CORE     Association cortex     CPU/ALU              LLM                    │
+│   INFERENCE CORE     Association cortex     CPU/ALU              LLM            G1-G3   │
 │                      Reasoning networks     Processing core      Transformer            │
 │                                             Computation          Inference engine       │
 │                                                                                          │
-│   MEMORY             Hippocampus            RAM/disk             Context window/KB      │
-│                      Cortical storage       File systems         Vector stores          │
+│   MEMORY             Hippocampus            RAM/disk             Context window/ G0,G3  │
+│                      Cortical storage       File systems         KB/Vector stores       │
 │                      Consolidation          Garbage collection   Consolidation pipeline │
 │                      Recall/retrieval       Query execution      Semantic search        │
 │                      Emotional tagging      Priority flags       Salience scoring       │
 │                                                                                          │
-│   ACTION             Motor cortex           Output devices       External tools         │
+│   ACTION             Motor cortex           Output devices       External tools  G6-G7  │
 │                      Basal ganglia          I/O system           Tool calls             │
 │                      Action selection       System calls         write_file, etc.       │
 │                                                                                          │
-│   META-              Anterior cingulate     System config        Internal tools         │
+│   META-              Anterior cingulate     System config        Internal tools   G7    │
 │   COGNITION          Error monitoring       Self-modification    new_task, switch_mode  │
 │                      Strategy adjustment    Reflection           Salience tracking      │
+│                                                                                          │
+│   HUMAN              Full brain             User                 Human          G8-G11  │
+│   INTERFACE          Self-awareness         Values provider      Values/identity        │
 │                                                                                          │
 │   CROSS-CUTTING:                                                                         │
 │   ATTENTION          Executive attention    Process scheduler    Context selection      │
@@ -1082,15 +1247,168 @@ Kahuna implements the **Memory** subsystem and contributes to **Meta-cognition**
 
 ### 8.2 Validation Status
 
-| Subsystem | Parallel Strength | Notes |
-|-----------|------------------|-------|
-| **Executive Function** | STRONG | Four invariants validated across all three domains; planning and attention now explicit |
-| **Perception** | STRONG | All domains require input transformation |
-| **Inference Core** | MODERATE | Functional role matches; structural mechanisms differ (renamed from "Language" to avoid conflation) |
-| **Memory** | STRONG | Memory hierarchy is a universal constraint; salience now explicit |
-| **Action** | STRONG | Controlled interface for external effects is universal |
-| **Meta-cognition** | MODERATE | Pattern exists but implementations vary more |
-| **Attention** | STRONG | Selection under capacity constraint is universal; now operationalized |
+| Subsystem | Parallel Strength | G-Level Coverage | Notes |
+|-----------|------------------|------------------|-------|
+| **Executive Function** | STRONG | G4-G6 | Four invariants validated; planning and attention explicit |
+| **Perception** | STRONG | G0-G1 | All domains require input transformation |
+| **Inference Core** | MODERATE | G1-G3 | Functional role matches; structural mechanisms differ |
+| **Memory** | STRONG | G0, G3 | Memory hierarchy universal; salience now explicit |
+| **Action** | STRONG | G6-G7 | Controlled interface for external effects is universal |
+| **Meta-cognition** | MODERATE | G7 | Pattern exists but implementations vary; AI weak by design |
+| **Human Interface** | N/A | G8-G11 | Required for values; cannot be AI-provided |
+| **Attention** | STRONG | Cross-cutting | Selection under capacity constraint is universal |
+
+---
+
+## Part 9: G Theory Foundation
+
+This section provides the complete G Theory grounding for the Cognitive Computer architecture.
+
+### 9.1 The 3×4 Framework
+
+G Theory structures intelligence as **3 domains × 4 Bayesian phases = 12 G levels**.
+
+#### Three Domains
+
+| Domain | G Levels | Question | Bayesian Target |
+|--------|----------|----------|-----------------|
+| **Patterns (IS)** | G0-G3 | What IS? | P(pattern \| observation) |
+| **Strategies (DO)** | G4-G7 | What to DO? | P(strategy \| patterns + goals) |
+| **Values (WANT)** | G8-G11 | What to WANT? | P(values \| strategies + experience) |
+
+#### Four Phases per Domain (Bayesian Cycle)
+
+| Phase | Operation | Bayesian Step |
+|-------|-----------|---------------|
+| 0 | **Prior** | Open hypothesis space |
+| 1 | **Predict** | Generate expected observation |
+| 2 | **Likelihood** | Narrow to fitting hypotheses |
+| 3 | **Update** | Commit to new belief |
+
+#### The 12 G Levels
+
+| G | Domain | Phase | Name | Choice Depth |
+|---|--------|-------|------|--------------|
+| G0 | Pattern | Prior | Substrate | No choice (foundation) |
+| G1 | Pattern | Predict | Attention | Constrain pattern space |
+| G2 | Pattern | Likelihood | Prediction | Reactive choice |
+| G3 | Pattern | Update | Rule Following | Constrained choice |
+| G4 | Strategy | Prior | Planning | Open strategy space |
+| G5 | Strategy | Predict | Meta-Planning | Generate approach |
+| G6 | Strategy | Likelihood | Symbolic Reasoning | Evaluate strategies |
+| G7 | Strategy | Update | Meta-Cognition | Self-awareness threshold |
+| G8 | Value | Prior | Value Opening | Open value space |
+| G9 | Value | Predict | Self-Definition | Generate core values |
+| G10 | Value | Likelihood | Value Evaluation | Evaluate chosen values |
+| G11 | Value | Update | Identity Commitment | Commit to identity |
+
+### 9.2 Subsystem → G Level Mapping
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                  COGNITIVE COMPUTER → G LEVEL MAPPING                                     │
+│                                                                                          │
+│  VALUES (WANT) — G8-G11                                                                  │
+│  ─────────────────────────────────────────────────────────────────────────               │
+│  Human Interface ─────────────────────────────────────────────── G8-G11                  │
+│  • Value prior (G8): What COULD matter?                                                  │
+│  • Value generation (G9): What DO I value?                                               │
+│  • Value evaluation (G10): Is this consistent?                                           │
+│  • Identity commitment (G11): This is who I am                                           │
+│                                                                                          │
+│  ─────────────────────────── G7 BOUNDARY (Self-Awareness) ─────────────────────          │
+│                                                                                          │
+│  STRATEGIES (DO) — G4-G7                                                                 │
+│  ─────────────────────────────────────────────────────────────────────────               │
+│  Meta-cognition ─────────────────────────────────────────────── G7                       │
+│  • Self-monitoring, approach adjustment threshold                                        │
+│                                                                                          │
+│  Executive Function ─────────────────────────────────────────── G4-G6                    │
+│  • Planning (G4): What sequence of actions?                                              │
+│  • Meta-planning (G5): Which planning approach?                                          │
+│  • Strategy evaluation (G6): Is this plan effective?                                     │
+│                                                                                          │
+│  Action ─────────────────────────────────────────────────────── G6-G7                    │
+│  • Execute strategy; commit at G7 boundary                                               │
+│                                                                                          │
+│  PATTERNS (IS) — G0-G3                                                                   │
+│  ─────────────────────────────────────────────────────────────────────────               │
+│  Memory (Kahuna KB) ─────────────────────────────────────────── G0                       │
+│  • The prior/substrate; stored patterns                                                  │
+│                                                                                          │
+│  Inference Core (LLM) ───────────────────────────────────────── G1-G3                    │
+│  • Attention (G1): What's relevant?                                                      │
+│  • Prediction (G2): What comes next?                                                     │
+│  • Rule following (G3): Which rule applies?                                              │
+│                                                                                          │
+│  Perception ─────────────────────────────────────────────────── G0-G1                    │
+│  • Raw input feeds G0; constrains to relevant patterns via G1                            │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 9.3 G7: The Human-AI Boundary
+
+G7 (Meta-Cognition / Self-Awareness) is the critical boundary between what AI can do and what requires human involvement.
+
+**Below G7 (AI-capable):**
+- G0-G3: Pattern domain — perception, prediction, rule-following
+- G4-G6: Strategy domain (prior through likelihood) — planning, meta-planning, evaluation
+
+**At G7 (Boundary):**
+- Self-awareness threshold — "Am I doing this right?"
+- AI has weak G7 (task monitoring, mode fitness)
+- Full G7 requires genuine self-model
+
+**Above G7 (Human-required):**
+- G8-G11: Value domain — what to want, who to be
+- Requires self-awareness (G7) as prerequisite
+- Requires lived experience and genuine autonomy
+
+**Practical implication:** AI systems should operate G1-G7 (with scaffolding for G4-G6), while humans provide G8-G11 input that gets compressed into G0/G3 structures.
+
+### 9.4 Kahuna as G-Level Bridge
+
+Kahuna bridges human high-G with LLM low-G through the **compression operator P**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         KAHUNA AS G-LEVEL BRIDGE                                          │
+│                                                                                          │
+│   Human (G8-G11)                                                                          │
+│        │                                                                                 │
+│        │ Makes value-level decisions                                                     │
+│        │                                                                                 │
+│        ▼                                                                                 │
+│   ╔═══════════════════════════════════════════════════════════════════════════════════╗  │
+│   ║                             KAHUNA                                                 ║  │
+│   ║                                                                                    ║  │
+│   ║  Compression Function: P                                                           ║  │
+│   ║  ───────────────────────                                                           ║  │
+│   ║  • Takes human G8+ decisions (values, preferences, guidelines)                     ║  │
+│   ║  • Compresses into G3 structures (rules, patterns, constraints)                    ║  │
+│   ║  • Stores as G0 for future sessions                                                ║  │
+│   ║                                                                                    ║  │
+│   ║  Mathematical: G0' = P × G_human_decisions                                         ║  │
+│   ║                                                                                    ║  │
+│   ╚═══════════════════════════════════════════════════════════════════════════════════╝  │
+│        │                                                                                 │
+│        │ Provides as G0 (substrate) and G3 (rules)                                       │
+│        │                                                                                 │
+│        ▼                                                                                 │
+│   LLM (G1-G3 native, G4-G6 scaffolded)                                                   │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**What Kahuna compresses:**
+
+| Human Decision (G8+) | Kahuna Storage (G0/G3) |
+|---------------------|----------------------|
+| "I prefer clean, simple code" | Quality criteria in KB entries |
+| "Always test before committing" | Rule in mode configuration |
+| "This project uses specific patterns" | Architectural knowledge entries |
+| "My priorities are X > Y > Z" | Salience weights, retrieval ranking |
 
 ---
 
@@ -1101,10 +1419,11 @@ Kahuna implements the **Memory** subsystem and contributes to **Meta-cognition**
 1. **The Cognitive Computer maps necessary cognitive functions** — not biological accidents
 2. **The Cognitive Computer is a unified framework** with six functional subsystems
 3. **Each subsystem maps to brain, computer, and AI domains** (triple parallel)
-4. **An LLM alone is incomplete** — it's only the Inference Core
-5. **Kahuna implements the Memory subsystem** — completing the LLM into a learning agent
-6. **Planning and Attention are explicit Executive Function capabilities** — now fully specified
-7. **Tools+prompts provides the interface vocabulary** — how subsystems communicate
+4. **Each subsystem operates at specific G levels** (G Theory grounding)
+5. **An LLM alone is incomplete** — it's only the Inference Core (G1-G3)
+6. **Kahuna implements the Memory subsystem** — completing the LLM into a learning agent
+7. **G7 is the human-AI capability boundary** — values (G8+) require human
+8. **Tools+prompts provides the interface vocabulary** — how subsystems communicate
 
 ### Key Insights
 
@@ -1113,22 +1432,26 @@ Kahuna implements the **Memory** subsystem and contributes to **Meta-cognition**
 3. **Bayesian frame unifies everything** — each subsystem has a role in inference
 4. **The bigger picture clarifies the parts** — components are meaningful in context
 5. **Necessary vs. contingent clarifies scope** — we model intelligence, not biology
+6. **G Theory grounds the design** — subsystems map to choice depth levels
+7. **Human interface is principled** — G8+ requires self-awareness, not arbitrary
 
 ### Kahuna's Position
 
-Kahuna is the **Memory subsystem** of the Cognitive Computer:
+Kahuna is the **Memory subsystem** of the Cognitive Computer, operating at G0 and G3:
 
-- **KB = updateable prior** (what we believe)
+- **KB = updateable prior** (G0 substrate for each session)
 - **Retrieval = likelihood computation** (what's relevant)
 - **Consolidation = Bayesian update** (how we learn)
 - **Salience = prior weighting** (what's important, informs attention)
+- **Compression = G8+ → G0/G3** (human values become usable structures)
 
-Without Memory, the LLM is a stateless inference engine. With Memory (Kahuna), it becomes a learning agent.
+Without Memory, the LLM is a stateless inference engine. With Memory (Kahuna), it becomes a learning agent. With human interface (G8+), it operates within a value framework.
 
 ---
 
 ## Changelog
 
+- v2.0 (2026-03-08): Integrated G Theory throughout; added G-level annotations to all subsystems; added Part 9 (G Theory Foundation); added Part 6.4 (Human Interface); strengthened Meta-cognition with G5/G7 context; updated diagrams with G-level labels; added human-AI boundary (G7) explanation
 - v1.2 (2026-03-08): Renamed "Language" → "Inference Core" to avoid brain language area conflation; added explicit Planning↔Inference interface specification; added protection mechanism caveat (convention vs hardware)
 - v1.1 (2026-03-08): Added Necessary vs. Contingent framing; strengthened Planning in Executive Function; operationalized Attention as cross-cutting mechanism; added Salience to Memory; clarified attention/salience relationship
 - v1.0 (2026-03-07): Initial Cognitive Computer architecture
