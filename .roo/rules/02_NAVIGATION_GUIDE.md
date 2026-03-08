@@ -64,13 +64,29 @@ docs/
 
 ### Design Documents
 
-| Document                       | Contents                                    |
-| ------------------------------ | ------------------------------------------- |
-| `README.md`                    | Product overview, core concepts, index      |
-| `tool-specifications.md`       | MCP tool specs, schemas, response formats   |
-| `knowledge-architecture.md`    | Knowledge base structure, file formats      |
-| `user-journey.md`              | End-to-end copilot usage flow               |
-| `copilot-configuration.md`     | VCK and copilot config design               |
+Design documents are organized hierarchically in `docs/design/`:
+
+```
+docs/design/
+├── README.md                           # Index and navigation
+├── 01-product/                         # Product-level design
+│   └── kahuna-product-model.md         # Core product concepts
+├── 02-architecture/                    # System architecture
+│   ├── abstract-architecture.md        # High-level architecture
+│   └── static-dynamic-integration.md   # Static/dynamic system integration
+├── 03-subsystem/                       # Subsystem designs
+└── 04-foundations/                     # Theoretical foundations
+    ├── llm-agent-model.md              # LLM agent completion model
+    └── theoretical-foundations.md      # Cognitive methodology theory
+```
+
+### Reference Documents
+
+| Document                       | Contents                                               |
+| ------------------------------ | ------------------------------------------------------ |
+| `cognitive-methodology.md`     | Detailed cognitive SW dev methodology, theory, glossary |
+
+Legacy Kahuna documentation is preserved in `docs/reference/legacy-kahuna/` for historical reference.
 
 ### Working (`docs/internal/`)
 
@@ -116,26 +132,32 @@ Orchestrator subtask prompts specify exact paths. See `.roo/rules-orchestrator/O
 
 ```
 apps/
-└── mcp/                    # MCP server (stdio) — context management tools for copilots
-    └── src/
-        ├── knowledge/      # Knowledge base domain logic
-        │   ├── agents/     # Agent prompts, tools, shared runner
-        │   ├── storage/    # KB storage service, types, utilities
-        │   └── surfacing/  # Context writer
-        ├── tools/          # MCP tool handlers (learn, ask, prepare-context, health-check, initialize)
-        ├── config.ts       # Centralized configuration (models, server constants)
-        └── index.ts        # Server entry point
+└── mcp/                        # MCP server (stdio) — context management tools for copilots
+    ├── src/
+    │   ├── integrations/       # External integration support
+    │   │   ├── execution/      # HTTP executor, circuit breaker, retry logic
+    │   │   └── verification/   # Integration verification
+    │   ├── knowledge/          # Knowledge base domain logic
+    │   │   ├── agents/         # Agent prompts, tools, shared runner
+    │   │   ├── storage/        # KB storage service, types, utilities
+    │   │   └── surfacing/      # Context writer, file tree, framework copier
+    │   ├── templates/          # Template index
+    │   ├── tools/              # MCP tool handlers
+    │   ├── usage/              # Usage tracking and pricing
+    │   ├── vault/              # Secrets management (1Password, env providers)
+    │   ├── config.ts           # Centralized configuration
+    │   └── index.ts            # Server entry point
+    └── templates/              # Static template files
+        ├── copilot-configs/    # Copilot configuration templates
+        ├── frameworks/         # Framework boilerplate templates
+        ├── knowledge-base/     # KB seed files (.mdc)
+        └── project-env/        # Project environment templates
 
 packages/
-├── testing/                # QA testing infrastructure
-│   ├── scenarios/          # Test scenarios (customer-support-agent, etc.)
-│   └── src/                # CLI: create, list, collect commands
-└── vck-templates/          # VCK content (copilot configs, framework scaffolds, KB seeds)
-    ├── src/                # Template generator logic
-    └── templates/          # Static template files
-        ├── copilot-configs/  # Copilot configuration templates
-        ├── frameworks/       # Framework boilerplate templates
-        └── knowledge-base/   # KB seed files (.mdc) copied during initialize
+├── testing/                    # QA testing infrastructure
+│   ├── scenarios/              # Test scenarios
+│   └── src/                    # CLI: create, list, collect commands
+└── vck-templates/              # (legacy) VCK templates
 ```
 
 ---

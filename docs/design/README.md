@@ -1,298 +1,99 @@
-# Kahuna MCP - Product Design
+# Kahuna Design Documentation
 
-**Status:** Final
-**Date:** 2026-02-05
-**Scope:** Claude Code + LangGraph (initial release)
+This directory contains **permanent design documentation** for Kahuna — the cognitive hardware platform that completes LLM-based copilots.
 
-> **Implementation note:** These documents capture product-level design intent. For current implementation details (architecture, file formats, agent specifics), see [Architecture: Context Management System](../architecture/02-context-management-system.md).
+> **Working documents** live in [`docs/internal/`](../internal/). Documents are promoted here when stable and validated.
+
+---
+
+## Structure
+
+| Directory | Level | Purpose |
+|-----------|-------|---------|
+| [`01-product/`](01-product/) | Product | **Why** Kahuna exists, **what value** it creates, **who** it's for |
+| [`02-architecture/`](02-architecture/) | Architecture | **What** components exist, **how** they connect |
+| [`03-subsystem/`](03-subsystem/) | Subsystem | **How** individual parts work internally |
+| [`04-foundations/`](04-foundations/) | Foundations | **Theoretical models** that inform the design |
+
+**Reading order:** Start at Product, progress through Architecture, then Subsystem. Foundations can be read anytime for deeper understanding.
 
 ---
 
 ## Document Index
 
-| Document | Audience | Contents |
-|----------|----------|----------|
-| **This document** | Everyone | Product overview, core concepts, design decisions |
-| [user-journey.md](./user-journey.md) | Everyone | Day 1 → Month 2 user scenarios |
-| [tool-specifications.md](./tool-specifications.md) | Implementers | Detailed MCP tool specs |
-| [knowledge-architecture.md](./knowledge-architecture.md) | Implementers | Knowledge base structure and flows |
-| [copilot-configuration.md](./copilot-configuration.md) | Implementers | Files created by `kahuna_initialize` |
+### Product Level
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [`kahuna-product-model.md`](01-product/kahuna-product-model.md) | Core value proposition, layered product model (Core + Specializations), capabilities, key scenarios | ✅ Complete |
+
+### Architecture Level
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [`abstract-architecture.md`](02-architecture/abstract-architecture.md) | Subsystems, components, integration contracts | ✅ Stable |
+| [`static-dynamic-integration.md`](02-architecture/static-dynamic-integration.md) | How static structure enables dynamic computation | ✅ Stable |
+
+### Subsystem Level
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| — | Individual subsystem designs (Encoding, Storage, Retrieval, etc.) | 📋 Planned |
+
+### Foundations
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [`llm-agent-model.md`](04-foundations/llm-agent-model.md) | LLM as Bayesian inference engine, agent design patterns | ✅ Complete |
+| [`theoretical-foundations.md`](04-foundations/theoretical-foundations.md) | Consolidated theoretical insights (Bayes, FEP, Multiple→One) | ✅ Complete |
 
 ---
 
-## 1. Product Overview
+## Conceptual Coverage Matrix
 
-### What Is Kahuna MCP?
+The matrix below shows coverage across **abstraction levels** (rows) and **scopes** (columns). Use this to identify gaps and understand document coverage.
 
-Kahuna MCP is an MCP server that transforms empty folders into structured agent development environments for "vibe coders" building LangGraph agents with Claude Code.
+| Level | Kahuna Core | Specialization Framework | Kahuna Code (Instance) |
+|-------|-------------|--------------------------|------------------------|
+| **Product** | ✅ [Product Model](01-product/kahuna-product-model.md) | ✅ *(within Product Model)* | ✅ *(within Product Model)* |
+| **Architecture** | ✅ [Abstract Architecture](02-architecture/abstract-architecture.md), [Static-Dynamic](02-architecture/static-dynamic-integration.md) | ✅ *(within arch docs)* | ⏳ Future |
+| **Subsystem** | 📋 Pending | 📋 Pending | ⏳ Future |
+| **Foundations** | ✅ [LLM Agent Model](04-foundations/llm-agent-model.md), [Theoretical](04-foundations/theoretical-foundations.md) | — | — |
 
-**Target Users:** Non-developer "vibe coders" - employees building business agents without formal developer training.
-
-**Core Problem:** Coding copilots are powerful but forgetful. Every session starts fresh. Users repeat themselves. Copilots make the same mistakes twice. Knowledge is lost between sessions.
-
-**Core Value Proposition:** "Surfacing information instead of querying for it."
-
-Unlike tools like Context7 that expect copilots to know what to query, Kahuna's agents determine what context is relevant and surface it proactively. The copilot doesn't ask "what do I need?" - Kahuna tells it.
-
-### What Kahuna Is NOT
-
-- **Not a RAG system** - RAG retrieves code snippets based on queries. Kahuna proactively surfaces synthesized knowledge at the right time.
-- **Not just storage** - Traditional knowledge bases store and retrieve. Kahuna's agents synthesize, organize, and surface.
-- **Not a memory feature** - Built-in copilot memory is shallow (preferences, names). Kahuna captures deep context: decisions, policies, requirements, project-specific patterns.
-
-### What Kahuna IS
-
-**Kahuna is an agent-powered documentation generator.** Its agents:
-1. **Ingest** files and conversation logs
-2. **Synthesize** structured markdown capturing the relevant knowledge
-3. **Organize** the knowledge base structure (agents decide how)
-4. **Surface** the right context at the right time
+**Legend:**
+- ✅ Complete — Document exists and is stable
+- 📋 Planned/Pending — Content exists in working docs or is planned
+- ⏳ Future — Will be documented when upstream content stabilizes
+- — Not applicable
 
 ---
 
-## 2. Core Concepts
+## How to Use This Documentation
 
-### 2.1 Two Knowledge Input Channels
+**For understanding Kahuna's value:**
+→ Start with [`01-product/kahuna-product-model.md`](01-product/kahuna-product-model.md)
 
-Kahuna accepts knowledge from two sources:
+**For understanding system structure:**
+→ Read [`02-architecture/abstract-architecture.md`](02-architecture/abstract-architecture.md) for subsystems and components
+→ Read [`02-architecture/static-dynamic-integration.md`](02-architecture/static-dynamic-integration.md) for how structure enables computation
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         KNOWLEDGE INPUTS                                     │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   CONVERSATIONS                          USER FILES                          │
-│   ─────────────                          ──────────                          │
-│                                                                              │
-│   Claude Code session logs               Policies, specs, requirements       │
-│   contain implicit knowledge:            contain explicit knowledge:         │
-│                                                                              │
-│   • Decisions made and why               • Business rules                    │
-│   • Alternatives considered              • API specifications                │
-│   • Problems encountered                 • Compliance requirements           │
-│   • Lessons learned                      • Technical constraints             │
-│   • User preferences                     • Reference documentation           │
-│                                                                              │
-│   Kahuna EXTRACTS this knowledge         Kahuna CLASSIFIES and STORES       │
-│   from conversation patterns             for appropriate retrieval           │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────────┐
-                    │   KNOWLEDGE BASE    │
-                    │                     │
-                    │   .context-guide.md  │
-                    │   (single file with │
-                    │    all knowledge)   │
-                    └─────────────────────┘
-```
+**For implementing a subsystem:**
+→ Check Subsystem designs (when available), with Architecture for context
 
-**The "Throw Files at Kahuna" Pattern:**
-
-The copilot can send any file to Kahuna with minimal explanation:
-
-> "Here's our company's API design guidelines"
-
-Kahuna's agents:
-1. Classify what kind of knowledge this is (policy, spec, reference, etc.)
-2. Determine if/how it should affect the knowledge base
-3. Store it appropriately for later surfacing
-4. Report back what was done
-
-The copilot MAY provide context ("this is our security policy"), but the goal is for Kahuna to figure it out.
-
-### 2.2 Conversations as Semantic Changelog
-
-**The Thesis:** Conversation logs capture knowledge that files cannot.
-
-| Files tell you | Conversations tell you |
-|----------------|------------------------|
-| What code exists | Why it was written that way |
-| Current state | What alternatives were considered |
-| The destination | The journey |
-
-A git diff shows "added timeout variable." The conversation reveals: the user was experiencing timeouts on large queries, Promise.all with timeout fallback was chosen over other approaches, and how to verify the fix works.
-
-**Application:** Kahuna agents extract the "why" and "how" from conversations, not just the "what" from files.
-
-### 2.3 Surfacing, Not Storage
-
-> "The value isn't in storing knowledge - it's in surfacing the right knowledge at the right time."
-
-**Wrong:** User manually queries a knowledge base
-**Right:** Copilot automatically receives relevant context for the current task
-
-The copilot describes what it's doing, and Kahuna's agents determine what's relevant. This is the inverse of RAG-style "query and retrieve."
-
-### 2.4 Files as Interface
-
-The `.context-guide.md` file is the interface between Kahuna and the copilot.
-
-```
-project/
-└── .context-guide.md        # Single markdown file with all relevant knowledge
-```
-
-**Initial structure:** `kahuna_initialize` creates a starter `.context-guide.md` with curated patterns (e.g., LangGraph best practices). This provides Day 1 value.
-
-**Subsequent updates:** `kahuna_prepare_context` regenerates the entire file with task-relevant knowledge from the knowledge base.
-
-**Why files?** Copilots already know how to read files and follow links. No special retrieval protocol needed. The knowledge base is structured markdown that copilots navigate naturally.
-
-### 2.5 Two-Stage Processing
-
-```
-DETECT → CLASSIFY → GATE → PROCESS
-         [No LLM cost]     [LLM cost]
-```
-
-Only content that passes the gate incurs LLM costs. Use heuristics and pattern matching first, reserve agent processing for what actually needs it.
-
-### 2.6 LLM-Catered Responses with Steering Hints
-
-All tool responses include actionable hints guiding what to do next:
-
-```markdown
-<hints>
-## What You Can Do Next
-
-- **Read the full decision**: Check the Search Approach section in `.context-guide.md`
-- **Check the policy**: The API guidelines affect how you should implement this
-- **Start implementation**: The decision above provides the rationale you need
-</hints>
-```
+**For theoretical grounding:**
+→ Foundations documents explain the cognitive science and LLM theory behind design decisions
 
 ---
 
-## 3. MCP Tools
+## Contributing
 
-Four active tools (plus one deferred) in three categories. See [tool-specifications.md](./tool-specifications.md) for detailed specs.
+Documents are promoted from [`docs/internal/`](../internal/) when:
+1. Content is stable (not actively being revised)
+2. Document has clear scope and purpose
+3. No major gaps or TODOs remaining
+4. Has been reviewed/validated
 
-| Category | Tools | Purpose |
-|----------|-------|---------|
-| **Building Knowledge Base** | `kahuna_learn`, `kahuna_sync` (deferred) | Populate ~/.kahuna with knowledge |
-| **Environment Setup** | `kahuna_initialize`, `kahuna_prepare_context` | Prepare project for development |
-| **Assistance** | `kahuna_ask` | Use context + KB to help copilot |
-
-> **Note:** Verification/review is handled through a copilot skill rather than an MCP tool. See [copilot-configuration.md](./copilot-configuration.md) for skill details.
-
----
-
-## 4. Cold Start Strategy
-
-**Problem:** Users want Day 1 value, but conversation-based knowledge requires history.
-
-**Solution:** Layered value delivery
-
-| Layer | Source | Day 1? | Description |
-|-------|--------|--------|-------------|
-| 1. Curated Patterns | Kahuna-provided | ✅ Yes | LangGraph best practices |
-| 2. Project Structure | Init template | ✅ Yes | Boilerplate that embodies patterns |
-| 3. User Files | Policies, specs | ✅ Yes | Immediate if user has existing docs |
-| 4. Project Decisions | Extracted from work | After first task | Specific to this project |
-| 5. Historical Context | Accumulated | Over time | Rich "why" from conversations |
-
-**Day 1 is not empty:**
-- Curated LangGraph patterns provide real guidance
-- If user has existing policy docs, they can send them immediately
-- Task context steering works even without project history
-
----
-
-## 5. Design Decisions
-
-### 5.1 Two Input Channels (Conversations + Files)
-
-**Decision:** Kahuna accepts knowledge from both conversation logs AND user-provided files.
-
-**Rationale:**
-- Conversations capture implicit knowledge (decisions, rationale, lessons)
-- User files provide explicit knowledge (policies, requirements, specs)
-- Both are valuable; neither is sufficient alone
-- "Throw files at it" is a natural user mental model
-
-### 5.2 Files as Interface
-
-**Decision:** Request Task Context writes to `.context-guide.md` rather than returning content directly.
-
-**Rationale:**
-- Copilots already know how to read files
-- No special parsing of tool output needed
-- Context persists if copilot needs to re-read
-- Consistent model across all knowledge access
-
-### 5.3 Single Natural Language Parameter
-
-**Decision:** Most tools accept a single natural language parameter rather than complex structured inputs.
-
-**Rationale:**
-- Fewer parameters = fewer LLM mistakes
-- Natural language is how copilots think
-- The tool can be smarter about parsing intent
-
-### 5.4 Agent-Determined Structure
-
-**Decision:** Agents determine the `.context-guide.md` content structure based on relevance, rather than predefined categories.
-
-**Rationale:**
-- Fits "agents figure it out" philosophy
-- Avoids premature categorization decisions
-- Can iterate on content organization without changing design
-- Single file is simpler than managing multiple files
-
-### 5.5 Automatic Classification
-
-**Decision:** Kahuna classifies incoming files automatically; copilot provides optional hints.
-
-**Rationale:**
-- Reduces copilot cognitive load
-- "Throw files at it" pattern is more natural
-- Hints can improve classification but aren't required
-- Agents can ask for clarification if truly ambiguous
-
-### 5.6 Curated Patterns for Cold Start
-
-**Decision:** Init pre-populates `.context-guide.md` with LangGraph-specific starter content.
-
-**Rationale:**
-- Users need Day 1 value
-- LangGraph has established best practices
-- Content can evolve as project develops
-
-### 5.7 Claude Code + LangGraph Focus
-
-**Decision:** Initial release targets only Claude Code + LangGraph.
-
-**Rationale:**
-- One-month timeline requires focus
-- LangGraph is the dominant agent framework
-- Claude Code has accessible conversation logs
-- Can expand later
-
----
-
-## 6. Out of Scope (Deferred)
-
-| Feature | Reason | Future Phase |
-|---------|--------|--------------|
-| PR Review Action | Requires GitHub infrastructure | Phase 2 |
-| Deployment Skills | Not core to knowledge management | Phase 2 |
-| Multi-project Knowledge | Adds complexity | Phase 3 |
-| Other Copilots | Different log formats | After validation |
-| Other Frameworks | Focus first | After validation |
-| Vector/Semantic Search | Keyword sufficient for MVP | If scale requires |
-
----
-
-## Changelog
-
-- v1.0 (2026-02-05): Initial authoritative design consolidating documents 00-08
-- v1.1 (2026-02-05): Added file-based knowledge input; restructured as overview document
-- v1.2 (2026-02-05): Clarified Kahuna as agent-powered documentation generator; adopted agent-determined structure for .context-guide.md
-- v1.3 (2026-02-05): Finalized tool names: setup, learn, prepare_context, ask, review, sync
-- v1.4 (2026-02-05): Two-stage architecture; tool categories; assistance tools use context + KB
-- v1.5 (2026-02-05): Added 09d-copilot-configuration.md to document index; updated 09b/09c status
-- v1.6 (2026-02-05): Clarified .context-guide.md structure (single file approach); fixed ~/.kahuna as global; aligned status terminology
-- v2.0 (2026-02-05): Promoted to docs/design/; restructured as conceptual overview (technical details moved to companion docs)
-- v2.1 (2026-02-09): Renamed kahuna_setup → kahuna_initialize; removed kahuna_review (now skill-based); updated tool table
+When moving documents:
+- Update cross-references to use new paths
+- Remove internal working notes
+- Ensure the document works standalone

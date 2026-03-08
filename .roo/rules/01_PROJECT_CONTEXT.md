@@ -4,20 +4,18 @@
 
 You are working in the **Kahuna 2.0** repository. Following these rules is CRITICAL for maintaining code quality, consistency, and effective development.
 
-**Kahuna** is a context management platform that helps coding copilots succeed with complex tasks. The primary interface is an **MCP server** that provides tools for sending context, retrieving relevant information, and verifying results. Behind the MCP tools, a **Knowledge Base** of organized markdown files (written by agents, for agents) grows and improves over time.
+**Kahuna** is a context management platform that helps coding copilots succeed with complex tasks. The primary interface is an **MCP server** that provides tools for copilot interaction. Behind the MCP tools, a **Knowledge Base** of organized markdown files (written by agents, for agents) grows and improves over time.
 
 **Core Components:**
 
-- **MCP Server** - Local stdio server providing tools for copilots (send_context, get_context, verify_results, etc.)
+- **MCP Server** - Local stdio server providing tools for copilots
 - **Knowledge Base** - Organized markdown documentation maintained by specialized agents
-- **Agent Pipeline** - Categorization and processing agents that transform raw files into structured knowledge
-- **VCK Templates** - Static copilot configurations and framework rules (Vibe Code Kits)
-
-**Architecture:** The MCP server runs locally and handles file reading/writing. Agents and knowledge base logic will eventually live in a cloud API, but for now development focuses on getting the MCP tools working with local agents.
+- **Agents** - LLM-powered processing that transforms information into structured knowledge
+- **Templates** - Static copilot configurations and framework scaffolds
 
 **Technology Stack:** TypeScript/Node.js monorepo (pnpm + Turborepo) with MCP server (stdio) as the primary runtime.
 
-**Development Stage:** Kahuna 2.0 is a complete rebuild from scratch, currently in early infrastructure phase. Backwards compatibility is **never** required. Focus on clean, simple code that enables rapid iteration. If something isn't working, change it or delete it.
+**Development Stage:** Kahuna 2.0 is a complete rebuild from scratch. Backwards compatibility is **never** required. Focus on clean, simple code that enables rapid iteration. If something isn't working, change it or delete it.
 
 **Note:** Roo's mode system automatically loads the appropriate rules for your current mode. This document contains universal context that applies to all modes.
 
