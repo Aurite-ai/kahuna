@@ -367,6 +367,19 @@ salience: number;  // 0.0 - 1.0
 Recency boosts recently accessed/updated entries:
 
 ```typescript
+/**
+ * Compute recency factor for query-time ranking.
+ *
+ * NOTE: This recency factor (14-day half-life) is ADDITIONAL to the recency
+ * already embedded in effective_salience from the Attention subsystem (30-day
+ * half-life). The different half-lives serve different purposes:
+ *
+ * - Attention's recency (30-day): Persistent decay for long-term salience
+ * - Retrieval's recency (14-day): Query-time boost for recently-used entries
+ *
+ * Combined effect: Recently accessed entries get a strong ranking boost
+ * beyond their baseline salience decay.
+ */
 function computeRecencyFactor(lastAccessed: Date, now: Date): number {
   const daysSince = (now.getTime() - lastAccessed.getTime()) / (1000 * 60 * 60 * 24);
   const halfLife = 14;  // days - entries half as "recent" after 14 days
@@ -440,68 +453,22 @@ function computeRelevanceScore(
 
 ### 3.4 Mode-Specific Configurations
 
+Mode configurations are defined canonically in the **Attention subsystem** ([`06-attention.md`](06-attention.md) Part 5.1). Retrieval imports these configurations at runtime rather than duplicating them.
+
 ```typescript
-const MODE_CONFIGS: Record<string, ModeConfig> = {
-  code: {
-    mode: 'code',
-    category_weights: {
-      patterns: 1.2,        // Boost patterns for code implementation
-      decisions: 1.1,       // Boost decisions
-      errors: 1.3,          // Strongly boost errors (avoid mistakes)
-      preferences: 1.0,     // Neutral
-      facts: 0.9,           // Slight reduction
-      context: 0.8,         // Lower priority
-    },
-    recency_importance: 'medium',
-    preferred_entry_types: ['patterns', 'errors', 'decisions'],
-    max_entries: 12,
-  },
-
-  architect: {
-    mode: 'architect',
-    category_weights: {
-      patterns: 1.1,
-      decisions: 1.3,       // Strongly boost decisions for architecture
-      errors: 1.0,
-      preferences: 1.2,     // Boost preferences for design
-      facts: 1.0,
-      context: 1.1,         // Boost context for big picture
-    },
-    recency_importance: 'low',  // Architecture decisions are more stable
-    preferred_entry_types: ['decisions', 'patterns', 'preferences'],
-    max_entries: 8,         // Fewer but more focused
-  },
-
-  debug: {
-    mode: 'debug',
-    category_weights: {
-      patterns: 1.0,
-      decisions: 0.9,
-      errors: 1.5,          // Strongly boost errors for debugging
-      preferences: 0.8,
-      facts: 1.2,           // Boost facts (configuration, etc.)
-      context: 1.0,
-    },
-    recency_importance: 'high',  // Recent info most relevant for debugging
-    preferred_entry_types: ['errors', 'facts', 'patterns'],
-    max_entries: 15,        // More entries for comprehensive debugging
-  },
-
-  ask: {
-    mode: 'ask',
-    category_weights: {
-      patterns: 1.0,
-      decisions: 1.1,
-      errors: 0.9,
-      preferences: 1.0,
-      facts: 1.2,           // Boost facts for Q&A
-      context: 1.1,
-    },
-    recency_importance: 'low',
-    preferred_entry_types: ['facts', 'decisions', 'context'],
-    max_entries: 10,
-  },
-};
+// Mode configurations imported from Attention subsystem.
+// See: 06-attention.md Part 5.1 for canonical definitions.
+//
+// At runtime, Retrieval obtains configs via: attention.getModeConfig(mode)
+//
+// Example structure (for reference only - canonical values in Attention):
+interface ModeConfig {
+  mode: string;
+  category_weights: Record<string, number>;  // e.g., errors: 1.4, patterns: 1.3
+  recency_importance: 'high' | 'medium' | 'low';
+  preferred_entry_types: string[];
+  max_entries?: number;
+}
 
 // Default for unrecognized modes
 const DEFAULT_MODE_CONFIG: ModeConfig = {
@@ -512,6 +479,8 @@ const DEFAULT_MODE_CONFIG: ModeConfig = {
   max_entries: 10,
 };
 ```
+
+> **Design Note:** The Attention subsystem owns mode configurations to ensure consistency across the system. Retrieval references these canonical values rather than maintaining duplicate definitions that could drift out of sync.
 
 ### 3.5 Diversity Enforcement
 
@@ -1502,6 +1471,9 @@ Retrieval computes P(relevant | task) — the likelihood function:
 
 ## Changelog
 
+- v1.2 (2026-03-08): Integration alignment fixes
+  - Removed duplicate mode weight definitions; now references Attention's canonical configs (Part 3.4)
+  - Added clarifying comment about dual recency factors (14-day retrieval vs 30-day decay) (Part 3.2)
 - v1.1 (2026-03-08): Address review gaps
   - Added design decision clarifying Query Processor uses rule-based processing (no LLM) (P1.1)
   - Fixed Storage filter mapping to include `exclude_categories` and `min_confidence` (P1.2)

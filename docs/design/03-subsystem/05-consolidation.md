@@ -909,7 +909,7 @@ async function detectKBConflicts(
   if (!proposal.target_entry_ids?.length) return conflicts;
 
   for (const targetId of proposal.target_entry_ids) {
-    const existing = await storage.get_entry(targetId);
+    const existing = await storage.read_entry({ entry_id: targetId });
     if (!existing) continue;
 
     // Check for contradiction
@@ -2070,6 +2070,8 @@ Consolidation performs P(H|E) = Bayesian Update:
 
 ## Changelog
 
+- v1.2 (2026-03-08): Integration alignment fixes
+  - Fixed naming: `storage.get_entry()` → `storage.read_entry()` to align with Storage API (Part 4.2)
 - v1.1 (2026-03-08): Address gaps from consolidation-subsystem-review.md
   - **P1.1**: Fixed Storage API signatures to use batch `apply_updates` API per 01-storage.md Part 3.5
   - **P1.2**: Added SUPERSEDE and LINK actions; documented mapping to Storage operations in Part 5.3

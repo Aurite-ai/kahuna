@@ -212,6 +212,11 @@ type SourceType =
 // Note: Aligns with common-schemas.md Episode source types.
 // 'consolidated' and 'system' are storage-specific additions for entries
 // that don't originate from episodes.
+//
+// IMPORTANT: The 'consolidated' type is set by Storage during merge operations
+// in apply_updates() - Encoding never produces this type directly. This type
+// indicates entries that were created or modified through KB consolidation
+// rather than direct user or system input.
 ```
 
 ### 2.2 Index Entry Schema
@@ -328,6 +333,7 @@ interface SearchFilters {
   categories?: string[];         // Include only these categories
   exclude_categories?: string[]; // Exclude these categories
   min_salience?: number;         // Minimum salience threshold
+  min_confidence?: number;       // Minimum confidence threshold
   max_age_days?: number;         // Entries modified within N days
   pinned_only?: boolean;         // Only pinned entries
   source_types?: SourceType[];   // Filter by source type
@@ -659,6 +665,11 @@ interface MetadataUpdate {
   salience?: number;
   confidence?: number;
   pinned?: boolean;
+
+  // === Access tracking (for Retrieval subsystem) ===
+  record_access?: boolean;         // If true, update last_accessed to now and increment access_count
+  last_accessed?: string;          // ISO 8601 timestamp (explicit override)
+  access_count_increment?: number; // Add to existing access_count
 }
 
 interface UpdateMetadataBatchInput {
@@ -1839,6 +1850,10 @@ Storage doesn't compute on P(H); it persists it. Other subsystems query and upda
 
 ## Changelog
 
+- v2.1 (2026-03-08): Integration alignment fixes
+  - Expanded `MetadataUpdate` interface with `record_access`, `last_accessed`, `access_count_increment` for Retrieval access tracking
+  - Added `min_confidence` to `SearchFilters` for confidence-based filtering
+  - Clarified that `SourceType.consolidated` is set by Storage during merge operations (not by Encoding)
 - v2.0 (2026-03-08): Implementation-ready update
   - Added concrete technology stack: `sqlite-vec` + `@huggingface/transformers` + `better-sqlite3`
   - Added `apply_updates` composite operation (Critical Gap #1 from analysis)

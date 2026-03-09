@@ -679,6 +679,8 @@ function clamp(value: number, min: number, max: number): number {
 | System Entry | `system` | System-generated |
 | Import | `imported` | External source |
 
+> **Note:** The `consolidated` source type is used by Storage during merge operations in `apply_updates()`. Encoding never produces this type directly — it is set by Storage when entries are created or modified through KB consolidation processes.
+
 ### 5.4 Confidence Computation
 
 Confidence comes from different sources depending on input type:
@@ -959,6 +961,8 @@ function prepare_embedding_text(input: EmbeddingPreparation): string {
 const MAX_EMBEDDING_CONTENT_CHARS = 8000;
 ```
 
+> **Note:** The `prepare_embedding_text()` function above is shown for reference to illustrate what Storage will embed. In practice, **Storage owns embedding composition** — Encoding passes structured fields (title, content, tags) to `Storage.store_entry()`, which composes the embedding text internally per its own rules (see [`01-storage.md`](01-storage.md) Part 8.4).
+
 ### 7.3 Storage.store_entry Contract
 
 When Encoding calls Storage.store_entry, Storage handles:
@@ -1118,6 +1122,27 @@ function validate_category(category: string, validCategories: string[]): void {
   }
 }
 
+/**
+ * Validate metadata ranges before calling Storage.
+ * Pre-validation prevents confusing INVALID_METADATA errors from Storage.
+ */
+function validate_metadata(confidence: number, salience: number): void {
+  if (confidence < 0 || confidence > 1) {
+    throw new EncodingError(
+      'INVALID_METADATA',
+      'Confidence must be between 0.0 and 1.0',
+      { field: 'confidence', value: confidence }
+    );
+  }
+  if (salience < 0 || salience > 1) {
+    throw new EncodingError(
+      'INVALID_METADATA',
+      'Salience must be between 0.0 and 1.0',
+      { field: 'salience', value: salience }
+    );
+  }
+}
+
 const MAX_CONTENT_SIZE = 1_000_000; // 1MB
 ```
 
@@ -1235,4 +1260,8 @@ Encoding expands P(H) by transforming raw information into hypothesis entries:
 
 ## Changelog
 
+- v1.1 (2026-03-08): Integration alignment fixes
+  - Added note clarifying `consolidated` source type is set by Storage, not Encoding (Part 5.3)
+  - Clarified that Storage owns embedding composition; `prepare_embedding_text()` is illustrative only (Part 7.2)
+  - Added `validate_metadata()` function for pre-validation of confidence/salience ranges (Part 9.3)
 - v1.0 (2026-03-08): Initial Encoding subsystem design
