@@ -21,7 +21,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
+
+      - name: Verify tag exists
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          TAG="${{ inputs.tag }}"
+          if ! git tag --list | grep -qx "$TAG"; then
+            echo "Error: tag '$TAG' does not exist in this repository." >&2
+            exit 1
+          fi
+          echo "Tag '$TAG' found."
 
       - name: Validate version
         run: |
