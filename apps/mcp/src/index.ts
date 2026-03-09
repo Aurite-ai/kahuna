@@ -103,6 +103,7 @@ import { learnTool } from './tools/learn.js';
 import { listIntegrationsTool } from './tools/list-integrations.js';
 import { prepareContextTool } from './tools/prepare-context.js';
 import { provideContextTool } from './tools/provide-context.js';
+import { setModeTool } from './tools/set-mode.js';
 import type { ToolContext } from './tools/types.js';
 import { updateConnectorTool } from './tools/update-connector.js';
 import { usageTool } from './tools/usage.js';
@@ -133,6 +134,8 @@ const allTools = [
   verifyIntegrationTool.definition,
   discoverIntegrationTool.definition,
   updateConnectorTool.definition,
+  // Mode management
+  setModeTool.definition,
 ];
 
 /**
@@ -184,6 +187,10 @@ async function routeToolCall(
 
     case 'kahuna_update_connector':
       return updateConnectorTool.handler(args, ctx);
+
+    // Mode management
+    case 'kahuna_set_mode':
+      return setModeTool.handler(args, ctx);
 
     default:
       return {
