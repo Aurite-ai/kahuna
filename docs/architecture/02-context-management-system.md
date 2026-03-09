@@ -205,7 +205,13 @@ apps/mcp/src/
 │   │   └── utils.ts                       # Slugify, frontmatter parsing, MDC generation
 │   └── surfacing/
 │       ├── index.ts
-│       └── context-writer.ts              # Write .kahuna/context-guide.md to project root
+│       ├── context-writer.ts              # Write .kahuna/context-guide.md to project root
+│       └── framework-copier.ts            # Copy framework templates (LangGraph/OpenAI)
+│
+├── templates/                             # VCK templates (bundled with MCP server)
+│   ├── copilot-configs/                   # Copilot configuration templates
+│   ├── frameworks/                        # Framework boilerplate (langgraph/, openai/)
+│   └── knowledge-base/                    # KB seed files (langgraph-best-practices.mdc, openai-agents-overview.mdc)
 │
 ├── tools/                                 # MCP tool handlers (thin wrappers)
 │   ├── types.ts                           # ToolContext, MCPToolResponse, markdownResponse()
