@@ -144,6 +144,12 @@ export const FRAMEWORK_TEMPLATES: FrameworkTemplate[] = [
     description: 'Python agent framework using LangGraph for stateful workflows',
     path: 'frameworks/langgraph',
   },
+  {
+    id: 'openai',
+    name: 'OpenAI Agent SDK',
+    description: 'OpenAI Agent SDK',
+    path: 'frameworks/openai',
+  },
 ];
 
 /**
