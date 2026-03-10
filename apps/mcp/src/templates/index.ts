@@ -144,6 +144,13 @@ export const FRAMEWORK_TEMPLATES: FrameworkTemplate[] = [
     description: 'Python agent framework using LangGraph for stateful workflows',
     path: 'frameworks/langgraph',
   },
+  {
+    id: 'openai',
+    name: 'OpenAI Agent SDK',
+    description:
+      'Python agent framework using OpenAI Agents SDK for tool calling and multi-agent handoffs',
+    path: 'frameworks/openai',
+  },
 ];
 
 /**
@@ -279,6 +286,15 @@ export async function getLangGraphFiles(): Promise<TemplateFile[]> {
 }
 
 /**
+ * Get OpenAI framework files.
+ */
+export async function getOpenAIFiles(): Promise<TemplateFile[]> {
+  const templatesDir = getTemplatesDir();
+  const frameworkDir = path.join(templatesDir, 'frameworks', 'openai');
+  return readDirectoryRecursive(frameworkDir);
+}
+
+/**
  * Get Claude Code configuration files.
  */
 export async function getClaudeCodeFiles(): Promise<TemplateFile[]> {
@@ -303,6 +319,8 @@ export async function getFrameworkFiles(frameworkId: string): Promise<TemplateFi
   switch (frameworkId) {
     case 'langgraph':
       return getLangGraphFiles();
+    case 'openai':
+      return getOpenAIFiles();
     default:
       throw new Error(`Unknown framework: ${frameworkId}`);
   }

@@ -2,7 +2,7 @@
 
 **Status:** Final
 **Date:** 2026-02-05
-**Scope:** Claude Code + LangGraph (initial release)
+**Scope:** Claude Code + LangGraph/OpenAI Agents SDK (initial release)
 
 > **Implementation note:** These documents capture product-level design intent. For current implementation details (architecture, file formats, agent specifics), see [Architecture: Context Management System](../architecture/02-context-management-system.md).
 
@@ -24,7 +24,7 @@
 
 ### What Is Kahuna MCP?
 
-Kahuna MCP is an MCP server that transforms empty folders into structured agent development environments for "vibe coders" building LangGraph agents with Claude Code.
+Kahuna MCP is an MCP server that transforms empty folders into structured agent development environments for "vibe coders" building AI agents (LangGraph or OpenAI Agents SDK) with Claude Code.
 
 **Target Users:** Non-developer "vibe coders" - employees building business agents without formal developer training.
 
@@ -187,14 +187,14 @@ Four active tools (plus one deferred) in three categories. See [tool-specificati
 
 | Layer | Source | Day 1? | Description |
 |-------|--------|--------|-------------|
-| 1. Curated Patterns | Kahuna-provided | ✅ Yes | LangGraph best practices |
+| 1. Curated Patterns | Kahuna-provided | ✅ Yes | LangGraph/OpenAI Agents SDK best practices |
 | 2. Project Structure | Init template | ✅ Yes | Boilerplate that embodies patterns |
 | 3. User Files | Policies, specs | ✅ Yes | Immediate if user has existing docs |
 | 4. Project Decisions | Extracted from work | After first task | Specific to this project |
 | 5. Historical Context | Accumulated | Over time | Rich "why" from conversations |
 
 **Day 1 is not empty:**
-- Curated LangGraph patterns provide real guidance
+- Curated framework patterns (LangGraph or OpenAI Agents SDK) provide real guidance
 - If user has existing policy docs, they can send them immediately
 - Task context steering works even without project history
 
@@ -253,22 +253,22 @@ Four active tools (plus one deferred) in three categories. See [tool-specificati
 
 ### 5.6 Curated Patterns for Cold Start
 
-**Decision:** Init pre-populates `.kahuna/context-guide.md` with LangGraph-specific starter content.
+**Decision:** Init pre-populates `.kahuna/context-guide.md` with framework-specific starter content (LangGraph or OpenAI Agents SDK).
 
 **Rationale:**
 - Users need Day 1 value
-- LangGraph has established best practices
+- Both frameworks have established best practices
 - Content can evolve as project develops
 
-### 5.7 Claude Code + LangGraph Focus
+### 5.7 Claude Code + Agent Framework Focus
 
-**Decision:** Initial release targets only Claude Code + LangGraph.
+**Decision:** Initial release targets Claude Code with LangGraph and OpenAI Agents SDK support.
 
 **Rationale:**
-- One-month timeline requires focus
-- LangGraph is the dominant agent framework
+- Focus on Python agent frameworks
+- LangGraph and OpenAI Agents SDK are the dominant frameworks
 - Claude Code has accessible conversation logs
-- Can expand later
+- Can expand to other copilots/frameworks later
 
 ---
 
@@ -280,7 +280,7 @@ Four active tools (plus one deferred) in three categories. See [tool-specificati
 | Deployment Skills | Not core to knowledge management | Phase 2 |
 | Multi-project Knowledge | Adds complexity | Phase 3 |
 | Other Copilots | Different log formats | After validation |
-| Other Frameworks | Focus first | After validation |
+| Other Frameworks (non-Python) | Focus on Python first | After validation |
 | Vector/Semantic Search | Keyword sufficient for MVP | If scale requires |
 
 ---

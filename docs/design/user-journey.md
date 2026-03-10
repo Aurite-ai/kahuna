@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document illustrates how a "vibe coder" uses Kahuna MCP from Day 1 through ongoing development. The user is a non-developer employee building LangGraph agents with Claude Code - capable of describing what they want but not experienced with coding conventions or patterns.
+This document illustrates how a "vibe coder" uses Kahuna MCP from Day 1 through ongoing development. The user is a non-developer employee building AI agents (LangGraph or OpenAI Agents SDK) with Claude Code - capable of describing what they want but not experienced with coding conventions or patterns.
 
 ---
 

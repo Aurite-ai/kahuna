@@ -58,7 +58,7 @@ Claude Code settings for the project.
 - Project-specific editor/copilot settings
 - Committed to git for team consistency
 
-**MVP Content:** Default settings appropriate for LangGraph development.
+**MVP Content:** Default settings appropriate for agent development (LangGraph or OpenAI Agents SDK).
 
 ### .claude/settings.local.json
 
