@@ -1,6 +1,5 @@
 CLAUDE.local.md
 .claude/settings.local.json
-javascript
 __pycache__/
 *.pyc
 .venv/
