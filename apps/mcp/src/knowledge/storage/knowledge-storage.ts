@@ -68,9 +68,33 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
 
   /**
    * Get the file path for a given slug
+   *
+   * @param slug - The slug for the knowledge entry
+   * @param subdirectory - Optional subdirectory within the base directory
    */
-  private getFilePath(slug: string): string {
+  private getFilePath(slug: string, subdirectory?: string): string {
+    if (subdirectory) {
+      return path.join(this.baseDir, subdirectory, `${slug}.mdc`);
+    }
     return path.join(this.baseDir, `${slug}.mdc`);
+  }
+
+  /**
+   * Ensure a subdirectory exists within the knowledge base
+   *
+   * @param subdirectory - Subdirectory path relative to baseDir
+   */
+  private async ensureSubdirectory(subdirectory: string): Promise<void> {
+    const subdirPath = path.join(this.baseDir, subdirectory);
+    try {
+      await fs.mkdir(subdirPath, { recursive: true });
+    } catch (error) {
+      throw new KnowledgeStorageError(
+        `Failed to create subdirectory: ${subdirPath}`,
+        'DIR_ERROR',
+        error instanceof Error ? error : undefined
+      );
+    }
   }
 
   /**
@@ -79,9 +103,15 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
    * Accepts simplified SaveKnowledgeEntryInput with flat fields.
    * Sets source.project = process.cwd() automatically.
    * Preserves created_at on updates.
+   * Supports optional subdirectory for project-specific storage.
    */
   async save(input: SaveKnowledgeEntryInput): Promise<KnowledgeEntry> {
     await this.ensureDir();
+
+    // Ensure subdirectory exists if specified
+    if (input.subdirectory) {
+      await this.ensureSubdirectory(input.subdirectory);
+    }
 
     // Generate slug from title
     const slug = generateSlug(input.title);
@@ -92,13 +122,13 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
       );
     }
 
-    const filepath = this.getFilePath(slug);
+    const filepath = this.getFilePath(slug, input.subdirectory);
     const now = new Date().toISOString();
 
     // Check if file exists to preserve created_at
     let createdAt = now;
     try {
-      const existing = await this.get(slug);
+      const existing = await this.get(slug, input.subdirectory);
       if (existing) {
         createdAt = existing.created_at;
       }
@@ -147,43 +177,84 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
   /**
    * List all knowledge entries with optional filtering.
    *
-   * Reads all .mdc files from the directory, parses them,
+   * Reads all .mdc files from the directory and subdirectories, parses them,
    * and applies filters in memory. No tag-based filtering (tags removed).
+   *
+   * @param filter - Optional filter criteria
+   * @param subdirectories - Optional array of subdirectories to include. If null/undefined, scans ALL subdirectories. Pass empty array [] to scan only base directory.
    */
-  async list(filter?: KnowledgeEntryFilter): Promise<KnowledgeEntry[]> {
+  async list(
+    filter?: KnowledgeEntryFilter,
+    subdirectories?: string[] | null
+  ): Promise<KnowledgeEntry[]> {
     await this.ensureDir();
 
-    // Read directory contents
-    let files: string[];
-    try {
-      files = await fs.readdir(this.baseDir);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return [];
-      }
-      throw new KnowledgeStorageError(
-        `Failed to read knowledge directory: ${this.baseDir}`,
-        'DIR_ERROR',
-        error instanceof Error ? error : undefined
-      );
-    }
-
-    // Filter for .mdc files
-    const mdcFiles = files.filter((f) => f.endsWith('.mdc'));
-
-    // Parse all files
     const entries: KnowledgeEntry[] = [];
-    for (const filename of mdcFiles) {
+
+    // Helper function to read .mdc files from a directory
+    const readMdcFiles = async (dirPath: string, subdirectory?: string): Promise<void> => {
+      let files: string[];
       try {
-        const slug = filename.replace(/\.mdc$/, '');
-        const content = await fs.readFile(path.join(this.baseDir, filename), 'utf-8');
-        const parsed = parseMdcFile(content);
-        entries.push({ ...parsed.frontmatter, slug, content: parsed.body });
+        files = await fs.readdir(dirPath);
       } catch (error) {
-        // Log warning but don't fail the entire operation
-        console.warn(`Failed to parse ${filename}:`, error);
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          return;
+        }
+        throw new KnowledgeStorageError(
+          `Failed to read directory: ${dirPath}`,
+          'DIR_ERROR',
+          error instanceof Error ? error : undefined
+        );
+      }
+
+      // Filter for .mdc files
+      const mdcFiles = files.filter((f) => f.endsWith('.mdc'));
+
+      // Parse all files
+      for (const filename of mdcFiles) {
+        try {
+          const slug = filename.replace(/\.mdc$/, '');
+          const content = await fs.readFile(path.join(dirPath, filename), 'utf-8');
+          const parsed = parseMdcFile(content);
+          entries.push({
+            ...parsed.frontmatter,
+            slug,
+            content: parsed.body,
+            subdirectory,
+          });
+        } catch (error) {
+          // Log warning but don't fail the entire operation
+          const displayPath = subdirectory ? `${subdirectory}/${filename}` : filename;
+          console.warn(`Failed to parse ${displayPath}:`, error);
+        }
+      }
+    };
+
+    // Read from base directory
+    await readMdcFiles(this.baseDir);
+
+    // Determine which subdirectories to scan
+    if (subdirectories === null || subdirectories === undefined) {
+      // Scan ALL subdirectories
+      try {
+        const allFiles = await fs.readdir(this.baseDir, { withFileTypes: true });
+        const subdirs = allFiles.filter((f) => f.isDirectory()).map((f) => f.name);
+        for (const subdir of subdirs) {
+          const subdirPath = path.join(this.baseDir, subdir);
+          await readMdcFiles(subdirPath, subdir);
+        }
+      } catch (error) {
+        // If we can't read subdirectories, just continue with base directory files
+        console.warn('Failed to scan subdirectories:', error);
+      }
+    } else if (subdirectories.length > 0) {
+      // Scan specific subdirectories
+      for (const subdir of subdirectories) {
+        const subdirPath = path.join(this.baseDir, subdir);
+        await readMdcFiles(subdirPath, subdir);
       }
     }
+    // If subdirectories is empty array [], only base directory is scanned (already done above)
 
     // Apply filters if provided
     if (!filter) return entries;
@@ -232,10 +303,11 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
    * Get a single entry by slug
    *
    * @param slug - Filename without extension (e.g., "api-design-guidelines")
+   * @param subdirectory - Optional subdirectory within the knowledge base
    * @returns Entry or null if not found
    */
-  async get(slug: string): Promise<KnowledgeEntry | null> {
-    const filepath = this.getFilePath(slug);
+  async get(slug: string, subdirectory?: string): Promise<KnowledgeEntry | null> {
+    const filepath = this.getFilePath(slug, subdirectory);
 
     try {
       const content = await fs.readFile(filepath, 'utf-8');
@@ -257,9 +329,10 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
    * Check if an entry exists
    *
    * @param slug - Filename without extension
+   * @param subdirectory - Optional subdirectory within the knowledge base
    */
-  async exists(slug: string): Promise<boolean> {
-    const filepath = this.getFilePath(slug);
+  async exists(slug: string, subdirectory?: string): Promise<boolean> {
+    const filepath = this.getFilePath(slug, subdirectory);
 
     try {
       await fs.access(filepath);
@@ -273,10 +346,11 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
    * Delete an entry (or mark as archived)
    *
    * @param slug - Filename without extension
+   * @param subdirectory - Optional subdirectory within the knowledge base
    * @param permanent - If true, delete file; if false, set status to archived
    */
-  async delete(slug: string, permanent = false): Promise<void> {
-    const filepath = this.getFilePath(slug);
+  async delete(slug: string, subdirectory?: string, permanent = false): Promise<void> {
+    const filepath = this.getFilePath(slug, subdirectory);
 
     if (permanent) {
       // Hard delete - remove file
@@ -294,7 +368,7 @@ export class FileKnowledgeStorageService implements KnowledgeStorageService {
       }
     } else {
       // Soft delete - mark as archived
-      const existing = await this.get(slug);
+      const existing = await this.get(slug, subdirectory);
       if (!existing) {
         throw new KnowledgeStorageError(`Entry not found: ${slug}`, 'NOT_FOUND');
       }

@@ -262,6 +262,7 @@ describe('runAgent', () => {
               title: 'API Guidelines',
               summary: 'REST API standards.',
               topics: ['API Design'],
+              isProjectContext: true,
             },
           },
         ],
@@ -279,6 +280,7 @@ describe('runAgent', () => {
       tool: 'categorize_file',
       category: 'policy',
       title: 'API Guidelines',
+      isProjectContext: true,
     });
   });
 

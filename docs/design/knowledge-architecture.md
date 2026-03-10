@@ -68,9 +68,14 @@ The global knowledge base lives at `~/.kahuna/`. This folder is:
 ├── state.json                # Processing state, sync tracking
 │
 ├── knowledge/                # Classified knowledge entries (.mdc files)
-│   ├── [uuid-1].mdc          # Knowledge entry with frontmatter
-│   ├── [uuid-2].mdc
-│   └── ...
+│   ├── [general-file-1].mdc  # General context (applies to all projects)
+│   ├── [general-file-2].mdc
+│   ├── org-context.mdc       # Organization context
+│   ├── user-context.mdc      # User context
+│   │
+│   └── [project-hash]/       # Project-specific knowledge (hash of project directory path)
+│       ├── [file-1].mdc      # Files specific to this project
+│       └── [file-2].mdc
 │
 ├── conversations/            # Processed conversation summaries (.mdc files)
 │   ├── [session-id-1].mdc
@@ -81,6 +86,25 @@ The global knowledge base lives at `~/.kahuna/`. This folder is:
     └── [project-hash]/       # Prepared context ready to copy
         └── ...
 ```
+
+### Project-Level Context
+
+When files are uploaded that are project-specific, they are stored in a subfolder within the knowledge base named with the hash of the project directory path:
+
+**Storage behavior:**
+- **General context:** Files that apply across all projects (policies, standards, org/user context) are stored directly in `~/.kahuna/knowledge/`
+- **Project-specific context:** Files that are specific to a particular project are stored in `~/.kahuna/knowledge/[project-hash]/`
+
+**Retrieval behavior:**
+- Tools like [`kahuna_prepare_context`](./tool-specifications.md#5-kahuna_prepare_context) and [`kahuna_ask`](./tool-specifications.md#7-kahuna_ask) only fetch knowledge from:
+  1. General context (files directly in `~/.kahuna/knowledge/`)
+  2. The current project's subfolder (if it exists)
+- Files from other projects are not included in context retrieval
+
+**Benefits:**
+- **Isolation:** Project-specific knowledge doesn't pollute context for other projects
+- **Shared knowledge:** General policies and standards remain accessible to all projects
+- **Scalability:** Knowledge base can grow across many projects without context bloat
 
 ### .mdc Format (Markdown with Context)
 
@@ -298,11 +322,17 @@ Surfaced from Kahuna knowledge base on 2026-02-05.
 
 **Reads:**
 - User-provided files/folders (recursive)
+- Current project directory path (for determining storage location)
 
 **Writes to ~/.kahuna/:**
-- New `.mdc` file in `knowledge/[uuid].mdc`
+- New `.mdc` file in `knowledge/[slug].mdc` (general context)
+- OR `knowledge/[project-hash]/[slug].mdc` (project-specific context)
 - YAML frontmatter with classification metadata
 - Markdown content below frontmatter
+
+**Storage location determined by:**
+- File content and context (agent determines if project-specific or general)
+- Project path hash for project-specific files
 
 **Does NOT write to:** `project/.kahuna/context-guide.md`
 
@@ -310,17 +340,19 @@ Surfaced from Kahuna knowledge base on 2026-02-05.
 
 **Reads:**
 - Task description
-- `~/.kahuna/knowledge/` entries
+- `~/.kahuna/knowledge/` entries (general context)
+- `~/.kahuna/knowledge/[project-hash]/` entries (current project's context)
 - `~/.kahuna/conversations/` summaries
 
 **Writes to project/.kahuna/context-guide.md:**
-- Surfaced knowledge entries
+- Surfaced knowledge entries from general and current project context
 
 ### kahuna_ask (Assistance)
 
 **Reads (in order):**
 1. `project/.kahuna/context-guide.md` (if exists) - checked first
-2. `~/.kahuna/knowledge/` - fallback/additional
+2. `~/.kahuna/knowledge/` (general context) - fallback/additional
+3. `~/.kahuna/knowledge/[project-hash]/` (current project's context) - fallback/additional
 
 **Writes:** Nothing (returns text response)
 
@@ -489,15 +521,16 @@ The knowledge architecture evolves from simple to sophisticated:
 
 ## Design Decisions
 
-### Why Global Knowledge Base (~/.kahuna)?
+### Why Global Knowledge Base (~/.kahuna) with Project Subfolders?
 
-**Decision:** Store knowledge globally at `~/.kahuna/` rather than per-project.
+**Decision:** Store knowledge globally at `~/.kahuna/` with project-specific subfolders for project-scoped context.
 
 **Rationale:**
-- Knowledge can apply across projects
-- Policies and patterns often shared
-- Avoids duplicating common knowledge
-- Simpler mental model for users
+- **Shared knowledge:** General policies and patterns apply across projects
+- **Project isolation:** Project-specific files don't pollute context for other projects
+- **Avoids duplication:** Common knowledge stored once, accessible to all projects
+- **Scalability:** Knowledge base can grow across many projects without context bloat
+- **Simpler retrieval:** Tools automatically fetch general + current project context
 
 ### Why Separate Learn from Prepare?
 
@@ -606,3 +639,4 @@ confidence: 0.95
 - v3.0 (2026-02-05): Promoted to docs/design/; updated links and status to Final
 - v3.1 (2026-02-09): Renamed kahuna_setup → kahuna_initialize; removed kahuna_review (now skill-based)
 - v3.2 (2026-02-09): Added `integration` category for data sources, tools, and external services; aligned categories with implementation
+- v3.3 (2026-03-09): Added project-level context with hashed subfolders; updated storage and retrieval behavior

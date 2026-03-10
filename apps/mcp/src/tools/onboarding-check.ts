@@ -96,8 +96,8 @@ export async function checkOnboardingStatus(
   const projectHash = generateProjectHash(cwd);
   const expectedProjectSlug = `project-context-${projectHash}`;
 
-  // Get all active entries
-  const entries = await storage.list({ status: 'active' });
+  // Get all active entries from base directory only (context files are not in subdirectories)
+  const entries = await storage.list({ status: 'active' }, []);
 
   // Find org context - flexible matching for slugs containing "org" and "context"
   const orgEntry = entries.find((entry) => isOrgContextSlug(entry.slug));
