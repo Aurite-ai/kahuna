@@ -1,0 +1,45 @@
+name: Publish MCP to npm
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for OIDC provenance attestation
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Validate version matches release tag
+        run: |
+          chmod +x scripts/validate-version.sh
+          ./scripts/validate-version.sh "${{ github.ref_name }}"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and bundle MCP server
+        run: |
+          pnpm --filter @aurite-ai/kahuna build
+          pnpm --filter @aurite-ai/kahuna bundle
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        working-directory: apps/mcp
