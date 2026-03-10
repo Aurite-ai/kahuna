@@ -147,7 +147,8 @@ export const FRAMEWORK_TEMPLATES: FrameworkTemplate[] = [
   {
     id: 'openai',
     name: 'OpenAI Agent SDK',
-    description: 'OpenAI Agent SDK',
+    description:
+      'Python agent framework using OpenAI Agents SDK for tool calling and multi-agent handoffs',
     path: 'frameworks/openai',
   },
 ];
