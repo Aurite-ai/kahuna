@@ -17,6 +17,7 @@ Usage:
 
 import asyncio
 import sys
+from agents import Runner
 
 
 async def main():
@@ -60,7 +61,7 @@ async def main():
 
     # First turn
     print("\nUser: What city is the Golden Gate Bridge in?")
-    result = await agent.run("What city is the Golden Gate Bridge in?")
+    result = await Runner.run(agent, "What city is the Golden Gate Bridge in?")
     print(f"Agent: {result.final_output}")
 
     # Second turn - using conversation history
@@ -68,7 +69,7 @@ async def main():
     inputs = result.to_input_list() + [
         {"role": "user", "content": "What state is it in?"}
     ]
-    result = await agent.run(inputs)
+    result = await Runner.run(agent, inputs)
     print(f"Agent: {result.final_output}")
 
     # Show conversation summary

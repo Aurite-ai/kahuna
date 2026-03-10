@@ -19,7 +19,6 @@ To add a new tool:
 from typing import Annotated
 
 from agents import function_tool
-from pydantic import BaseModel, Field
 
 
 # Example: Simple function tool with primitive return type
@@ -96,54 +95,6 @@ def divide(
     return a / b
 
 
-# Example: Structured output using Pydantic models
-class CalculationResult(BaseModel):
-    """Structured result for complex calculations."""
-
-    result: float = Field(description="The calculated result")
-    operation: str = Field(description="The operation performed")
-    operands: list[float] = Field(description="The input operands")
-
-
-@function_tool
-def calculate_with_metadata(
-    operation: Annotated[str, "The operation: add, subtract, multiply, or divide"],
-    a: Annotated[float, "The first number"],
-    b: Annotated[float, "The second number"],
-) -> CalculationResult:
-    """Perform a calculation and return structured metadata.
-
-    This demonstrates returning a Pydantic model for structured output.
-
-    Args:
-        operation: The operation to perform
-        a: The first operand
-        b: The second operand
-
-    Returns:
-        A CalculationResult with the result and metadata
-    """
-    operations = {
-        "add": lambda x, y: x + y,
-        "subtract": lambda x, y: x - y,
-        "multiply": lambda x, y: x * y,
-        "divide": lambda x, y: x / y if y != 0 else None,
-    }
-
-    if operation not in operations:
-        raise ValueError(f"Unknown operation: {operation}")
-
-    result = operations[operation](a, b)
-    if result is None:
-        raise ValueError("Cannot divide by zero")
-
-    return CalculationResult(
-        result=result,
-        operation=operation,
-        operands=[a, b],
-    )
-
-
 # List of all tools to export
 # Add new tools here to make them available for import
-tools = [add, subtract, multiply, divide, calculate_with_metadata]
+tools = [add, subtract, multiply, divide]
