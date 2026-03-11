@@ -468,6 +468,37 @@ This is the foundation for understanding everything else in this course.
 
 ---
 
+# Structuring Input: The GRSO Framework
+
+Since input matters so much, how do you structure it well?
+
+Think of it like chess. Masters don't memorize every game — they learn **opening principles** that guide play.
+
+| Component | Purpose |
+|-----------|---------|
+| **G**oal | What success looks like |
+| **R**ules | Must/must not constraints |
+| **S**trategies | Preferred approaches |
+| **O**pening | How to begin |
+
+We'll build up to this throughout the series.
+
+<!--
+Before we move on, I want to give you a preview of where we're headed.
+
+Since input matters so much, how do you actually structure it well? The answer is the GRSO framework.
+
+Think of it like chess. Chess masters don't memorize every possible game - that's impossible. Instead, they learn opening principles - structured guidance that constrains the space of good play without dictating every move.
+
+Good prompts work the same way. GRSO stands for Goal, Rules, Strategies, and Opening.
+
+Goal is what success looks like. Rules are hard constraints - must do this, must not do that. Strategies are soft preferences - approaches that tend to work. And Opening is how to begin - seeding the right trajectory.
+
+We'll build up to this framework throughout the series. But first, we need to understand what can go wrong.
+-->
+
+---
+
 # Coming Up Next
 
 **Video 2: Context Poisoning**
