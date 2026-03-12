@@ -783,6 +783,30 @@ For decision-making prompts, use G/R/S/O. It gives the AI the structure it needs
 
 ---
 
+# Try It: Kahuna
+
+A tool that helps manage context for your AI copilot.
+
+**Step 1:** Install Claude Code
+→ https://code.claude.com/docs/en/quickstart
+
+**Step 2:** Install Kahuna
+→ https://www.npmjs.com/package/@aurite-ai/kahuna
+
+**Step 3:** Say "Set up Kahuna" in your project
+
+**Step 4:** Teach it context from our shared drive (example context for AI agents)
+
+<!--
+If you want to practice with a real tool, try Kahuna.
+
+First, install Claude Code — that's the coding copilot from Anthropic. Then install the Kahuna package from npm.
+
+Once it's set up, you can teach it context. We have example documents in our shared Google Drive folder that you can use to practice.
+-->
+
+---
+
 # Questions?
 
 Use the G/R/S/O cheat sheet for your next complex task.
