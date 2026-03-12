@@ -1,23 +1,91 @@
 # @aurite-ai/kahuna
 
-MCP server providing context management tools for coding copilots. Runs locally via stdio transport — copilots call Kahuna tools to learn from files, surface relevant context, manage integrations, and track usage.
+**Kahuna is your AI copilot's memory.** It helps coding copilots like Claude Code remember what they've learned, find relevant context for each task, and work more effectively on your projects.
+
+## What Kahuna Does
+
+Without Kahuna, your AI copilot starts fresh every conversation. With Kahuna:
+
+- **Provides structured rules** — Deploys copilot configuration that guides AI agent development
+- **Learns from your codebase** — Feed it files, docs, and examples. Kahuna remembers across sessions.
+- **Surfaces relevant context** — When you start a task, Kahuna finds what's helpful.
+- **Tracks context across projects** — Your organization's patterns and preferences persist.
 
 ## Quick Start (Claude Code)
 
-**One command to get started:**
+### Step 1: Add Kahuna
 
 ```bash
-# Add Kahuna with API key inline
-claude mcp add kahuna -s project -e ANTHROPIC_API_KEY="your-anthropic-api-key" -- npx @aurite-ai/kahuna
+claude mcp add kahuna -s user -e ANTHROPIC_API_KEY="your-anthropic-api-key" -- npx @aurite-ai/kahuna
 ```
 
 > **Scope options:**
-> - `-s project` — Config stored for current project (recommended for project-specific setup)
-> - `-s user` — Config stored as global (available across all projects)
+> - `-s project` — Config stored for current project
+> - `-s user` — Config stored globally (available across all projects)
 
-That's it! Restart Claude Code and Kahuna tools will be available. Use `/mcp` in Claude Code to verify the server is connected.
+### Step 2: Set Up Kahuna
 
-**Alternative: Two-step setup (global scope)**
+In each new project, restart Claude Code and say:
+
+> **"Set up Kahuna"**
+
+This deploys copilot rules to your project and runs first-time onboarding. The copilot will ask a few questions to understand your organization and project context—this only happens once, then Kahuna remembers.
+
+### Step 3: Teach Kahuna Your Context
+
+Share files from anywhere on your system:
+
+> **"learn ~/Downloads/business-policies.pdf"**
+
+Or share entire folders:
+
+> **"learn the docs/ folder"**
+
+Kahuna classifies and stores everything in its knowledge base. This context persists across sessions and projects.
+
+### Step 4: Start Building
+
+When you start a task, Kahuna automatically surfaces relevant context:
+
+> **"build a customer support agent"**
+
+Kahuna finds the relevant policies, examples, and patterns you've taught it.
+
+Use `/mcp` in Claude Code to verify the server is connected.
+
+## How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  YOU                          COPILOT                  KAHUNA   │
+│                                                                 │
+│  "set up Kahuna"  ─────────►  deploys rules  ─────►  .claude/   │
+│                               asks questions          stores    │
+│                                                       context   │
+│                                                                 │
+│  "learn these docs" ───────►  kahuna_learn   ─────►  knowledge  │
+│                                                       base      │
+│                                                                 │
+│  "build feature X" ────────►  kahuna_prepare ─────►  surfaces   │
+│                               _context                relevant  │
+│                                                       files     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key tools:**
+
+| Tool | What It Does |
+|------|--------------|
+| `kahuna_initialize` | Deploys copilot rules, runs onboarding |
+| `kahuna_learn` | Adds files to knowledge base with classification |
+| `kahuna_prepare_context` | Surfaces relevant knowledge for a task |
+| `kahuna_ask` | Quick Q&A against the knowledge base |
+
+---
+
+## Other Installation Methods
+
+**Alternative: Two-step setup (if you prefer environment variables)**
 
 ```bash
 # Step 1: Add Kahuna to your global MCP config
@@ -30,17 +98,9 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 **Verify the package is accessible:**
 
 ```bash
-# Check the published version on npm
-npm view @aurite-ai/kahuna version
-
-# Or run it directly (downloads if needed)
-npx @aurite-ai/kahuna --version
-npx @aurite-ai/kahuna --help
+npm view @aurite-ai/kahuna version    # Check published version
+npx @aurite-ai/kahuna --version       # Run directly (downloads if needed)
 ```
-
-> **Note:** See [Other Installation Methods](#other-installation-methods) below for npm global install, Docker, or building from source.
-
-## Other Installation Methods
 
 ### npm (Global Install)
 
@@ -136,10 +196,10 @@ KAHUNA_KNOWLEDGE_DIR=/path/to/custom/knowledge
 
 #### Claude Code (Recommended)
 
-**One command (project scope with inline API key):**
+**One command:**
 
 ```bash
-claude mcp add kahuna -s project -e ANTHROPIC_API_KEY=<your-anthropic-api-key> -- npx @aurite-ai/kahuna
+claude mcp add kahuna -s user -e ANTHROPIC_API_KEY=<your-anthropic-api-key> -- npx @aurite-ai/kahuna
 ```
 
 **Or two-step setup (global scope):**
@@ -505,67 +565,6 @@ The vault defaults to using environment variables. For other providers:
   }
 }
 ```
-
-## Architecture
-
-```
-apps/mcp/src/
-├── index.ts                    # MCP server entry point, tool registration
-├── config.ts                   # Model identifiers, server constants
-│
-├── knowledge/                  # Knowledge base domain logic
-│   ├── agents/                 # Agent prompts, tools, shared runner
-│   │   ├── prompts.ts          # System prompts (categorization, retrieval, Q&A)
-│   │   ├── knowledge-tools.ts  # Agent tools (list, read, select, categorize)
-│   │   └── run-agent.ts        # Shared agentic loop runner
-│   ├── storage/                # KB storage service
-│   │   ├── types.ts            # KnowledgeEntry, classification types
-│   │   ├── knowledge-storage.ts # CRUD for .mdc files
-│   │   └── utils.ts            # Slug generation, frontmatter parsing
-│   └── surfacing/              # Context surfacing
-│       └── context-writer.ts   # Write .kahuna/context-guide.md
-│
-├── integrations/               # External service integration management
-│   ├── types.ts                # Integration descriptor types
-│   ├── extraction.ts           # Extract integrations from KB files
-│   ├── storage.ts              # Integration storage service
-│   ├── execution/              # Integration execution engine
-│   │   ├── executor.ts         # Main executor
-│   │   ├── retry.ts            # Retry logic with backoff
-│   │   └── circuit-breaker.ts  # Circuit breaker pattern
-│   └── verification/           # Integration verification
-│       └── verifier.ts         # Credential and connection verification
-│
-├── vault/                      # Secure credential management
-│   ├── types.ts                # Vault provider interfaces
-│   ├── env-provider.ts         # Environment variable provider
-│   ├── 1password-provider.ts   # 1Password integration
-│   └── sensitive-detection.ts  # Detect sensitive data in files
-│
-├── usage/                      # Token usage and cost tracking
-│   ├── types.ts                # Usage tracking interfaces
-│   ├── tracker.ts              # Session-level tracking
-│   ├── project-storage.ts      # Project-level persistence
-│   ├── pricing.ts              # Model pricing data
-│   └── calculator.ts           # Cost calculation
-│
-└── tools/                      # MCP tool handlers (thin wrappers)
-    ├── types.ts                # ToolContext, MCPToolResponse
-    ├── learn.ts                # kahuna_learn handler
-    ├── prepare-context.ts      # kahuna_prepare_context handler
-    ├── provide-context.ts      # kahuna_provide_context handler
-    ├── ask.ts                  # kahuna_ask handler
-    ├── delete.ts               # kahuna_delete handler
-    ├── usage.ts                # kahuna_usage handler
-    ├── list-integrations.ts    # kahuna_list_integrations handler
-    ├── use-integration.ts      # kahuna_use_integration handler
-    ├── verify-integration.ts   # kahuna_verify_integration handler
-    ├── initialize.ts           # kahuna_initialize handler
-    ├── health-check.ts         # health_check handler
-    └── onboarding-check.ts     # Onboarding status utilities
-```
-
-**Design principle:** Tool handlers are thin wrappers that validate input, call into domain modules, and format markdown responses. Domain logic lives in dedicated modules (`knowledge/`, `integrations/`, `vault/`, `usage/`).
 
 ## Development
 
