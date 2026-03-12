@@ -107,7 +107,8 @@ describe('executeKnowledgeTool', () => {
 
       await executeKnowledgeTool('list_knowledge_files', {}, storage);
 
-      expect(storage.list).toHaveBeenCalledWith({ status: 'active' });
+      // Now includes project hash as second parameter
+      expect(storage.list).toHaveBeenCalledWith({ status: 'active' }, expect.any(Array));
     });
 
     it('handles entry with empty topics', async () => {
@@ -235,6 +236,7 @@ describe('executeKnowledgeTool', () => {
           title: 'API Design Guidelines',
           summary: 'REST API design standards and naming conventions.',
           topics: ['API Design', 'REST', 'Authentication'],
+          isProjectContext: false,
         },
         storage
       );
@@ -246,6 +248,7 @@ describe('executeKnowledgeTool', () => {
       expect(parsed.title).toBe('API Design Guidelines');
       expect(parsed.summary).toBe('REST API design standards and naming conventions.');
       expect(parsed.topics).toEqual(['API Design', 'REST', 'Authentication']);
+      expect(parsed.isProjectContext).toBe(false);
     });
 
     it('returns error for invalid input', async () => {
@@ -268,6 +271,100 @@ describe('executeKnowledgeTool', () => {
       const result = await executeKnowledgeTool('unknown_tool', {}, storage);
 
       expect(result).toBe('Unknown tool: unknown_tool');
+    });
+  });
+
+  describe('subdirectory filtering', () => {
+    it('list_knowledge_files only includes base directory and current project subdirectory', async () => {
+      const storage = createMockStorage();
+      const mockList = vi.mocked(storage.list);
+
+      await executeKnowledgeTool('list_knowledge_files', {}, storage);
+
+      // Verify that list was called with project hash subdirectory
+      expect(storage.list).toHaveBeenCalledWith(
+        { status: 'active' },
+        expect.arrayContaining([expect.any(String)])
+      );
+
+      // Verify the subdirectory array has exactly one element (the project hash)
+      const callArgs = mockList.mock.calls[0];
+      expect(callArgs[1]).toHaveLength(1);
+      expect(typeof callArgs[1]?.[0]).toBe('string');
+    });
+
+    it('read_knowledge_file checks base directory first, then project subdirectory', async () => {
+      const storage = createMockStorage();
+      const mockGet = vi.mocked(storage.get);
+      // Mock get to return null on first call (base dir), then return entry on second call (project dir)
+      mockGet.mockResolvedValueOnce(null).mockResolvedValueOnce(
+        createMockEntry({
+          slug: 'test-file',
+          title: 'Test File',
+          content: 'Test content',
+        })
+      );
+
+      const result = await executeKnowledgeTool(
+        'read_knowledge_file',
+        { slug: 'test-file' },
+        storage
+      );
+
+      // Verify get was called twice - once for base dir, once for project dir
+      expect(storage.get).toHaveBeenCalledTimes(2);
+      expect(storage.get).toHaveBeenNthCalledWith(1, 'test-file');
+      expect(storage.get).toHaveBeenNthCalledWith(2, 'test-file', expect.any(String));
+
+      // Verify result contains the file content
+      expect(result).toContain('Test File');
+      expect(result).toContain('Test content');
+    });
+
+    it('read_knowledge_file returns base directory file if found', async () => {
+      const storage = createMockStorage();
+      const mockGet = vi.mocked(storage.get);
+      // Mock get to return entry on first call (base dir)
+      mockGet.mockResolvedValueOnce(
+        createMockEntry({
+          slug: 'base-file',
+          title: 'Base File',
+          content: 'Base content',
+        })
+      );
+
+      const result = await executeKnowledgeTool(
+        'read_knowledge_file',
+        { slug: 'base-file' },
+        storage
+      );
+
+      // Verify get was only called once for base dir
+      expect(storage.get).toHaveBeenCalledTimes(1);
+      expect(storage.get).toHaveBeenCalledWith('base-file');
+
+      // Verify result contains the file content
+      expect(result).toContain('Base File');
+      expect(result).toContain('Base content');
+    });
+
+    it('read_knowledge_file returns not found if file not in base or project subdirectory', async () => {
+      const storage = createMockStorage();
+      const mockGet = vi.mocked(storage.get);
+      // Mock get to return null for both calls
+      mockGet.mockResolvedValue(null);
+
+      const result = await executeKnowledgeTool(
+        'read_knowledge_file',
+        { slug: 'missing-file' },
+        storage
+      );
+
+      // Verify get was called twice
+      expect(storage.get).toHaveBeenCalledTimes(2);
+
+      // Verify result is not found message
+      expect(result).toBe('File not found: missing-file');
     });
   });
 });

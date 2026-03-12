@@ -2,7 +2,7 @@
   "permissions": {
     "allow": [
       "Edit(*)",
-      "ReadFile(*)",
+      "Read(*)",
       "Bash(git status)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
@@ -55,14 +55,14 @@
       "Bash(printenv:*)"
     ],
     "deny": [
-      "ReadFile(.env)",
-      "ReadFile(.env.*)",
-      "ReadFile(**/secrets/*)",
-      "ReadFile(**/.secrets/*)",
-      "ReadFile(**/credentials.json)",
-      "ReadFile(**/*secret*)",
-      "ReadFile(**/*password*)",
-      "ReadFile(**/*token*)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/secrets/*)",
+      "Read(**/.secrets/*)",
+      "Read(**/credentials.json)",
+      "Read(**/*secret*)",
+      "Read(**/*password*)",
+      "Read(**/*token*)",
       "Edit(.env)",
       "Edit(.env.*)",
       "Edit(**/secrets/*)",

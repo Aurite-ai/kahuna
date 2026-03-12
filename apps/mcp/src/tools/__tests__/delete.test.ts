@@ -68,10 +68,10 @@ describe('deleteToolHandler', () => {
       const result = await deleteToolHandler({ slugs: ['old-api-guidelines'] }, ctx);
 
       // Verify storage.get was called to retrieve title
-      expect(ctx.storage.get).toHaveBeenCalledWith('old-api-guidelines');
+      expect(ctx.storage.get).toHaveBeenCalledWith('old-api-guidelines', undefined);
 
       // Verify storage.delete was called
-      expect(ctx.storage.delete).toHaveBeenCalledWith('old-api-guidelines', true);
+      expect(ctx.storage.delete).toHaveBeenCalledWith('old-api-guidelines', undefined, true);
 
       // Verify markdown response
       expect(result.isError).toBeUndefined();
@@ -101,13 +101,41 @@ describe('deleteToolHandler', () => {
       const result = await deleteToolHandler({ slugs: ['old-policy', 'deprecated-doc'] }, ctx);
 
       expect(ctx.storage.delete).toHaveBeenCalledTimes(2);
-      expect(ctx.storage.delete).toHaveBeenCalledWith('old-policy', true);
-      expect(ctx.storage.delete).toHaveBeenCalledWith('deprecated-doc', true);
+      expect(ctx.storage.delete).toHaveBeenCalledWith('old-policy', undefined, true);
+      expect(ctx.storage.delete).toHaveBeenCalledWith('deprecated-doc', undefined, true);
 
       const text = result.content[0].text;
       expect(text).toContain('2 files');
       expect(text).toContain('old-policy');
       expect(text).toContain('deprecated-doc');
+    });
+
+    it('deletes a file from a subdirectory', async () => {
+      const mockEntry = createMockEntry({
+        slug: 'project-specific-doc',
+        title: 'Project Specific Doc',
+      });
+
+      vi.mocked(ctx.storage.get).mockResolvedValue(mockEntry);
+      vi.mocked(ctx.storage.delete).mockResolvedValue(undefined);
+
+      const result = await deleteToolHandler(
+        { slugs: ['project-specific-doc'], subdirectory: 'abc123' },
+        ctx
+      );
+
+      // Verify storage.get was called with subdirectory
+      expect(ctx.storage.get).toHaveBeenCalledWith('project-specific-doc', 'abc123');
+
+      // Verify storage.delete was called with subdirectory
+      expect(ctx.storage.delete).toHaveBeenCalledWith('project-specific-doc', 'abc123', true);
+
+      // Verify markdown response
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      expect(text).toContain('# Files Deleted from Knowledge Base');
+      expect(text).toContain('project-specific-doc');
+      expect(text).toContain('Project Specific Doc');
     });
   });
 

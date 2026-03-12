@@ -84,6 +84,8 @@ export interface KnowledgeEntry extends KnowledgeEntryFrontmatter {
   /** Derived from filename (e.g., "api-design-guidelines" from "api-design-guidelines.mdc") */
   slug: string;
   content: string;
+  /** Optional subdirectory within the knowledge base (e.g., project hash for project-specific storage) */
+  subdirectory?: string;
 }
 
 /**
@@ -100,6 +102,8 @@ export interface SaveKnowledgeEntryInput {
   confidence: number;
   reasoning: string;
   topics: string[];
+  /** Optional subdirectory within the knowledge base (e.g., project hash for project-specific storage) */
+  subdirectory?: string;
 }
 
 /**
@@ -157,23 +161,32 @@ export interface KnowledgeStorageService {
 
   /**
    * List all knowledge entries (with optional filtering).
+   * @param filter - Optional filter criteria
+   * @param subdirectories - Optional array of subdirectories to include. If null/undefined, scans ALL subdirectories. Pass empty array [] to scan only base directory.
    */
-  list(filter?: KnowledgeEntryFilter): Promise<KnowledgeEntry[]>;
+  list(filter?: KnowledgeEntryFilter, subdirectories?: string[] | null): Promise<KnowledgeEntry[]>;
 
   /**
    * Get a single entry by slug.
+   * @param slug - The entry slug
+   * @param subdirectory - Optional subdirectory within the knowledge base
    */
-  get(slug: string): Promise<KnowledgeEntry | null>;
+  get(slug: string, subdirectory?: string): Promise<KnowledgeEntry | null>;
 
   /**
    * Check if an entry exists.
+   * @param slug - The entry slug
+   * @param subdirectory - Optional subdirectory within the knowledge base
    */
-  exists(slug: string): Promise<boolean>;
+  exists(slug: string, subdirectory?: string): Promise<boolean>;
 
   /**
    * Delete an entry (or mark as archived).
+   * @param slug - The entry slug
+   * @param subdirectory - Optional subdirectory within the knowledge base
+   * @param permanent - If true, delete file; if false, set status to archived
    */
-  delete(slug: string, permanent?: boolean): Promise<void>;
+  delete(slug: string, subdirectory?: string, permanent?: boolean): Promise<void>;
 
   /**
    * Check if the knowledge base directory exists and is accessible.

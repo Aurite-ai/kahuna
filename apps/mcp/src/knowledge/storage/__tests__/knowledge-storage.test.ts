@@ -270,7 +270,7 @@ describe('FileKnowledgeStorageService', () => {
 
     it('filters by status', async () => {
       // Archive one entry
-      await storage.delete('api-guidelines', false);
+      await storage.delete('api-guidelines', undefined, false);
 
       const activeEntries = await storage.list({ status: 'active' });
       const archivedEntries = await storage.list({ status: 'archived' });
@@ -349,7 +349,7 @@ describe('FileKnowledgeStorageService', () => {
     it('hard deletes entry (permanent=true)', async () => {
       await storage.save(createTestInput({ title: 'Delete Me' }));
 
-      await storage.delete('delete-me', true);
+      await storage.delete('delete-me', undefined, true);
 
       const exists = await storage.exists('delete-me');
       expect(exists).toBe(false);
@@ -361,7 +361,7 @@ describe('FileKnowledgeStorageService', () => {
     it('soft deletes entry (permanent=false)', async () => {
       await storage.save(createTestInput({ title: 'Archive Me' }));
 
-      await storage.delete('archive-me', false);
+      await storage.delete('archive-me', undefined, false);
 
       const entry = await storage.get('archive-me');
       expect(entry).not.toBeNull();
@@ -374,27 +374,31 @@ describe('FileKnowledgeStorageService', () => {
       // Small delay to ensure different timestamp
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      await storage.delete('archive-timestamp', false);
+      await storage.delete('archive-timestamp', undefined, false);
 
       const entry = await storage.get('archive-timestamp');
       expect(entry?.updated_at).not.toBe(saved.updated_at);
     });
 
     it('throws NOT_FOUND for non-existent entry (hard delete)', async () => {
-      await expect(storage.delete('non-existent', true)).rejects.toThrow(KnowledgeStorageError);
+      await expect(storage.delete('non-existent', undefined, true)).rejects.toThrow(
+        KnowledgeStorageError
+      );
 
       try {
-        await storage.delete('non-existent', true);
+        await storage.delete('non-existent', undefined, true);
       } catch (error) {
         expect((error as KnowledgeStorageError).code).toBe('NOT_FOUND');
       }
     });
 
     it('throws NOT_FOUND for non-existent entry (soft delete)', async () => {
-      await expect(storage.delete('non-existent', false)).rejects.toThrow(KnowledgeStorageError);
+      await expect(storage.delete('non-existent', undefined, false)).rejects.toThrow(
+        KnowledgeStorageError
+      );
 
       try {
-        await storage.delete('non-existent', false);
+        await storage.delete('non-existent', undefined, false);
       } catch (error) {
         expect((error as KnowledgeStorageError).code).toBe('NOT_FOUND');
       }
@@ -528,6 +532,158 @@ describe('FileKnowledgeStorageService', () => {
       expect(entries).toHaveLength(3);
       const list = await storage.list();
       expect(list).toHaveLength(3);
+    });
+  });
+
+  describe('subdirectory filtering', () => {
+    it('lists only base directory files when subdirectories is empty array', async () => {
+      // Create files in base directory
+      await storage.save(createTestInput({ title: 'Base File 1' }));
+      await storage.save(createTestInput({ title: 'Base File 2' }));
+
+      // Create files in subdirectories
+      await storage.save(createTestInput({ title: 'Project A File', subdirectory: 'abc123' }));
+      await storage.save(createTestInput({ title: 'Project B File', subdirectory: 'def456' }));
+
+      // List with empty array should only return base directory files
+      const entries = await storage.list({}, []);
+
+      expect(entries).toHaveLength(2);
+      expect(entries.map((e) => e.title).sort()).toEqual(['Base File 1', 'Base File 2']);
+    });
+
+    it('lists base directory and specific subdirectory files', async () => {
+      // Create files in base directory
+      await storage.save(createTestInput({ title: 'Base File' }));
+
+      // Create files in multiple subdirectories
+      await storage.save(createTestInput({ title: 'Project A File', subdirectory: 'abc123' }));
+      await storage.save(createTestInput({ title: 'Project B File', subdirectory: 'def456' }));
+      await storage.save(createTestInput({ title: 'Project C File', subdirectory: 'ghi789' }));
+
+      // List with specific subdirectory should return base + that subdirectory
+      const entries = await storage.list({}, ['abc123']);
+
+      expect(entries).toHaveLength(2);
+      expect(entries.map((e) => e.title).sort()).toEqual(['Base File', 'Project A File']);
+    });
+
+    it('lists base directory and multiple specific subdirectories', async () => {
+      // Create files in base directory
+      await storage.save(createTestInput({ title: 'Base File' }));
+
+      // Create files in multiple subdirectories
+      await storage.save(createTestInput({ title: 'Project A File', subdirectory: 'abc123' }));
+      await storage.save(createTestInput({ title: 'Project B File', subdirectory: 'def456' }));
+      await storage.save(createTestInput({ title: 'Project C File', subdirectory: 'ghi789' }));
+
+      // List with multiple subdirectories
+      const entries = await storage.list({}, ['abc123', 'ghi789']);
+
+      expect(entries).toHaveLength(3);
+      expect(entries.map((e) => e.title).sort()).toEqual([
+        'Base File',
+        'Project A File',
+        'Project C File',
+      ]);
+    });
+
+    it('lists all subdirectories when subdirectories parameter is null', async () => {
+      // Create files in base directory
+      await storage.save(createTestInput({ title: 'Base File' }));
+
+      // Create files in multiple subdirectories
+      await storage.save(createTestInput({ title: 'Project A File', subdirectory: 'abc123' }));
+      await storage.save(createTestInput({ title: 'Project B File', subdirectory: 'def456' }));
+      await storage.save(createTestInput({ title: 'Project C File', subdirectory: 'ghi789' }));
+
+      // List with null should scan all subdirectories
+      const entries = await storage.list({}, null);
+
+      expect(entries).toHaveLength(4);
+      expect(entries.map((e) => e.title).sort()).toEqual([
+        'Base File',
+        'Project A File',
+        'Project B File',
+        'Project C File',
+      ]);
+    });
+
+    it('lists all subdirectories when subdirectories parameter is undefined', async () => {
+      // Create files in base directory
+      await storage.save(createTestInput({ title: 'Base File' }));
+
+      // Create files in multiple subdirectories
+      await storage.save(createTestInput({ title: 'Project A File', subdirectory: 'abc123' }));
+      await storage.save(createTestInput({ title: 'Project B File', subdirectory: 'def456' }));
+
+      // List with undefined (default) should scan all subdirectories
+      const entries = await storage.list({}, undefined);
+
+      expect(entries).toHaveLength(3);
+      expect(entries.map((e) => e.title).sort()).toEqual([
+        'Base File',
+        'Project A File',
+        'Project B File',
+      ]);
+    });
+
+    it('applies filters when listing with subdirectory restriction', async () => {
+      // Create files in base directory
+      await storage.save(
+        createTestInput({ title: 'Base Policy', category: 'policy', content: 'Policy content' })
+      );
+      await storage.save(
+        createTestInput({
+          title: 'Base Reference',
+          category: 'reference',
+          content: 'Reference content',
+        })
+      );
+
+      // Create files in subdirectory
+      await storage.save(
+        createTestInput({
+          title: 'Project Policy',
+          category: 'policy',
+          content: 'Project policy',
+          subdirectory: 'abc123',
+        })
+      );
+      await storage.save(
+        createTestInput({
+          title: 'Project Reference',
+          category: 'reference',
+          content: 'Project reference',
+          subdirectory: 'abc123',
+        })
+      );
+
+      // Create file in different subdirectory
+      await storage.save(
+        createTestInput({
+          title: 'Other Project Policy',
+          category: 'policy',
+          subdirectory: 'def456',
+        })
+      );
+
+      // List with category filter and subdirectory restriction
+      const entries = await storage.list({ category: 'policy' }, ['abc123']);
+
+      expect(entries).toHaveLength(2);
+      expect(entries.map((e) => e.title).sort()).toEqual(['Base Policy', 'Project Policy']);
+    });
+
+    it('handles non-existent subdirectory gracefully', async () => {
+      // Create files in base directory
+      await storage.save(createTestInput({ title: 'Base File' }));
+
+      // List with non-existent subdirectory should only return base files
+      const entries = await storage.list({}, ['nonexistent']);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].title).toBe('Base File');
     });
   });
 });

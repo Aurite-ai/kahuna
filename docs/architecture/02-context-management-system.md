@@ -44,17 +44,17 @@ All domain logic lives in the `knowledge/` module under `apps/mcp/src/`. MCP too
 ```
                     ┌───────────────┐
   User files ──────►│ kahuna_learn  │──── Categorization Agent (Haiku) ────► ~/.kahuna/knowledge/*.mdc
-                    └───────────────┘
+                    └───────────────┘                                          (general or project-specific)
 
                     ┌───────────────────────┐
   Task desc. ──────►│ kahuna_prepare_context│──── Retrieval Agent (Haiku) ──► selects KB files
-                    └───────────────────────┘         │
+                    └───────────────────────┘         │                        (from general + current project)
                                                       ▼
                                                Context Writer ──► project/.kahuna/context-guide.md
 
                     ┌───────────────┐
   Question ────────►│ kahuna_ask    │──── Q&A Agent (Sonnet) ──► reads KB files ──► synthesized answer
-                    └───────────────┘
+                    └───────────────┘                            (from general + current project)
 ```
 
 ### Tool Roles
@@ -88,6 +88,7 @@ All domain logic lives in the `knowledge/` module under `apps/mcp/src/`. MCP too
 | D14 | **Overwrite `.kahuna/context-guide.md`** on each prepare_context call | Simple. Single file approach. |
 | D15 | **Shared Anthropic client in ToolContext** | One client at server startup, injected into all handlers. |
 | D16 | **`knowledge/` subfolder** grouping all KB logic | Clean separation: `tools/` = MCP interface, `knowledge/` = domain logic. |
+| D17 | **Project-specific KB subfolders** using directory path hash | Isolates project context while maintaining shared general knowledge. |
 
 ---
 
@@ -97,7 +98,33 @@ All domain logic lives in the `knowledge/` module under `apps/mcp/src/`. MCP too
 
 - **Default:** `~/.kahuna/knowledge/`
 - **Override:** `KAHUNA_KNOWLEDGE_DIR` environment variable
-- **Layout:** Flat directory of `.mdc` files (markdown with YAML frontmatter)
+- **Layout:** Flat directory of `.mdc` files (markdown with YAML frontmatter) for general context, with project-specific subdirectories
+
+### Project-Level Context
+
+When files are uploaded that are project-specific, they are stored in a subfolder within the knowledge base:
+
+```
+~/.kahuna/knowledge/
+├── general-file-1.mdc              # General context (applies to all projects)
+├── general-file-2.mdc
+├── org-context.mdc
+├── user-context.mdc
+└── a1b2c3/                         # Project-specific folder (hash of project path)
+    ├── project-file-1.mdc
+    └── project-file-2.mdc
+```
+
+**Project folder naming:** The subfolder name is a hash of the project directory path, ensuring:
+- Unique identification of each project
+- No path conflicts across different projects
+- Consistent storage location for the same project
+
+**Context retrieval behavior:**
+- [`kahuna_prepare_context`](../design/tool-specifications.md#5-kahuna_prepare_context) and [`kahuna_ask`](../design/tool-specifications.md#7-kahuna_ask) fetch knowledge from:
+  1. General context (files directly in `~/.kahuna/knowledge/`)
+  2. Current project's subfolder (if it exists)
+- Files from other projects are not included in context retrieval
 
 ### .mdc File Format
 
@@ -205,7 +232,13 @@ apps/mcp/src/
 │   │   └── utils.ts                       # Slugify, frontmatter parsing, MDC generation
 │   └── surfacing/
 │       ├── index.ts
-│       └── context-writer.ts              # Write .kahuna/context-guide.md to project root
+│       ├── context-writer.ts              # Write .kahuna/context-guide.md to project root
+│       └── framework-copier.ts            # Copy framework templates (LangGraph/OpenAI)
+│
+├── templates/                             # VCK templates (bundled with MCP server)
+│   ├── copilot-configs/                   # Copilot configuration templates
+│   ├── frameworks/                        # Framework boilerplate (langgraph/, openai/)
+│   └── knowledge-base/                    # KB seed files (langgraph-best-practices.mdc, openai-agents-overview.mdc)
 │
 ├── tools/                                 # MCP tool handlers (thin wrappers)
 │   ├── types.ts                           # ToolContext, MCPToolResponse, markdownResponse()

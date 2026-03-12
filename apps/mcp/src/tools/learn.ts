@@ -221,6 +221,7 @@ function extractCategorizationResult(agentResult: AgentResult): {
   title: string;
   summary: string;
   topics: string[];
+  isProjectContext: boolean;
 } | null {
   const catResult = agentResult.toolResults.find(
     (r) => (r as Record<string, unknown>).tool === 'categorize_file'
@@ -234,6 +235,7 @@ function extractCategorizationResult(agentResult: AgentResult): {
     title: r.title as string,
     summary: r.summary as string,
     topics: r.topics as string[],
+    isProjectContext: r.isProjectContext as boolean,
   };
 }
 
@@ -241,7 +243,7 @@ function extractCategorizationResult(agentResult: AgentResult): {
  * Extract the report_contradictions result from agent tool results.
  */
 function extractContradictionsResult(agentResult: AgentResult): {
-  contradictions: Array<{ slug: string; explanation: string }>;
+  contradictions: Array<{ slug: string; explanation: string; subdirectory?: string }>;
 } | null {
   const contradictionsResult = agentResult.toolResults.find(
     (r) => (r as Record<string, unknown>).tool === 'report_contradictions'
@@ -249,7 +251,11 @@ function extractContradictionsResult(agentResult: AgentResult): {
   if (!contradictionsResult) return null;
   const r = contradictionsResult as Record<string, unknown>;
   return {
-    contradictions: r.contradictions as Array<{ slug: string; explanation: string }>,
+    contradictions: r.contradictions as Array<{
+      slug: string;
+      explanation: string;
+      subdirectory?: string;
+    }>,
   };
 }
 
@@ -307,7 +313,12 @@ No accessible files found in the provided paths.
 function buildLearnSuccessMarkdownWithAggregates(
   results: FileLearnResult[],
   aggregates: LearnAggregateResults,
-  contradictions?: Array<{ filename: string; slug: string; explanation: string }>
+  contradictions?: Array<{
+    filename: string;
+    slug: string;
+    explanation: string;
+    subdirectory?: string;
+  }>
 ): string {
   const successful = results.filter((r) => r.success);
   const failed = results.filter((r) => !r.success);
@@ -399,7 +410,8 @@ function buildLearnSuccessMarkdownWithAggregates(
       'The following existing files contradict the new file(s). Consider removing outdated information:\n'
     );
     for (const c of contradictions) {
-      parts.push(`- **${c.slug}** (from \`${c.filename}\`)`);
+      const location = c.subdirectory ? `${c.subdirectory}/${c.slug}` : c.slug;
+      parts.push(`- **${location}** (from \`${c.filename}\`)`);
       parts.push(`  ${c.explanation}\n`);
     }
   }
@@ -485,7 +497,12 @@ export async function learnToolHandler(
     totalSecretsRedacted: 0,
     secretsByType: new Map(),
   };
-  const allContradictions: Array<{ filename: string; slug: string; explanation: string }> = [];
+  const allContradictions: Array<{
+    filename: string;
+    slug: string;
+    explanation: string;
+    subdirectory?: string;
+  }> = [];
 
   // Add path errors as failed results
   for (const pathError of pathErrors) {
@@ -645,7 +662,7 @@ export async function learnToolHandler(
       const uniqueTitle = `${catResult.title} [${projectHash}]`;
 
       // Check if an entry with this title already exists
-      const existingEntries = await storage.list({ status: 'active' });
+      const existingEntries = await storage.list({ status: 'active' }, [projectHash]);
       const existingEntry = existingEntries?.find((e) => e.title === uniqueTitle);
       const existingSlug = existingEntry?.slug;
 
@@ -684,6 +701,7 @@ export async function learnToolHandler(
             filename,
             slug: contradiction.slug,
             explanation: contradiction.explanation,
+            subdirectory: contradiction.subdirectory,
           });
         }
       }
@@ -702,6 +720,8 @@ export async function learnToolHandler(
           ? `${catResult.reasoning} (User note: ${description})`
           : catResult.reasoning,
         topics: catResult.topics,
+        // Add subdirectory if this is project-specific context (determined by agent)
+        subdirectory: catResult.isProjectContext ? projectHash : undefined,
       };
 
       const entry = await storage.save(saveInput);

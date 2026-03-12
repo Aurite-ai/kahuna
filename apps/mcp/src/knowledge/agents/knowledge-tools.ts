@@ -10,6 +10,7 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import { z } from 'zod';
 import { getFrameworkIds } from '../../config.js';
+import { generateProjectHash } from '../../tools/onboarding-check.js';
 import type { KnowledgeStorageService } from '../storage/types.js';
 
 // =============================================================================
@@ -122,8 +123,21 @@ export const categorizeFileTool: Tool = {
         maxItems: 5,
         description: '3-5 key topics as natural language phrases',
       },
+      isProjectContext: {
+        type: 'boolean',
+        description:
+          'True if this file contains project-specific information (only relevant to this project). False if it contains general knowledge applicable to multiple projects.',
+      },
     },
-    required: ['category', 'confidence', 'reasoning', 'title', 'summary', 'topics'],
+    required: [
+      'category',
+      'confidence',
+      'reasoning',
+      'title',
+      'summary',
+      'topics',
+      'isProjectContext',
+    ],
   },
 };
 
@@ -133,7 +147,8 @@ export const categorizeFileTool: Tool = {
  */
 export const reportContradictionsTool: Tool = {
   name: 'report_contradictions',
-  description: 'Report files in the knowledge base that contradict the new file being categorized',
+  description:
+    'Report files in the knowledge base that contradict the new file being categorized. Use the full path (subdirectory/slug) from the list_knowledge_files output.',
   input_schema: {
     type: 'object' as const,
     properties: {
@@ -144,7 +159,13 @@ export const reportContradictionsTool: Tool = {
           properties: {
             slug: {
               type: 'string',
-              description: 'Slug of the contradicting file',
+              description:
+                'Slug of the contradicting file (just the slug part, not including subdirectory)',
+            },
+            subdirectory: {
+              type: 'string',
+              description:
+                'Subdirectory of the contradicting file (if any). Extract from the full path shown in list_knowledge_files.',
             },
             explanation: {
               type: 'string',
@@ -243,6 +264,7 @@ const categorizeFileInputSchema = z.object({
   title: z.string(),
   summary: z.string(),
   topics: z.array(z.string()),
+  isProjectContext: z.boolean(),
 });
 
 /**
@@ -260,6 +282,7 @@ const reportContradictionsInputSchema = z.object({
   contradictions: z.array(
     z.object({
       slug: z.string(),
+      subdirectory: z.string().optional(),
       explanation: z.string(),
     })
   ),
@@ -280,18 +303,21 @@ export async function executeKnowledgeTool(
 ): Promise<string> {
   switch (toolName) {
     case 'list_knowledge_files': {
-      const entries = await storage.list({ status: 'active' });
+      // Only include files from base directory and current project's subdirectory
+      const projectHash = generateProjectHash(process.cwd());
+      const entries = await storage.list({ status: 'active' }, [projectHash]);
       if (entries.length === 0) {
         return 'No files in knowledge base.';
       }
 
-      // Enriched format: slug, title, category, summary, topics
+      // Enriched format: slug, title, category, summary, topics, subdirectory
       const lines = entries.map((e) => {
+        const location = e.subdirectory ? `${e.subdirectory}/${e.slug}` : e.slug;
         const topicsStr =
           e.classification.topics.length > 0
             ? `  Topics: ${e.classification.topics.join(', ')}`
             : '';
-        return `- ${e.slug} [${e.classification.category}]\n  "${e.summary}"${topicsStr ? `\n${topicsStr}` : ''}`;
+        return `- ${location} [${e.classification.category}]\n  "${e.summary}"${topicsStr ? `\n${topicsStr}` : ''}`;
       });
 
       return `Knowledge base files (${entries.length} entries):\n\n${lines.join('\n\n')}`;
@@ -304,7 +330,16 @@ export async function executeKnowledgeTool(
         return `Invalid input: ${issues}`;
       }
       const { slug } = parseResult.data;
-      const entry = await storage.get(slug);
+
+      // Try base directory first
+      let entry = await storage.get(slug);
+
+      // If not found, try project subdirectory
+      if (!entry) {
+        const projectHash = generateProjectHash(process.cwd());
+        entry = await storage.get(slug, projectHash);
+      }
+
       if (!entry) {
         return `File not found: ${slug}`;
       }

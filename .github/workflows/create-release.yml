@@ -1,0 +1,51 @@
+name: Create Draft Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.2.3)'
+        required: true
+
+jobs:
+  create-draft-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Verify tag exists
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          TAG="${{ inputs.tag }}"
+          if ! git tag --list | grep -qx "$TAG"; then
+            echo "Error: tag '$TAG' does not exist in this repository." >&2
+            exit 1
+          fi
+          echo "Tag '$TAG' found."
+
+      - name: Validate version
+        run: |
+          chmod +x scripts/validate-version.sh
+          TAG="${{ inputs.tag || github.ref_name }}"
+          ./scripts/validate-version.sh "$TAG"
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x scripts/create-release.sh scripts/generate-release-notes.sh
+          TAG="${{ inputs.tag || github.ref_name }}"
+          NOTES_FILE=$(mktemp)
+          ./scripts/generate-release-notes.sh "$TAG" --branch main --out "$NOTES_FILE"
+          ./scripts/create-release.sh "$TAG" --type draft --branch main --notes "$NOTES_FILE"

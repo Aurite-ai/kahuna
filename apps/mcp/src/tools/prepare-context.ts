@@ -29,6 +29,7 @@ import {
   writeContextReadme,
 } from '../knowledge/index.js';
 import { generateAgentUsageLine } from '../usage/index.js';
+import { generateProjectHash } from './onboarding-check.js';
 import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
 
 /**
@@ -354,8 +355,9 @@ export async function prepareContextToolHandler(
   const { task, files, includeBoilerplate } = parseResult.data;
 
   try {
-    // Check if KB is empty
-    const allEntries = await storage.list({ status: 'active' });
+    // Check if KB is empty - only consider base directory and current project's subdirectory
+    const projectHash = generateProjectHash(process.cwd());
+    const allEntries = await storage.list({ status: 'active' }, [projectHash]);
 
     if (allEntries.length === 0) {
       return markdownResponse(buildEmptyKBMarkdown());

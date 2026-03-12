@@ -264,9 +264,10 @@ USE THIS TOOL WHEN:
 
 Kahuna's agents will:
 1. Classify what kind of knowledge each file contains
-2. Detect contradictions with existing knowledge base files
-3. Store in ~/.kahuna knowledge base with metadata
-4. Files will be available for future context surfacing
+2. Determine if the file is general (applies to all projects) or project-specific
+3. Detect contradictions with existing knowledge base files
+4. Store in ~/.kahuna knowledge base with metadata (general or project subfolder)
+5. Files will be available for future context surfacing
 
 <examples>
 ### Single file
@@ -291,7 +292,9 @@ kahuna_learn(
 <hints>
 - Accepts both files AND folders - folders are processed recursively
 - Description helps classification but isn't required
-- Files go to ~/.kahuna knowledge base, NOT directly to .kahuna/context-guide.md
+- Files go to ~/.kahuna knowledge base (general or project-specific subfolder)
+- Project-specific files are stored in ~/.kahuna/knowledge/[project-hash]/
+- General files (policies, standards) are stored directly in ~/.kahuna/knowledge/
 - Use kahuna_prepare_context to surface learned knowledge
 </hints>
 ```
@@ -372,7 +375,8 @@ The following existing files contradict the new file(s). Consider removing outda
 
 **Implemented:**
 - LLM-powered categorization (Haiku)
-- Contradiction detection with existing KB files
+- Project-level context detection and storage
+- Contradiction detection with existing KB files (general + current project)
 - Metadata extraction (title, summary, topics)
 
 **Future enhancements:**
@@ -482,6 +486,8 @@ USE THIS TOOL WHEN:
 
 This is the PRIMARY context retrieval tool. Call it ONCE at task start, then work from .kahuna/context-guide.md.
 
+Searches both general context (applies to all projects) and current project's context.
+
 <examples>
 ### Starting a task
 kahuna_prepare_context(
@@ -503,6 +509,7 @@ kahuna_prepare_context(
 <hints>
 - Call ONCE at task start, then work from .kahuna/context-guide.md
 - Natural language task description works best
+- Searches general context + current project's context automatically
 - After calling, read .kahuna/context-guide.md for navigation
 - If you need more context mid-task, use kahuna_ask instead
 </hints>
@@ -549,9 +556,13 @@ kahuna_prepare_context(
 
 **Build first:**
 - Accept task description
-- Search existing knowledge base for relevant content
+- Search existing knowledge base for relevant content (general + current project)
 - Return list of relevant sections with summaries
 - Generate .kahuna/context-guide.md with task-specific content
+
+**Implemented:**
+- Project-level context retrieval (general + current project only)
+- Automatic project path hashing for subfolder lookup
 
 **Future enhancements:**
 - LLM-powered relevance scoring
@@ -651,7 +662,7 @@ USE THIS TOOL WHEN:
 - Need clarification on a decision or pattern
 - Context guide doesn't have what you need
 
-Searches .kahuna/context-guide.md first (if exists), then falls back to ~/.kahuna knowledge base.
+Searches .kahuna/context-guide.md first (if exists), then falls back to ~/.kahuna knowledge base (general + current project).
 
 <examples>
 ### Direct question
@@ -665,7 +676,7 @@ kahuna_ask(question="Do we have rate limiting requirements documented?")
 </examples>
 
 <hints>
-- Searches project .kahuna/context-guide.md first, then knowledge base
+- Searches project .kahuna/context-guide.md first, then knowledge base (general + current project)
 - Use for quick questions mid-task
 - For comprehensive context setup, use kahuna_prepare_context instead
 - Returns text directly, doesn't modify .kahuna/context-guide.md
@@ -708,7 +719,11 @@ The project uses keyword-based search for these reasons:
 **Build first:**
 - Accept question
 - Search .kahuna/context-guide.md for relevant content
+- Search knowledge base (general + current project) for additional context
 - Return synthesized answer with source citations
+
+**Implemented:**
+- Project-level context retrieval (general + current project only)
 
 **Future enhancements:**
 - LLM-powered answer synthesis
@@ -789,3 +804,7 @@ Tool descriptions contain full steering context. The agent always knows when to 
   - Rewrote kahuna_initialize: now deploys agent-dev rules + returns onboarding instructions (no longer scaffolds projects)
   - Added kahuna_provide_context: stores org/user context from onboarding or conversation
   - Updated tool count: 5 active tools + 1 deferred
+- v7.1 (2026-03-09): Added project-level context behavior:
+  - kahuna_learn stores files in general or project-specific subfolders
+  - kahuna_prepare_context and kahuna_ask retrieve from general + current project only
+  - Project subfolders use hash of project directory path
