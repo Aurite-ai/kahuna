@@ -1,23 +1,91 @@
 # @aurite-ai/kahuna
 
-MCP server providing context management tools for coding copilots. Runs locally via stdio transport — copilots call Kahuna tools to learn from files, surface relevant context, manage integrations, and track usage.
+**Kahuna is your AI copilot's memory.** It helps coding copilots like Claude Code remember what they've learned, find relevant context for each task, and work more effectively on your projects.
+
+## What Kahuna Does
+
+Without Kahuna, your AI copilot starts fresh every conversation. With Kahuna:
+
+- **Provides structured rules** — Deploys copilot configuration that guides AI agent development
+- **Learns from your codebase** — Feed it files, docs, and examples. Kahuna remembers across sessions.
+- **Surfaces relevant context** — When you start a task, Kahuna finds what's helpful.
+- **Tracks context across projects** — Your organization's patterns and preferences persist.
 
 ## Quick Start (Claude Code)
 
-**One command to get started:**
+### Step 1: Add Kahuna
 
 ```bash
-# Add Kahuna with API key inline
 claude mcp add kahuna -s user -e ANTHROPIC_API_KEY="your-anthropic-api-key" -- npx @aurite-ai/kahuna
 ```
 
 > **Scope options:**
-> - `-s project` — Config stored for current project (recommended for project-specific setup)
-> - `-s user` — Config stored as global (available across all projects)
+> - `-s project` — Config stored for current project
+> - `-s user` — Config stored globally (available across all projects)
 
-That's it! Restart Claude Code and Kahuna tools will be available. Use `/mcp` in Claude Code to verify the server is connected.
+### Step 2: Set Up Kahuna
 
-**Alternative: Two-step setup (global scope)**
+In each new project, restart Claude Code and say:
+
+> **"Set up Kahuna"**
+
+This deploys copilot rules to your project and runs first-time onboarding. The copilot will ask a few questions to understand your organization and project context—this only happens once, then Kahuna remembers.
+
+### Step 3: Teach Kahuna Your Context
+
+Share files from anywhere on your system:
+
+> **"learn ~/Downloads/business-policies.pdf"**
+
+Or share entire folders:
+
+> **"learn the docs/ folder"**
+
+Kahuna classifies and stores everything in its knowledge base. This context persists across sessions and projects.
+
+### Step 4: Start Building
+
+When you start a task, Kahuna automatically surfaces relevant context:
+
+> **"build a customer support agent"**
+
+Kahuna finds the relevant policies, examples, and patterns you've taught it.
+
+Use `/mcp` in Claude Code to verify the server is connected.
+
+## How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  YOU                          COPILOT                  KAHUNA   │
+│                                                                 │
+│  "set up Kahuna"  ─────────►  deploys rules  ─────►  .claude/   │
+│                               asks questions          stores    │
+│                                                       context   │
+│                                                                 │
+│  "learn these docs" ───────►  kahuna_learn   ─────►  knowledge  │
+│                                                       base      │
+│                                                                 │
+│  "build feature X" ────────►  kahuna_prepare ─────►  surfaces   │
+│                               _context                relevant  │
+│                                                       files     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key tools:**
+
+| Tool | What It Does |
+|------|--------------|
+| `kahuna_initialize` | Deploys copilot rules, runs onboarding |
+| `kahuna_learn` | Adds files to knowledge base with classification |
+| `kahuna_prepare_context` | Surfaces relevant knowledge for a task |
+| `kahuna_ask` | Quick Q&A against the knowledge base |
+
+---
+
+## Other Installation Methods
+
+**Alternative: Two-step setup (if you prefer environment variables)**
 
 ```bash
 # Step 1: Add Kahuna to your global MCP config
@@ -30,17 +98,9 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 **Verify the package is accessible:**
 
 ```bash
-# Check the published version on npm
-npm view @aurite-ai/kahuna version
-
-# Or run it directly (downloads if needed)
-npx @aurite-ai/kahuna --version
-npx @aurite-ai/kahuna --help
+npm view @aurite-ai/kahuna version    # Check published version
+npx @aurite-ai/kahuna --version       # Run directly (downloads if needed)
 ```
-
-> **Note:** See [Other Installation Methods](#other-installation-methods) below for npm global install, Docker, or building from source.
-
-## Other Installation Methods
 
 ### npm (Global Install)
 
