@@ -8,7 +8,7 @@ MCP server providing context management tools for coding copilots. Runs locally 
 
 ```bash
 # Add Kahuna with API key inline
-claude mcp add kahuna -s project -e ANTHROPIC_API_KEY="your-anthropic-api-key" -- npx @aurite-ai/kahuna
+claude mcp add kahuna -s user -e ANTHROPIC_API_KEY="your-anthropic-api-key" -- npx @aurite-ai/kahuna
 ```
 
 > **Scope options:**
