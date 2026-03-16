@@ -1,8 +1,12 @@
 name: Publish MCP to npm
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (semver, e.g. 1.2.3)'
+        required: true
+        type: string
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -11,12 +15,24 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write  # Required to create and push git tags
       id-token: write  # Required for OIDC provenance attestation
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Determine npm tag
+        id: npm-tag
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_name }}" = "develop" ]; then
+            echo "tag=dev" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unsupported branch: ${{ github.ref_name }}. Must be 'main' or 'develop'." >&2
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -28,10 +44,9 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
 
-      - name: Validate version matches release tag
-        run: |
-          chmod +x scripts/validate-version.sh
-          ./scripts/validate-version.sh "${{ github.ref_name }}"
+      - name: Set version in package.json
+        run: npm version "${{ inputs.version }}" --no-git-tag-version
+        working-directory: apps/mcp
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -41,6 +56,15 @@ jobs:
           pnpm --filter @aurite-ai/kahuna build
           pnpm --filter @aurite-ai/kahuna bundle
 
+      - name: Create and push git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --tag "${{ steps.npm-tag.outputs.tag }}"
         working-directory: apps/mcp
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
