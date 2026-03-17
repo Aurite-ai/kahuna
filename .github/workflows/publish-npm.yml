@@ -49,5 +49,5 @@ jobs:
           pnpm --filter @aurite-ai/kahuna bundle
 
       - name: Publish to npm
-        run: npm publish --provenance --access public --tag "${{ inputs.npm_tag }}" --dry-run
+        run: npm publish --provenance --access public --tag "${{ inputs.npm_tag }}"
         working-directory: apps/mcp
