@@ -5,11 +5,6 @@ on:
     branches:
       - develop
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish (semver, e.g. 1.2.3)'
-        required: true
-        type: string
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -42,8 +37,14 @@ jobs:
       - name: Resolve version
         id: resolve-version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            VERSION=$(node -p "require('./apps/mcp/package.json').version")
+            PUBLISHED=$(npm view "@aurite-ai/kahuna@${VERSION}" version 2>/dev/null || true)
+            if [ -n "$PUBLISHED" ]; then
+              echo "Error: version ${VERSION} has already been published to npm. Update the package version before publishing." >&2
+              exit 1
+            fi
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           else
             BASE_VERSION=$(node -p "require('./apps/mcp/package.json').version")
             VERSIONS=$(npm view @aurite-ai/kahuna versions --json 2>/dev/null || echo '[]')
