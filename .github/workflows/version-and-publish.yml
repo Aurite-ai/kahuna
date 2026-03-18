@@ -1,0 +1,84 @@
+name: Version and Publish MCP
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to create and push git tags
+    outputs:
+      version: ${{ steps.resolve-version.outputs.version }}
+      npm_tag: ${{ steps.npm-tag.outputs.tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Determine npm tag
+        id: npm-tag
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_name }}" = "develop" ]; then
+            echo "tag=dev" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unsupported branch: ${{ github.ref_name }}. Must be 'main' or 'develop'." >&2
+            exit 1
+          fi
+
+      - name: Resolve version
+        id: resolve-version
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            VERSION=$(node -p "require('./apps/mcp/package.json').version")
+            PUBLISHED=$(npm view "@aurite-ai/kahuna@${VERSION}" version 2>/dev/null || true)
+            if [ -n "$PUBLISHED" ]; then
+              echo "Error: version ${VERSION} has already been published to npm. Update the package version before publishing." >&2
+              exit 1
+            fi
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          else
+            BASE_VERSION=$(node -p "require('./apps/mcp/package.json').version")
+            VERSIONS=$(npm view @aurite-ai/kahuna versions --json 2>/dev/null || echo '[]')
+            NEXT_X=$(node -e "
+              const versions = $VERSIONS;
+              const base = '$BASE_VERSION';
+              const devVersions = versions.filter(v => v.startsWith(base + '-dev.'));
+              if (devVersions.length === 0) {
+                process.stdout.write('0');
+              } else {
+                const nums = devVersions.map(v => parseInt(v.slice(base.length + 5), 10));
+                process.stdout.write(String(Math.max(...nums) + 1));
+              }
+            ")
+            echo "version=${BASE_VERSION}-dev.${NEXT_X}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and push git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ steps.resolve-version.outputs.version }}"
+          git push origin "v${{ steps.resolve-version.outputs.version }}"
+
+  publish:
+    needs: version
+    uses: ./.github/workflows/publish-npm.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      npm_tag: ${{ needs.version.outputs.npm_tag }}
+
+  release:
+    needs: version
+    if: ${{ github.ref_name == 'main' }}
+    uses: ./.github/workflows/create-release.yml
+    with:
+      tag: v${{ needs.version.outputs.version }}
