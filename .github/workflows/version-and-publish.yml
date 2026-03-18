@@ -75,3 +75,10 @@ jobs:
     with:
       version: ${{ needs.version.outputs.version }}
       npm_tag: ${{ needs.version.outputs.npm_tag }}
+
+  release:
+    needs: version
+    if: ${{ github.ref_name == 'main' }}
+    uses: ./.github/workflows/create-release.yml
+    with:
+      tag: v${{ needs.version.outputs.version }}
