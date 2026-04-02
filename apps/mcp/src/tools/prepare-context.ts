@@ -8,9 +8,12 @@
  * See: docs/internal/designs/context-management-system.md
  */
 
-import { z } from 'zod';
-import { MODELS } from '../config.js';
-import { type IntegrationSummary, listIntegrationSummaries } from '../integrations/index.js';
+import { z } from "zod";
+import { MODELS } from "../config.js";
+import {
+  type IntegrationSummary,
+  listIntegrationSummaries,
+} from "../integrations/index.js";
 import {
   type AgentResult,
   type FrameworkCopyResult,
@@ -27,16 +30,20 @@ import {
   retrievalTools,
   runAgent,
   writeContextReadme,
-} from '../knowledge/index.js';
-import { generateAgentUsageLine } from '../usage/index.js';
-import { generateProjectHash } from './onboarding-check.js';
-import { type MCPToolResponse, type ToolContext, markdownResponse } from './types.js';
+} from "../knowledge/index.js";
+import { generateAgentUsageLine } from "../usage/index.js";
+import { generateProjectHash } from "./onboarding-check.js";
+import {
+  type MCPToolResponse,
+  type ToolContext,
+  markdownResponse,
+} from "./types.js";
 
 /**
  * Tool definition for MCP registration.
  */
 export const prepareContextToolDefinition = {
-  name: 'kahuna_prepare_context',
+  name: "kahuna_prepare_context",
   description: `Prepare the .kahuna/context-guide.md with relevant knowledge for a task.
 
 USE THIS TOOL WHEN:
@@ -66,26 +73,28 @@ kahuna_prepare_context(task="Understand our API design patterns")
 </hints>`,
 
   inputSchema: {
-    type: 'object' as const,
+    type: "object" as const,
     properties: {
       task: {
-        type: 'string',
-        description: 'What you are trying to do. Be specific for better results.',
+        type: "string",
+        description:
+          "What you are trying to do. Be specific for better results.",
       },
       files: {
-        type: 'array',
-        description: 'Optional: Files you will be working with (helps with relevance)',
+        type: "array",
+        description:
+          "Optional: Files you will be working with (helps with relevance)",
         items: {
-          type: 'string',
+          type: "string",
         },
       },
       includeBoilerplate: {
-        type: 'boolean',
+        type: "boolean",
         description:
-          'Whether to copy framework boilerplate to src/. Defaults to true. Set false if you already have project structure.',
+          "Whether to copy framework boilerplate to src/. Defaults to true. Set false if you already have project structure.",
       },
     },
-    required: ['task'],
+    required: ["task"],
   },
 };
 
@@ -94,9 +103,9 @@ kahuna_prepare_context(task="Understand our API design patterns")
  */
 const prepareContextInputSchema = z.object({
   task: z
-    .string({ error: 'Missing or empty task' })
+    .string({ error: "Missing or empty task" })
     .transform((val) => val.trim())
-    .refine((val) => val.length > 0, { message: 'Missing or empty task' }),
+    .refine((val) => val.length > 0, { message: "Missing or empty task" }),
   files: z.array(z.string()).optional(),
   includeBoilerplate: z.boolean().optional().default(true),
 });
@@ -122,7 +131,7 @@ interface FrameworkSelection {
  */
 function extractSelections(agentResult: AgentResult): FileSelection[] {
   const selectResult = agentResult.toolResults.find(
-    (r) => (r as Record<string, unknown>).tool === 'select_files_for_context'
+    (r) => (r as Record<string, unknown>).tool === "select_files_for_context",
   );
   if (!selectResult) return [];
   const r = selectResult as Record<string, unknown>;
@@ -133,9 +142,11 @@ function extractSelections(agentResult: AgentResult): FileSelection[] {
 /**
  * Extract framework selection from agent tool results.
  */
-function extractFrameworkSelection(agentResult: AgentResult): FrameworkSelection | null {
+function extractFrameworkSelection(
+  agentResult: AgentResult,
+): FrameworkSelection | null {
   const frameworkResult = agentResult.toolResults.find(
-    (r) => (r as Record<string, unknown>).tool === 'select_framework'
+    (r) => (r as Record<string, unknown>).tool === "select_framework",
   );
   if (!frameworkResult) return null;
   const r = frameworkResult as Record<string, unknown>;
@@ -153,65 +164,69 @@ function buildContextReadyMarkdown(
   task: string,
   kbFiles: KBFileReference[],
   referencedFiles?: ReferencedFile[],
-  frameworkResult?: FrameworkCopyResult
+  frameworkResult?: FrameworkCopyResult,
 ): string {
   const parts: string[] = [];
 
-  parts.push('# Context Ready\n');
+  parts.push("# Context Ready\n");
   parts.push(`**Task:** ${task}\n`);
 
   // Framework section (if scaffolded)
   if (frameworkResult && frameworkResult.copiedFiles.length > 0) {
     parts.push(`## Framework Scaffolded: ${frameworkResult.displayName}\n`);
-    parts.push('**Files copied:**');
+    parts.push("**Files copied:**");
     for (const file of frameworkResult.copiedFiles) {
       parts.push(`- ${file}`);
     }
     if (frameworkResult.skippedFiles.length > 0) {
-      parts.push('\n**Files skipped (already exist):**');
+      parts.push("\n**Files skipped (already exist):**");
       for (const file of frameworkResult.skippedFiles) {
         parts.push(`- ${file}`);
       }
     }
-    parts.push('');
+    parts.push("");
   } else if (frameworkResult && frameworkResult.skippedFiles.length > 0) {
     parts.push(`## Framework: ${frameworkResult.displayName}\n`);
-    parts.push('All framework files already exist in your project. No files copied.\n');
+    parts.push(
+      "All framework files already exist in your project. No files copied.\n",
+    );
   }
 
   // KB files (referenced by path, not copied)
   if (kbFiles.length > 0) {
-    parts.push('## Knowledge Base Files\n');
-    parts.push('| Topic | KB Path | Why Relevant |');
-    parts.push('|-------|---------|--------------|');
+    parts.push("## Knowledge Base Files\n");
+    parts.push("| Topic | KB Path | Why Relevant |");
+    parts.push("|-------|---------|--------------|");
 
     for (const file of kbFiles) {
       const title = file.title || file.slug;
       parts.push(`| ${title} | ${file.kbPath} | ${file.reason} |`);
     }
-    parts.push('');
+    parts.push("");
   }
 
   // Local project files (referenced, not copied)
   if (referencedFiles && referencedFiles.length > 0) {
-    parts.push('## Local Project Files\n');
-    parts.push('These files are in your project:\n');
-    parts.push('| Topic | Location | Why Relevant |');
-    parts.push('|-------|----------|--------------|');
+    parts.push("## Local Project Files\n");
+    parts.push("These files are in your project:\n");
+    parts.push("| Topic | Location | Why Relevant |");
+    parts.push("|-------|----------|--------------|");
 
     for (const ref of referencedFiles) {
       parts.push(`| ${ref.slug} | ${ref.localPath} | ${ref.reason} |`);
     }
-    parts.push('');
+    parts.push("");
   }
 
   // Start Here section
-  parts.push('## Start Here\n');
+  parts.push("## Start Here\n");
   let stepNum = 1;
 
   // If framework was scaffolded, mention it first
   if (frameworkResult && frameworkResult.copiedFiles.length > 0) {
-    parts.push(`${stepNum}. **Explore scaffolded code** — Check src/ for framework structure`);
+    parts.push(
+      `${stepNum}. **Explore scaffolded code** — Check src/ for framework structure`,
+    );
     stepNum++;
   }
 
@@ -236,20 +251,20 @@ function buildContextReadyMarkdown(
     }
   }
 
-  parts.push('\n<hints>');
-  parts.push('- .kahuna/context-guide.md contains file references');
-  parts.push('- KB files are referenced by their knowledge base paths');
+  parts.push("\n<hints>");
+  parts.push("- .kahuna/context-guide.md contains file references");
+  parts.push("- KB files are referenced by their knowledge base paths");
   if (referencedFiles && referencedFiles.length > 0) {
-    parts.push('- Some entries reference local project files');
+    parts.push("- Some entries reference local project files");
   }
   if (frameworkResult?.copiedFiles.length) {
-    parts.push('- Framework boilerplate is in src/ — start from there');
+    parts.push("- Framework boilerplate is in src/ — start from there");
   }
-  parts.push('- If you need more context mid-task, use kahuna_ask');
-  parts.push('- After completing work, use kahuna_learn to capture learnings');
-  parts.push('</hints>');
+  parts.push("- If you need more context mid-task, use kahuna_ask");
+  parts.push("- After completing work, use kahuna_learn to capture learnings");
+  parts.push("</hints>");
 
-  return parts.join('\n');
+  return parts.join("\n");
 }
 
 function buildEmptyKBMarkdown(): string {
@@ -264,7 +279,10 @@ The knowledge base is empty. No files to surface for this task.
 </hints>`;
 }
 
-function buildNoRelevantFilesMarkdown(task: string, totalFiles: number): string {
+function buildNoRelevantFilesMarkdown(
+  task: string,
+  totalFiles: number,
+): string {
   return `# No Relevant Context
 
 The knowledge base has ${totalFiles} files, but none are relevant to: "${task}"
@@ -282,43 +300,44 @@ The knowledge base has ${totalFiles} files, but none are relevant to: "${task}"
  */
 function buildIntegrationsMarkdown(integrations: IntegrationSummary[]): string {
   if (integrations.length === 0) {
-    return '';
+    return "";
   }
 
   const statusIcon = (status: string) => {
     switch (status) {
-      case 'verified':
-        return '✅';
-      case 'configured':
-        return '🔧';
-      case 'error':
-        return '❌';
+      case "verified":
+        return "✅";
+      case "configured":
+        return "🔧";
+      case "error":
+        return "❌";
       default:
-        return '🔍';
+        return "🔍";
     }
   };
 
   const parts: string[] = [];
-  parts.push('## Available Integrations\n');
-  parts.push('These integrations are configured and ready to use:\n');
-  parts.push('| Integration | Type | Operations | Status |');
-  parts.push('|-------------|------|------------|--------|');
+  parts.push("## Available Integrations\n");
+  parts.push("These integrations are configured and ready to use:\n");
+  parts.push("| Integration | Type | Operations | Status |");
+  parts.push("|-------------|------|------------|--------|");
 
   for (const integration of integrations) {
-    const ops = integration.operationNames.slice(0, 3).join(', ');
-    const opsDisplay = integration.operationNames.length > 3 ? `${ops}, ...` : ops;
+    const ops = integration.operationNames.slice(0, 3).join(", ");
+    const opsDisplay =
+      integration.operationNames.length > 3 ? `${ops}, ...` : ops;
     parts.push(
-      `| ${integration.displayName} | ${integration.type} | ${opsDisplay} | ${statusIcon(integration.status)} ${integration.status} |`
+      `| ${integration.displayName} | ${integration.type} | ${opsDisplay} | ${statusIcon(integration.status)} ${integration.status} |`,
     );
   }
 
-  parts.push('');
+  parts.push("");
   parts.push(
-    'Use `kahuna_use_integration(integration="<id>", operation="<op>", params={...})` to call them.'
+    'Use `kahuna_use_integration(integration="<id>", operation="<op>", params={...})` to call them.',
   );
-  parts.push('');
+  parts.push("");
 
-  return parts.join('\n');
+  return parts.join("\n");
 }
 
 // =============================================================================
@@ -338,17 +357,17 @@ function buildIntegrationsMarkdown(integrations: IntegrationSummary[]): string {
  */
 export async function prepareContextToolHandler(
   args: Record<string, unknown>,
-  ctx: ToolContext
+  ctx: ToolContext,
 ): Promise<MCPToolResponse> {
   const { storage, anthropic, usageTracker } = ctx;
 
   // Validate input
   const parseResult = prepareContextInputSchema.safeParse(args);
   if (!parseResult.success) {
-    const issues = parseResult.error.issues.map((i) => i.message).join(', ');
+    const issues = parseResult.error.issues.map((i) => i.message).join(", ");
     return markdownResponse(
       `Invalid input: ${issues}\n\n<hints>\n- Provide a clear task description\n</hints>`,
-      true
+      true,
     );
   }
 
@@ -357,7 +376,7 @@ export async function prepareContextToolHandler(
   try {
     // Check if KB is empty - only consider base directory and current project's subdirectory
     const projectHash = generateProjectHash(process.cwd());
-    const allEntries = await storage.list({ status: 'active' }, [projectHash]);
+    const allEntries = await storage.list({ status: "active" }, [projectHash]);
 
     if (allEntries.length === 0) {
       return markdownResponse(buildEmptyKBMarkdown());
@@ -378,7 +397,7 @@ export async function prepareContextToolHandler(
       storage,
       anthropic,
       usageTracker,
-      'kahuna_prepare_context'
+      "kahuna_prepare_context",
     );
 
     // Extract file selections and framework selection
@@ -387,21 +406,23 @@ export async function prepareContextToolHandler(
 
     // Always include foundation context (org-context, user-context) if they exist
     // These are injected at code level, not relying on agent selection
-    const foundationSlugs = ['org-context', 'user-context'];
+    const foundationSlugs = ["org-context", "user-context"];
     for (const slug of foundationSlugs) {
       if (!selections.some((s) => s.slug === slug)) {
         const entry = await storage.get(slug);
         if (entry) {
           selections.unshift({
             slug,
-            reason: 'Foundation context (always included)',
+            reason: "Foundation context (always included)",
           });
         }
       }
     }
 
     if (selections.length === 0 && !frameworkSelection) {
-      return markdownResponse(buildNoRelevantFilesMarkdown(task, allEntries.length));
+      return markdownResponse(
+        buildNoRelevantFilesMarkdown(task, allEntries.length),
+      );
     }
 
     // Write to project directory
@@ -441,13 +462,16 @@ export async function prepareContextToolHandler(
     let frameworkResult: FrameworkCopyResult | undefined;
     if (includeBoilerplate) {
       try {
-        const framework = frameworkSelection?.framework ?? 'langgraph';
+        const framework = frameworkSelection?.framework ?? "langgraph";
         frameworkResult = await copyFrameworkBoilerplate(framework);
 
         // Auto-surface the framework's KB doc
-        const kbDocSlug = frameworkResult?.kbDocSlug ?? `framework-${framework}`;
+        const kbDocSlug =
+          frameworkResult?.kbDocSlug ?? `framework-${framework}`;
         const alreadyInKB = kbFiles.some((f) => f.slug === kbDocSlug);
-        const alreadyReferenced = referencedFiles.some((ref) => ref.slug === kbDocSlug);
+        const alreadyReferenced = referencedFiles.some(
+          (ref) => ref.slug === kbDocSlug,
+        );
 
         if (!alreadyInKB && !alreadyReferenced) {
           const kbEntry = await storage.get(kbDocSlug);
@@ -464,7 +488,8 @@ export async function prepareContextToolHandler(
         }
       } catch (error) {
         // Log but don't fail the whole operation
-        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        const errorMsg =
+          error instanceof Error ? error.message : "Unknown error";
         console.error(`Framework copy failed: ${errorMsg}`);
       }
     }
@@ -475,7 +500,7 @@ export async function prepareContextToolHandler(
       task,
       kbFiles,
       referencedFiles.length > 0 ? referencedFiles : undefined,
-      frameworkResult
+      frameworkResult,
     );
 
     // Build response markdown
@@ -483,7 +508,7 @@ export async function prepareContextToolHandler(
       task,
       kbFiles,
       referencedFiles.length > 0 ? referencedFiles : undefined,
-      frameworkResult
+      frameworkResult,
     );
 
     // Fetch and surface available integrations
@@ -495,7 +520,7 @@ export async function prepareContextToolHandler(
       }
     } catch {
       // Don't fail if integration fetching fails - just skip the section
-      console.error('Failed to fetch integrations for context surfacing');
+      console.error("Failed to fetch integrations for context surfacing");
     }
 
     // Add compact usage line with project totals
@@ -504,7 +529,7 @@ export async function prepareContextToolHandler(
       const usageLine = await generateAgentUsageLine(
         usage.totalInputTokens,
         usage.totalOutputTokens,
-        usage.totalCost
+        usage.totalCost,
       );
       markdown += `
 
@@ -514,10 +539,11 @@ ${usageLine}`;
 
     return markdownResponse(markdown);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return markdownResponse(
       `Failed to prepare context: ${errorMessage}\n\n<hints>\n- Check if the knowledge base directory is accessible (~/.kahuna/knowledge/)\n</hints>`,
-      true
+      true,
     );
   }
 }
