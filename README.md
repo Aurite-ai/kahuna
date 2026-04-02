@@ -2,7 +2,85 @@
 
 Kahuna is a context management platform that helps coding copilots succeed with complex tasks. The primary interface is an **MCP server** that provides tools for sending context, retrieving relevant information, managing integrations, and tracking usage. Behind the MCP tools, a **Knowledge Base** of organized markdown files (written by agents, for agents) grows and improves over time.
 
-> **Note:** This repository is in early development. See [docs/](docs/) for architecture and design documentation.
+> **Note:** This repository is in early development. See [Documentation](#documentation) below for architecture and design docs.
+
+## Documentation
+
+**For Users:**
+- [MCP Server Documentation](apps/mcp/README.md) — Installation, tools, configuration
+- [Advanced Documentation](apps/mcp/docs/ADVANCED.md) — Integrations, vault, KB structure
+
+**For Contributors:**
+- [Product Design](docs/design/README.md) — Core concepts, tool specifications
+- [Architecture: Repository Infrastructure](docs/architecture/01-repository-infrastructure.md)
+- [Architecture: Context Management System](docs/architecture/02-context-management-system.md)
+
+---
+
+## Quick Start (Claude Code)
+
+### Step 1: Add Kahuna
+
+```bash
+claude mcp add kahuna -s user -e ANTHROPIC_API_KEY="your-anthropic-api-key" -- npx @aurite-ai/kahuna
+```
+
+> **Scope options:**
+> - `-s project` — Config stored for current project only
+> - `-s user` — Config stored globally (available across all projects)
+
+### Step 2: Set Up Kahuna
+
+In each new project, restart Claude Code and say:
+
+> **"Set up Kahuna"**
+
+This deploys copilot rules to your project and runs first-time onboarding. The copilot will ask a few questions to understand your organization and project context—this only happens once, then Kahuna remembers.
+
+### Step 3: Teach Kahuna Your Context
+
+Share files from anywhere on your system:
+
+> **"learn ~/Downloads/business-policies.pdf"**
+
+Or share entire folders:
+
+> **"learn the docs/ folder"**
+
+Kahuna classifies and stores everything in its knowledge base. This context persists across sessions and projects.
+
+### Step 4: Start Building
+
+When you start a task, Kahuna automatically surfaces relevant context:
+
+> **"build a customer support agent"**
+
+Kahuna finds the relevant policies, examples, and patterns you've taught it.
+
+Use `/mcp` in Claude Code to verify the server is connected.
+
+---
+
+## How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  YOU                          COPILOT                  KAHUNA   │
+│                                                                 │
+│  "set up Kahuna"  ─────────►  deploys rules  ─────►  .claude/   │
+│                               asks questions          stores    │
+│                                                       context   │
+│                                                                 │
+│  "learn these docs" ───────►  kahuna_learn   ─────►  knowledge  │
+│                                                       base      │
+│                                                                 │
+│  "build feature X" ────────►  kahuna_prepare ─────►  surfaces   │
+│                               _context                relevant  │
+│                                                       files     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
 
 ## Features
 
@@ -13,12 +91,32 @@ Kahuna is a context management platform that helps coding copilots succeed with 
 - 📊 **Usage Tracking** - Monitor token consumption and costs per project
 - 🚀 **Onboarding System** - Guided setup for organization and project context
 
-## Prerequisites
+## Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `kahuna_initialize` | Deploys copilot rules, runs onboarding |
+| `kahuna_learn` | Adds files to knowledge base with classification |
+| `kahuna_prepare_context` | Surfaces relevant knowledge for a task |
+| `kahuna_ask` | Quick Q&A against the knowledge base |
+| `kahuna_delete` | Remove outdated files from the knowledge base |
+| `kahuna_provide_context` | Store org or user context in the knowledge base |
+| `kahuna_usage` | View token usage and cost summary for the project |
+| `kahuna_list_integrations` | List all discovered integrations and their status |
+| `kahuna_use_integration` | Execute operations on discovered integrations |
+| `kahuna_verify_integration` | Verify integration credentials and connectivity |
+| `health_check` | Verify MCP server connectivity |
+
+---
+
+## Development Setup
+
+### Prerequisites
 
 - Node.js 18+
 - pnpm 9+
 
-## Quick Start
+### Developer Quick Start
 
 ```bash
 # Install dependencies
@@ -33,79 +131,6 @@ pnpm build
 # Run tests
 pnpm test
 ```
-
-## MCP Server Setup
-
-The MCP server allows AI assistants (Claude Desktop, Roo Code, etc.) to interact with Kahuna programmatically via stdio transport.
-
-```bash
-# Build the MCP server
-pnpm --filter @aurite-ai/kahuna build
-```
-
-### Option A: Using Claude MCP CLI (Recommended)
-
-```bash
-claude mcp add kahuna -s project -e ANTHROPIC_API_KEY="your-key" -- npx @aurite-ai/kahuna
-```
-
-> **Note:** Use `-s user` for global scope (available across all projects).
-
-### Option B: Manual Configuration
-
-Create a `.mcp.json` file in your project directory:
-
-```json
-{
-  "mcpServers": {
-    "kahuna": {
-      "command": "npx",
-      "args": ["@aurite-ai/kahuna"],
-      "env": {
-        "ANTHROPIC_API_KEY": "your-key"
-      }
-    }
-  }
-}
-```
-
-For detailed tool documentation and development instructions, see [apps/mcp/README.md](apps/mcp/README.md).
-
-## Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `kahuna_learn` | Send files to Kahuna to learn from and add to the knowledge base |
-| `kahuna_prepare_context` | Prepare `.kahuna/context-guide.md` with task-relevant knowledge |
-| `kahuna_ask` | Quick Q&A using the knowledge base |
-| `kahuna_delete` | Remove outdated files from the knowledge base |
-| `kahuna_provide_context` | Store org or user context in the knowledge base |
-| `kahuna_usage` | View token usage and cost summary for the project |
-| `kahuna_initialize` | Initialize a project with Kahuna copilot configuration |
-| `kahuna_list_integrations` | List all discovered integrations and their status |
-| `kahuna_use_integration` | Execute operations on discovered integrations |
-| `kahuna_verify_integration` | Verify integration credentials and connectivity |
-| `health_check` | Verify MCP server connectivity |
-
-## Onboarding Flow
-
-Kahuna uses a two-step onboarding process to understand your context:
-
-1. **Organization Context** - Captures your industry, team structure, constraints, and priorities
-2. **Project Context** - Captures the problem, users, and success criteria for the specific project
-
-Say **"set up org context"** or **"set up project context"** to complete onboarding. This enables Kahuna to provide more relevant recommendations aligned with your needs.
-
-## Integration System
-
-Kahuna can discover and manage external service integrations (APIs, databases, messaging systems):
-
-1. **Discover** - Use `kahuna_learn` on files describing your services
-2. **List** - Use `kahuna_list_integrations` to see available integrations
-3. **Verify** - Use `kahuna_verify_integration` to test credentials/connectivity
-4. **Use** - Use `kahuna_use_integration` to execute operations
-
-Supports circuit breaker patterns, retry logic, and secure credential resolution from the vault.
 
 ## Scripts
 
@@ -146,13 +171,6 @@ kahuna/
 │   └── vck-templates/      # Copilot configuration templates
 └── docs/                   # Documentation
 ```
-
-## Documentation
-
-- [Architecture: Repository Infrastructure](docs/architecture/01-repository-infrastructure.md)
-- [Architecture: Context Management System](docs/architecture/02-context-management-system.md)
-- [Product Design](docs/design/README.md)
-- [MCP Server Documentation](apps/mcp/README.md)
 
 ## License
 

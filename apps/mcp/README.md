@@ -6,33 +6,45 @@ Without Kahuna, your AI copilot starts fresh every conversation. With Kahuna, it
 
 ---
 
-## Quick Start
+## Quick Start (Claude Code)
 
-**Step 1: Add Kahuna to Claude Code**
+### Step 1: Add Kahuna
 
 ```bash
-claude mcp add kahuna -s user -e ANTHROPIC_API_KEY="your-key" -- npx @aurite-ai/kahuna
+claude mcp add kahuna -s user -e ANTHROPIC_API_KEY="your-anthropic-api-key" -- npx @aurite-ai/kahuna
 ```
 
-**Step 2: Set up Kahuna**
+> **Scope options:**
+> - `-s project` — Config stored for current project only
+> - `-s user` — Config stored globally (available across all projects)
 
-Restart Claude Code, then say:
+### Step 2: Set Up Kahuna
+
+In each new project, restart Claude Code and say:
 
 > **"Set up Kahuna"**
 
-Kahuna will ask a few questions to understand your context. This only happens once.
+This deploys copilot rules to your project and runs first-time onboarding. The copilot will ask a few questions to understand your organization and project context—this only happens once, then Kahuna remembers.
 
----
+### Step 3: Teach Kahuna Your Context
 
-## How It Works
+Share files from anywhere on your system:
 
-Once set up, just talk naturally:
+> **"learn ~/Downloads/business-policies.pdf"**
 
-- **"Learn our API guidelines"** — Share files or folders. Kahuna classifies and remembers them across sessions.
+Or share entire folders:
 
-- **"Build a customer support agent"** — When you start a task, Kahuna finds relevant knowledge automatically.
+> **"learn the docs/ folder"**
 
-- **"What's our error handling pattern?"** — Ask questions mid-task. Kahuna searches your knowledge base and answers with citations.
+Kahuna classifies and stores everything in its knowledge base. This context persists across sessions and projects.
+
+### Step 4: Start Building
+
+When you start a task, Kahuna automatically surfaces relevant context:
+
+> **"build a customer support agent"**
+
+Kahuna finds the relevant policies, examples, and patterns you've taught it.
 
 Use `/mcp` in Claude Code to verify the server is connected.
 
