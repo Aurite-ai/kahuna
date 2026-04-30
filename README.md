@@ -1,25 +1,50 @@
-# Kahuna
-
-Kahuna is a context management platform that helps coding copilots succeed with complex tasks. The primary interface is an **MCP server** that provides tools for sending context, retrieving relevant information, managing integrations, and tracking usage. Behind the MCP tools, a **Knowledge Base** of organized markdown files (written by agents, for agents) grows and improves over time.
-
-> **Note:** This repository is in early development. See [Documentation](#documentation) below for architecture and design docs.
-
-## Documentation
-
-**For Users:**
-- [MCP Server Documentation](apps/mcp/README.md) — Installation, tools, configuration
-- [Advanced Documentation](apps/mcp/docs/ADVANCED.md) — Integrations, vault, KB structure
-
-**For Contributors:**
-- [Product Design](docs/design/README.md) — Core concepts, tool specifications
-- [Architecture: Repository Infrastructure](docs/architecture/01-repository-infrastructure.md)
-- [Architecture: Context Management System](docs/architecture/02-context-management-system.md)
+<div align="center">
+<h1>🧠 Kahuna</h1>
+<p><strong>Your AI copilot's memory. Persistent context across sessions, projects, and teams.</strong></p>
+<p>Give your coding agent the context it needs — automatically.</p>
+<p>
+<a href="https://github.com/Aurite-ai/kahuna/stargazers"><img src="https://img.shields.io/github/stars/Aurite-ai/kahuna?style=social" alt="GitHub stars"></a>
+<a href="https://www.npmjs.com/package/@aurite-ai/kahuna"><img src="https://img.shields.io/npm/v/@aurite-ai/kahuna" alt="npm version"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+<a href="https://github.com/Aurite-ai/kahuna/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
+<a href="https://github.com/Aurite-ai/kahuna/commits"><img src="https://img.shields.io/github/last-commit/Aurite-ai/kahuna" alt="Last commit"></a>
+</p>
+<p>Works with <strong>Claude Code</strong> · more copilots coming soon</p>
+</div>
 
 ---
 
-## Quick Start (Claude Code)
+## The Problem
 
-### Step 1: Add Kahuna
+Every time you start a new conversation with your AI copilot, it forgets everything.
+
+- 🔄 You repeat the same context about your project, your team, your standards
+- 🤷 The copilot makes mistakes you've already corrected in past sessions
+- 📄 Your policies, specs, and business rules sit in files the copilot never sees
+- 🧠 Decisions and rationale from past conversations are lost forever
+
+Copilots are powerful — but they have amnesia.
+
+## The Solution
+
+Kahuna gives your copilot a persistent memory that grows smarter over time.
+
+| Without Kahuna | With Kahuna |
+|---|---|
+| Copilot starts fresh every session | Copilot remembers what it learned |
+| You repeat context manually | Context surfaces automatically |
+| Knowledge lives in your head | Knowledge lives in a structured KB |
+| Decisions are forgotten | Decisions persist across sessions |
+
+**How it works:** Kahuna runs as an [MCP server](https://modelcontextprotocol.io/) alongside your copilot. You teach it your context once — policies, specs, decisions, patterns — and it proactively surfaces the right knowledge for each task.
+
+> 🔒 All data stays local. Your code and context never leave your machine.
+
+---
+
+## Quickstart (Claude Code)
+
+**Step 1:** Add Kahuna to Claude Code
 
 ```bash
 claude mcp add kahuna -s user -e ANTHROPIC_API_KEY="your-anthropic-api-key" -- npx @aurite-ai/kahuna
@@ -29,35 +54,82 @@ claude mcp add kahuna -s user -e ANTHROPIC_API_KEY="your-anthropic-api-key" -- n
 > - `-s project` — Config stored for current project only
 > - `-s user` — Config stored globally (available across all projects)
 
-### Step 2: Set Up Kahuna
-
-In each new project, restart Claude Code and say:
+**Step 2:** In any project, tell your copilot:
 
 > **"Set up Kahuna"**
 
-This deploys copilot rules to your project and runs first-time onboarding. The copilot will ask a few questions to understand your organization and project context—this only happens once, then Kahuna remembers.
+This deploys copilot rules and runs onboarding. The copilot asks a few questions to understand your context — this only happens once.
 
-### Step 3: Teach Kahuna Your Context
+**Step 3:** Start teaching it your context:
 
-Share files from anywhere on your system:
-
-> **"learn ~/Downloads/business-policies.pdf"**
-
-Or share entire folders:
-
+> **"learn ~/Downloads/api-guidelines.pdf"**
+>
 > **"learn the docs/ folder"**
 
-Kahuna classifies and stores everything in its knowledge base. This context persists across sessions and projects.
-
-### Step 4: Start Building
-
-When you start a task, Kahuna automatically surfaces relevant context:
+**Step 4:** Start working — Kahuna surfaces the right context automatically.
 
 > **"build a customer support agent"**
+>
+> Kahuna feeds your copilot your API conventions, auth patterns, and related context. No reminders needed.
 
-Kahuna finds the relevant policies, examples, and patterns you've taught it.
+<details>
+<summary>📦 More installation options (npm global, Docker, from source)</summary>
 
-Use `/mcp` in Claude Code to verify the server is connected.
+<br>
+
+**npm (Global Install)**
+
+```bash
+npm install -g @aurite-ai/kahuna
+```
+
+Configure your MCP client to use `kahuna-mcp` as the command.
+
+**npx (No Install)**
+
+```bash
+npx @aurite-ai/kahuna
+```
+
+**Docker**
+
+```bash
+docker pull kahuna/mcp
+docker run -i kahuna/mcp
+```
+
+**From Source**
+
+```bash
+git clone https://github.com/Aurite-ai/kahuna.git
+cd kahuna
+pnpm install
+pnpm --filter @aurite-ai/kahuna build
+pnpm --filter @aurite-ai/kahuna bundle
+```
+
+</details>
+
+---
+
+## What It Looks Like
+
+You teach Kahuna your company's API design guidelines:
+
+> "learn ~/docs/api-guidelines.pdf"
+
+Later, you start a task:
+
+> "build a REST endpoint for user profiles"
+
+Kahuna automatically surfaces the relevant context to your copilot:
+
+- ✅ Your API naming conventions
+- ✅ Authentication patterns your team uses
+- ✅ Error response format standards
+- ✅ Related endpoints already in the codebase
+
+Your copilot builds it right the first time — no reminders needed.
 
 ---
 
@@ -82,14 +154,50 @@ Use `/mcp` in Claude Code to verify the server is connected.
 
 ---
 
+> 💡 **If Kahuna saves you from repeating yourself, consider [giving it a ⭐](https://github.com/Aurite-ai/kahuna/stargazers).** It helps others discover the project.
+
+---
+
+## Contents
+
+- [The Problem](#the-problem)
+- [The Solution](#the-solution)
+- [Quickstart](#quickstart-claude-code)
+- [What It Looks Like](#what-it-looks-like)
+- [How It Works](#how-it-works)
+- [How It Compares](#how-it-compares)
+- [Features](#features)
+- [Available Tools](#available-tools)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## How It Compares
+
+| Feature | Kahuna | Copilot Memory | RAG Tools | Manual Context |
+|---|---|---|---|---|
+| Persists across sessions | ✅ | Partial | ✅ | ❌ |
+| Learns from files & conversations | ✅ | ❌ | Files only | N/A |
+| Proactive context surfacing | ✅ | ❌ | Query-based | ❌ |
+| Auto-classifies knowledge | ✅ | ❌ | ❌ | Manual |
+| Works across projects | ✅ | ❌ | Varies | ❌ |
+| Zero-config for copilot | ✅ | ✅ | ❌ | ❌ |
+| Data stays local | ✅ | ❌ | Varies | ✅ |
+
+Kahuna is not a replacement for built-in copilot memory — it's what copilot memory should have been.
+
+---
+
 ## Features
 
-- 🧠 **Knowledge Base** - Store, categorize, and retrieve context from markdown files
-- 🎯 **Smart Context Surfacing** - Automatically surface relevant knowledge for your task
-- 🔗 **Integration Management** - Discover, verify, and use external service integrations
-- 🔐 **Secure Credential Vault** - Store and manage secrets with multiple provider support
-- 📊 **Usage Tracking** - Monitor token consumption and costs per project
-- 🚀 **Onboarding System** - Guided setup for organization and project context
+- 🧠 **Knowledge Base** — Store, categorize, and retrieve context from markdown files
+- 🎯 **Smart Context Surfacing** — Automatically surface relevant knowledge for your task
+- 🔗 **Integration Management** — Discover, verify, and use external service integrations
+- 🔐 **Secure Credential Vault** — Store and manage secrets with multiple provider support
+- 📊 **Usage Tracking** — Monitor token consumption and costs per project
+- 🚀 **Onboarding System** — Guided setup for organization and project context
 
 ## Available Tools
 
@@ -109,14 +217,38 @@ Use `/mcp` in Claude Code to verify the server is connected.
 
 ---
 
-## Development Setup
+## Documentation
 
-### Prerequisites
+**For Users:**
+- [MCP Server Documentation](apps/mcp/README.md) — Installation, tools, configuration
+- [Advanced Documentation](apps/mcp/docs/ADVANCED.md) — Integrations, vault, KB structure
+
+**For Contributors:**
+- [Product Design](docs/design/README.md) — Core concepts, tool specifications
+- [Architecture: Repository Infrastructure](docs/architecture/01-repository-infrastructure.md)
+- [Architecture: Context Management System](docs/architecture/02-context-management-system.md)
+
+---
+
+## Contributing
+
+We welcome contributions of all kinds!
+
+- 🐛 **Found a bug?** [Open an issue](https://github.com/Aurite-ai/kahuna/issues)
+- 💡 **Have an idea?** [Open a feature request](https://github.com/Aurite-ai/kahuna/issues/new)
+- 🔧 **Want to contribute code?** [Open a PR](https://github.com/Aurite-ai/kahuna/pulls)
+
+<details>
+<summary>🛠️ Developer Setup</summary>
+
+<br>
+
+**Prerequisites**
 
 - Node.js 18+
 - pnpm 9+
 
-### Developer Quick Start
+**Quick Start**
 
 ```bash
 # Install dependencies
@@ -132,7 +264,7 @@ pnpm build
 pnpm test
 ```
 
-## Scripts
+**Scripts**
 
 | Command          | Description                        |
 | ---------------- | ---------------------------------- |
@@ -144,7 +276,7 @@ pnpm test
 | `pnpm typecheck` | Type-check all packages            |
 | `pnpm clean`     | Remove build artifacts and caches  |
 
-### Testing CLI
+**Testing CLI**
 
 | Command              | Description                                |
 | -------------------- | ------------------------------------------ |
@@ -153,7 +285,7 @@ pnpm test
 | `pnpm test:list`     | List available scenarios and test projects |
 | `pnpm test:collect`  | Collect results from a test session        |
 
-## Project Structure
+**Project Structure**
 
 ```
 kahuna/
@@ -171,6 +303,10 @@ kahuna/
 │   └── vck-templates/      # Copilot configuration templates
 └── docs/                   # Documentation
 ```
+
+</details>
+
+---
 
 ## License
 
