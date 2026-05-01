@@ -114,19 +114,21 @@ pnpm --filter @aurite-ai/kahuna bundle
 
 ## What It Looks Like
 
-You teach Kahuna your company's API design guidelines:
+You teach Kahuna your company's context:
 
 > "learn ~/docs/api-guidelines.pdf"
+>
+> "learn the docs/ folder"
 
 Later, you start a task:
 
-> "build a REST endpoint for user profiles"
+> "build a customer support agent"
 
 Kahuna automatically surfaces the relevant context to your copilot:
 
-- ✅ Your API naming conventions
-- ✅ Authentication patterns your team uses
-- ✅ Error response format standards
+- ✅ Your API conventions and auth patterns
+- ✅ Customer data models and access policies
+- ✅ Error handling and response format standards
 - ✅ Related endpoints already in the codebase
 
 Your copilot builds it right the first time — no reminders needed.
